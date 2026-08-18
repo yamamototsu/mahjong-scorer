@@ -15748,6 +15748,8 @@ input, select { padding: 10px 14px; }
     const PGAP = "3cqmin";
     const diceSum = diceVals[0] + diceVals[1];
     const wallTargetIdx = diceSettled || wallBlink ? (dealerIdx + (diceSum - 1)) % PC : -1;
+    const slotOf = i => (i - seatRot + PC) % PC;
+    const rotOf = i => (PC === 3 ? [0, -90, 90] : [0, -90, 180, 90])[slotOf(i)] ?? 0;
     const nameFont = (name, base) => {
       const n = (name || "").length;
       const scale = n <= 4 ? 1 : n <= 6 ? 0.88 : n <= 8 ? 0.76 : n <= 11 ? 0.66 : 0.58;
@@ -16582,9 +16584,8 @@ input, select { padding: 10px 14px; }
         whiteSpace: "nowrap"
       }
     }, "ツモ"))), React.createElement("div", null, !tmWinStep && !tmDrawMode && (diceRolling || diceSettled) && (() => {
-      const ROT = PC === 3 ? [0, -90, 90] : [0, -90, 180, 90];
       const faceIdx = diceSettled && wallTargetIdx >= 0 ? wallTargetIdx : dealerIdx;
-      const rot = ROT[(faceIdx - seatRot + PC) % PC] ?? 0;
+      const rot = rotOf(faceIdx);
       return React.createElement("div", {
         style: {
           position: "relative",
@@ -16619,7 +16620,7 @@ input, select { padding: 10px 14px; }
         size: 26,
         rolling: diceRolling,
         spin: diceSpin + 1
-      })), diceSettled && React.createElement("div", {
+      })), diceSettled && React.createElement(React.Fragment, null, React.createElement("div", {
         style: {
           fontSize: 26,
           fontWeight: 900,
@@ -16634,10 +16635,18 @@ input, select { padding: 10px 14px; }
           opacity: 0.85,
           marginRight: 4
         }
-      }, "合計"), diceVals[0] + diceVals[1])));
+      }, "合計"), diceVals[0] + diceVals[1]), wallTargetIdx >= 0 && React.createElement("div", {
+        style: {
+          fontSize: 11,
+          fontWeight: 800,
+          color: "#7dd3fc",
+          marginTop: 2,
+          whiteSpace: "nowrap"
+        }
+      }, SEAT_WINDS[(wallTargetIdx - dealerIdx + PC) % PC], " ", players[wallTargetIdx], " の山"))));
     })(), !tmWinStep && !tmDrawMode && !(diceRolling || diceSettled) && (() => {
       const rolled = diceRoundKey === `${roundWind}${dealerIdx}-${honba}-${rounds.length}`;
-      const rot = (PC === 3 ? [0, -90, 90] : [0, -90, 180, 90])[(dealerIdx - seatRot + PC) % PC] ?? 0;
+      const rot = rotOf(dealerIdx);
       return React.createElement("button", {
         onClick: rollDice,
         "aria-label": "サイコロを振る",
@@ -16672,8 +16681,7 @@ input, select { padding: 10px 14px; }
         spin: diceSpin + 1
       })));
     })()), !tmWinStep && !tmDrawMode && !(diceRolling || diceSettled) && (() => {
-      const ROT = PC === 3 ? [0, -90, 90] : [0, -90, 180, 90];
-      const rot = ROT[(dealerIdx - seatRot + PC) % PC] ?? 0;
+      const rot = rotOf(dealerIdx);
       const posBase = offsetY => ({
         position: "absolute",
         top: "50%",
