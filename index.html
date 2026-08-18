@@ -15449,81 +15449,79 @@ input, select { padding: 10px 14px; }
   }, "試合形式を選んでください"))), setupStep === 4 && React.createElement("div", null, React.createElement("div", {
     style: card
   }, React.createElement("div", {
-    style: question
+    style: {
+      ...question,
+      marginBottom: 10
+    }
   }, "対局設定の確認"), React.createElement("div", {
     style: {
       fontSize: 13,
-      lineHeight: 2
+      lineHeight: 1.7
     }
   }, React.createElement("div", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
+      justifyContent: "center",
+      flexWrap: "wrap",
+      gap: 8,
+      fontSize: 13,
+      fontWeight: 700,
+      color: t.tx,
       borderBottom: `1px solid ${t.bd}33`,
-      padding: "6px 0"
+      paddingBottom: 8,
+      marginBottom: 4
     }
-  }, React.createElement("span", {
+  }, React.createElement("span", null, gameDate), React.createElement("span", {
     style: {
       color: t.dm
     }
-  }, "対局日"), React.createElement("span", {
+  }, "|"), React.createElement("span", {
     style: {
-      fontWeight: 600
+      color: t.gd
     }
-  }, gameDate)), React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      borderBottom: `1px solid ${t.bd}33`,
-      padding: "6px 0"
-    }
-  }, React.createElement("span", {
+  }, MATCH_LABEL(matchType)), React.createElement("span", {
     style: {
       color: t.dm
     }
-  }, "形式"), React.createElement("span", {
-    style: {
-      fontWeight: 600
-    }
-  }, MATCH_LABEL(matchType))), React.createElement("div", {
-    style: {
-      borderBottom: `1px solid ${t.bd}33`,
-      padding: "6px 0 10px"
-    }
-  }, React.createElement("span", {
+  }, "|"), React.createElement("span", null, PC === 3 ? "三人麻雀" : "四人麻雀"), React.createElement("span", {
     style: {
       color: t.dm
     }
-  }, "プレイヤー"), (() => {
+  }, "|"), React.createElement("span", null, (rules.startPoints ?? 25000).toLocaleString(), " / ", (rules.returnPoints ?? 30000).toLocaleString())), React.createElement("div", {
+    style: {
+      borderBottom: `1px solid ${t.bd}33`,
+      padding: "2px 0 8px"
+    }
+  }, (() => {
     const seatBox = i => React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 3,
-        padding: "9px 6px",
-        borderRadius: 10,
+        gap: 2,
+        padding: "6px 6px",
+        borderRadius: 9,
         minWidth: 0,
-        background: i === 0 ? t.gdS : "rgba(255,255,255,0.05)",
-        border: `1px solid ${i === 0 ? t.gd : "rgba(255,255,255,0.18)"}`
+        background: i === 0 ? "rgba(234,179,8,0.2)" : "rgba(0,0,0,0.45)",
+        border: `1px solid ${i === 0 ? t.gd : "rgba(255,255,255,0.25)"}`
       }
     }, React.createElement("span", {
       style: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: 900,
         lineHeight: 1,
-        color: i === 0 ? "#1a1a1a" : t.tx,
-        background: i === 0 ? t.gd : t.sf,
-        border: `1px solid ${i === 0 ? t.gd : t.bd}`,
+        color: i === 0 ? "#1a1a1a" : "#fff",
+        background: i === 0 ? t.gd : "rgba(0,0,0,0.5)",
+        border: `1px solid ${i === 0 ? t.gd : "rgba(255,255,255,0.3)"}`,
         borderRadius: 5,
-        padding: "3px 8px"
+        padding: "2px 7px"
       }
     }, WINDS[i]), React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 700,
-        color: t.tx,
-        maxWidth: 92,
+        color: "#fff",
+        maxWidth: 78,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
@@ -15531,15 +15529,16 @@ input, select { padding: 10px 14px; }
     }, players[i]));
     return React.createElement("div", {
       style: {
-        marginTop: 10,
-        maxWidth: 300,
+        marginTop: 4,
+        maxWidth: 250,
         marginLeft: "auto",
         marginRight: "auto",
         aspectRatio: "1 / 1",
-        borderRadius: 16,
+        borderRadius: 14,
         position: "relative",
-        background: "linear-gradient(160deg, #16452f, #103526)",
-        border: "2px solid #24583f"
+        backgroundImage: `url(${TABLE_IMG})`,
+        backgroundSize: "100% 100%",
+        backgroundColor: "#103526"
       }
     }, React.createElement("div", {
       style: {
@@ -15589,49 +15588,29 @@ input, select { padding: 10px 14px; }
     }, players[0]), " が親"));
   })(), React.createElement("div", {
     style: {
-      fontSize: 11,
+      fontSize: 10,
       color: t.dm,
       textAlign: "center",
-      marginTop: 8,
-      lineHeight: 1.7
+      marginTop: 5
     }
   }, "手前が東（起家）。この向きで座ります")), React.createElement("div", {
     style: {
-      display: "flex",
-      justifyContent: "space-between",
-      borderBottom: `1px solid ${t.bd}33`,
-      padding: "6px 0"
+      padding: "6px 0 0"
     }
-  }, React.createElement("span", {
-    style: {
-      color: t.dm
-    }
-  }, "持ち点 / 返し"), React.createElement("span", {
-    style: {
-      fontWeight: 600
-    }
-  }, rules.startPoints.toLocaleString(), " / ", rules.returnPoints.toLocaleString())), React.createElement("div", {
-    style: {
-      padding: "6px 0"
-    }
-  }, React.createElement("span", {
-    style: {
-      color: t.dm
-    }
-  }, "ルール"), React.createElement("div", {
+  }, React.createElement("div", {
     style: {
       display: "flex",
-      gap: 6,
-      marginTop: 4,
-      flexWrap: "wrap"
+      gap: 5,
+      flexWrap: "wrap",
+      justifyContent: "center"
     }
   }, (() => {
     const chip = label => React.createElement("span", {
       key: label,
       style: {
-        padding: "3px 10px",
+        padding: "3px 8px",
         borderRadius: 6,
-        fontSize: 12,
+        fontSize: 11,
         background: t.sf,
         border: `1px solid ${t.bd}`
       }
