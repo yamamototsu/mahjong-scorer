@@ -16175,20 +16175,35 @@ input, select { padding: 10px 14px; }
       }
     }, "キャンセル")) : tmWinStep ? React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 700,
         color: t.ac,
         textAlign: "center",
-        marginBottom: 2
+        marginBottom: 6,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        flexWrap: "wrap"
       }
-    }, tmWinStep === "winner" ? multiRonMax > 1 ? "① あがった人をタップ（複数可）" : "① あがった人をタップ" : ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ or ホウジュウした人をタップ"), React.createElement("div", {
+    }, tmWinStep === "winner" ? React.createElement(React.Fragment, null, React.createElement("span", null, "① あがった人をタップ"), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 800,
+        color: t.dm,
+        padding: "2px 8px",
+        borderRadius: 6,
+        border: `1px solid ${t.bd}`,
+        background: t.sf
+      }
+    }, multiRonMax >= 3 ? "トリプルロン" : multiRonMax === 2 ? "ダブロン" : "頭ハネ")) : React.createElement("span", null, ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ or ホウジュウした人をタップ")), tmWinStep === "how" && ronPick.length >= 2 && React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
         textAlign: "center",
         marginBottom: 6
       }
-    }, tmWinStep === "winner" ? multiRonMax >= 3 ? "トリプルロンあり — 3人まで選べます" : multiRonMax === 2 ? "ダブロンあり — 2人まで。3人目も選べますが警告が出ます" : "頭ハネ — 本来は1人だけ。複数選ぶと警告が出ます" : ronPick.length >= 2 ? `${ronPick.length}人でロン。放銃者に近い人から順に手を入力します` : ""), React.createElement("div", {
+    }, ronPick.length, "人でロン。放銃者に近い人から順に手を入力します"), React.createElement("div", {
       style: {
         display: "flex",
         gap: 8
