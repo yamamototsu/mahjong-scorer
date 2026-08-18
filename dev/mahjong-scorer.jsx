@@ -7232,10 +7232,17 @@ input, select { padding: 10px 14px; }
             <Back onClick={() => setSetupStep(1)} />
             <Dots total={activeLeagueId ? 3 : 5} cur={activeLeagueId ? 1 : 3} />
             <div style={question}>親決め</div>
-            <div style={{ fontSize: 13, color: t.tx, textAlign: "center", marginBottom: 4, fontWeight: 700 }}>
-              仮親の <span style={{ color: t.gd }}>{players[0]}</span> さんはサイコロを振ってください
+            <div style={{
+              padding: "14px 12px", borderRadius: 14, marginBottom: 12, textAlign: "center",
+              background: t.gdS, border: `2px solid ${t.gd}66`,
+            }}>
+              <div style={{ fontSize: 12, color: t.dm, fontWeight: 700, letterSpacing: "0.08em" }}>仮親</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px" }}>
+                {players[0]} さん
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>サイコロを振ってください</div>
             </div>
-            <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginBottom: 14, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginBottom: 12, lineHeight: 1.7 }}>
               仮親から反時計回りに数えて、出た目の席の人が起家（最初の親）になります
             </div>
 
