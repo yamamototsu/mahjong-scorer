@@ -99,6 +99,7 @@ function getLimitName(han) {
   return null;
 }
 const WINDS = ["東", "南", "西", "北"];
+const TABLE_IMG = "assets/table.jpg";
 const SEATS_OF = pc => pc === 3 ? ["東", "南", "西"] : WINDS;
 const SANMA_DEFAULT_RULES = {
   startPoints: 40000,
@@ -10011,10 +10012,12 @@ input, select { padding: 10px 14px; }
         position: "relative",
         width: "min(94vw, 94vh, 560px)",
         aspectRatio: "1 / 1",
-        borderRadius: 20,
-        background: "linear-gradient(160deg, #1f5c3d, #14402b)",
-        border: `2px solid ${t.bd}`,
-        overflow: "hidden"
+        borderRadius: 18,
+        backgroundImage: `url(${TABLE_IMG})`,
+        backgroundSize: "100% 100%",
+        backgroundColor: "#14402b",
+        overflow: "hidden",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
       }
     }, React.createElement("svg", {
       viewBox: "0 0 100 100",
@@ -16254,10 +16257,12 @@ input, select { padding: 10px 14px; }
         flex: "0 1 auto",
         margin: "auto",
         containerType: "size",
-        background: "linear-gradient(160deg, #16452f, #103526)",
-        borderRadius: 24,
-        border: "3px solid #24583f",
-        overflow: "hidden"
+        backgroundImage: `url(${TABLE_IMG})`,
+        backgroundSize: "100% 100%",
+        backgroundColor: "#103526",
+        borderRadius: 18,
+        overflow: "hidden",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
       }
     }, PC === 3 ? React.createElement(React.Fragment, null, vSlot((1 + seatRot) % 3, "right", -90), vSlot((2 + seatRot) % 3, "left", 90), hSlot((0 + seatRot) % 3, {
       bottom: PGAP,
