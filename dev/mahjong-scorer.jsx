@@ -7898,6 +7898,9 @@ input, select { padding: 10px 14px; }
     const diceSum = diceVals[0] + diceVals[1];
     // 点滅は振ってから10秒間続ける（サイコロの表示時間とは別）
     const wallTargetIdx = (diceSettled || wallBlink) ? (dealerIdx + (diceSum - 1)) % PC : -1;
+    // 画面上の席位置（0=手前 1=右 2=向かい 3=左）と、その席を正面にする回転角
+    const slotOf = (i) => (i - seatRot + PC) % PC;
+    const rotOf = (i) => (PC === 3 ? [0, -90, 90] : [0, -90, 180, 90])[slotOf(i)] ?? 0;
 
     // 名前の長さに合わせて文字サイズを自動調整（長い名前でも枠に収める）
     const nameFont = (name, base) => {
@@ -8352,10 +8355,9 @@ input, select { padding: 10px 14px; }
             {/* サイコロエリア */}
             <div>
               {!tmWinStep && !tmDrawMode && (diceRolling || diceSettled) && (() => {
-                const ROT = PC === 3 ? [0, -90, 90] : [0, -90, 180, 90]; // 手前/右/(向かい)/左
                 // 出目が決まったら「山を割る人」の方を向く（振っている間は親の向き）
                 const faceIdx = (diceSettled && wallTargetIdx >= 0) ? wallTargetIdx : dealerIdx;
-                const rot = ROT[(faceIdx - seatRot + PC) % PC] ?? 0;
+                const rot = rotOf(faceIdx);
                 return (
                   <div style={{ position: "relative", width: 72, height: 62, margin: "0 auto" }}>
                     <div style={{
@@ -8369,13 +8371,20 @@ input, select { padding: 10px 14px; }
                         <Die value={diceVals[1]} size={26} rolling={diceRolling} spin={diceSpin + 1} />
                       </div>
                       {diceSettled && (
-                        <div style={{
-                          fontSize: 26, fontWeight: 900, color: "#fff", lineHeight: 1.15,
-                          textShadow: "0 2px 8px rgba(0,0,0,0.6)",
-                        }}>
-                          <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.85, marginRight: 4 }}>合計</span>
-                          {diceVals[0] + diceVals[1]}
-                        </div>
+                        <>
+                          <div style={{
+                            fontSize: 26, fontWeight: 900, color: "#fff", lineHeight: 1.15,
+                            textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+                          }}>
+                            <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.85, marginRight: 4 }}>合計</span>
+                            {diceVals[0] + diceVals[1]}
+                          </div>
+                          {wallTargetIdx >= 0 && (
+                            <div style={{ fontSize: 11, fontWeight: 800, color: "#7dd3fc", marginTop: 2, whiteSpace: "nowrap" }}>
+                              {SEAT_WINDS[(wallTargetIdx - dealerIdx + PC) % PC]} {players[wallTargetIdx]} の山
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -8383,7 +8392,7 @@ input, select { padding: 10px 14px; }
               })()}
               {!tmWinStep && !tmDrawMode && !(diceRolling || diceSettled) && (() => {
                 const rolled = diceRoundKey === `${roundWind}${dealerIdx}-${honba}-${rounds.length}`;
-                const rot = (PC === 3 ? [0, -90, 90] : [0, -90, 180, 90])[(dealerIdx - seatRot + PC) % PC] ?? 0;
+                const rot = rotOf(dealerIdx);
                 return (
                   <button onClick={rollDice} aria-label="サイコロを振る" style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
@@ -8410,8 +8419,7 @@ input, select { padding: 10px 14px; }
 
             {/* 局表示: 親の方を向いて配置。サイコロを振っている間は合計だけ見せる */}
             {!tmWinStep && !tmDrawMode && !(diceRolling || diceSettled) && (() => {
-              const ROT = PC === 3 ? [0, -90, 90] : [0, -90, 180, 90]; // 手前/右/(向かい)/左
-              const rot = ROT[(dealerIdx - seatRot + PC) % PC] ?? 0;
+              const rot = rotOf(dealerIdx);
               const posBase = (offsetY) => ({
                 position: "absolute", top: "50%", left: "50%",
                 transform: `translate(-50%,-50%) rotate(${rot}deg) translateY(${offsetY}cqmin)`,
