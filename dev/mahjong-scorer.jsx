@@ -7839,14 +7839,6 @@ input, select { padding: 10px 14px; }
                       <div style={{ position: "absolute", right: "7%", top: "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox(1)}</div>
                       {/* 東（手前・起家） */}
                       <div style={{ position: "absolute", bottom: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox(0)}</div>
-                      <div style={{
-                        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                        fontSize: 10, color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 1.6,
-                        whiteSpace: "nowrap",
-                      }}>
-                        東1局<br />
-                        <span style={{ color: t.gd, fontWeight: 700 }}>{players[0]}</span> が親
-                      </div>
                     </div>
                   );
                 })()}
