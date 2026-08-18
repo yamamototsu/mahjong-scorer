@@ -7770,7 +7770,7 @@ input, select { padding: 10px 14px; }
                         borderRadius: 5, padding: "2px 7px",
                       }}>{WINDS[i]}</span>
                       <span style={{
-                        fontSize: 12, fontWeight: 700, color: "#fff", maxWidth: 78,
+                        fontSize: 12, fontWeight: 700, color: "#fff", maxWidth: "100%",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>{players[i]}</span>
                     </div>
@@ -7783,13 +7783,13 @@ input, select { padding: 10px 14px; }
                       backgroundColor: "#103526",
                     }}>
                       {/* 西（向かい） */}
-                      <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)" }}>{seatBox(2)}</div>
+                      <div style={{ position: "absolute", top: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox(2)}</div>
                       {/* 北（左） */}
-                      <div style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}>{seatBox(3)}</div>
+                      <div style={{ position: "absolute", left: "7%", top: "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox(3)}</div>
                       {/* 南（右） */}
-                      <div style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)" }}>{seatBox(1)}</div>
+                      <div style={{ position: "absolute", right: "7%", top: "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox(1)}</div>
                       {/* 東（手前・起家） */}
-                      <div style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)" }}>{seatBox(0)}</div>
+                      <div style={{ position: "absolute", bottom: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox(0)}</div>
                       <div style={{
                         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
                         fontSize: 10, color: "rgba(255,255,255,0.55)", textAlign: "center", lineHeight: 1.6,
