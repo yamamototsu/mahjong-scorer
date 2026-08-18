@@ -2274,6 +2274,10 @@ export default function MahjongScorer() {
 *, *::before, *::after { box-sizing: border-box; }
 button { padding: 8px 12px; }
 input, select { padding: 10px 14px; }
+@keyframes diceHop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-14%) scale(1.05); }
+}
 @keyframes splashIn {
   0% { opacity: 0; transform: translateY(14px) scale(0.96); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -4267,6 +4271,7 @@ input, select { padding: 10px 14px; }
   const [diceOpen, setDiceOpen] = useState(false);
   const [diceVals, setDiceVals] = useState([1, 1]);
   const [diceRolling, setDiceRolling] = useState(false);
+  const [diceSpin, setDiceSpin] = useState(0);   // 振った回数（3Dの回転量に使う）
   const [diceSettled, setDiceSettled] = useState(false);
   const [diceRoundKey, setDiceRoundKey] = useState(null); // サイコロを振った局（局が変わると案内を再表示）
   const diceClearTimer = React.useRef(null);
@@ -4358,6 +4363,7 @@ input, select { padding: 10px 14px; }
 
 
   const rollDice = () => {
+    setDiceSpin(v => v + 1);
     setDiceRoundKey(`${roundWind}${dealerIdx}-${honba}-${rounds.length}`);
     if (diceClearTimer.current) clearTimeout(diceClearTimer.current);
     setDiceRolling(true);
@@ -4382,45 +4388,69 @@ input, select { padding: 10px 14px; }
   };
 
   // サイコロの目（ピップ配置）
-  const Die = ({ value, size = 68, rolling }) => {
-    // 3x3グリッド上のピップ位置
+  // ── 3Dサイコロ（キューブが転がって出目で止まる） ──
+  // 面の配置: 前=1 / 後=6 / 上=2 / 下=5 / 右=3 / 左=4（対面の和が7）
+  const DIE_FACE_ROT = {
+    1: { x: 0, y: 0 }, 6: { x: 0, y: 180 },
+    2: { x: -90, y: 0 }, 5: { x: 90, y: 0 },
+    3: { x: 0, y: -90 }, 4: { x: 0, y: 90 },
+  };
+  const Die = ({ value, size = 68, rolling, spin = 0 }) => {
     const LAYOUT = {
-      1: [4],
-      2: [0, 8],
-      3: [0, 4, 8],
-      4: [0, 2, 6, 8],
-      5: [0, 2, 4, 6, 8],
-      6: [0, 2, 3, 5, 6, 8],
+      1: [4], 2: [0, 8], 3: [0, 4, 8],
+      4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
     };
-    const pips = LAYOUT[value] || [4];
-    const dot = size * 0.16;
+    const h = size / 2;
+    const dot = size * 0.15;
+    const faces = [
+      { n: 1, tf: `translateZ(${h}px)` },
+      { n: 6, tf: `rotateY(180deg) translateZ(${h}px)` },
+      { n: 2, tf: `rotateX(90deg) translateZ(${h}px)` },
+      { n: 5, tf: `rotateX(-90deg) translateZ(${h}px)` },
+      { n: 3, tf: `rotateY(90deg) translateZ(${h}px)` },
+      { n: 4, tf: `rotateY(-90deg) translateZ(${h}px)` },
+    ];
+    const fin = DIE_FACE_ROT[value] || DIE_FACE_ROT[1];
+    // 振るたびに回転量を増やして、出目の向きでピタッと止める
+    const turns = 360 * (3 + (spin % 3));
+    const rot = `rotateX(${fin.x + turns}deg) rotateY(${fin.y + turns}deg) rotateZ(${(spin % 2) * 180}deg)`;
+    const faceStyle = (n) => ({
+      position: "absolute", inset: 0, borderRadius: size * 0.16,
+      background: "linear-gradient(150deg, #ffffff 0%, #f2efe7 55%, #ddd8cc 100%)",
+      border: "1px solid #cbc6ba",
+      boxShadow: "inset 0 0 " + (size * 0.18) + "px rgba(0,0,0,0.14)",
+      display: "grid", gridTemplateColumns: "repeat(3,1fr)", gridTemplateRows: "repeat(3,1fr)",
+      padding: size * 0.13, boxSizing: "border-box",
+      backfaceVisibility: "hidden",
+    });
     return (
       <div style={{
-        width: size, height: size, borderRadius: size * 0.18,
-        background: "linear-gradient(150deg, #ffffff, #e8e4dc)",
-        border: "1px solid #c9c4b8",
-        boxShadow: rolling
-          ? "0 6px 16px rgba(0,0,0,0.5)"
-          : "0 3px 8px rgba(0,0,0,0.45), inset 0 -2px 4px rgba(0,0,0,0.08)",
-        display: "grid",
-        gridTemplateColumns: "repeat(3,1fr)",
-        gridTemplateRows: "repeat(3,1fr)",
-        padding: size * 0.13,
-        boxSizing: "border-box",
-        transform: rolling ? "rotate(12deg) scale(1.06)" : "rotate(0deg) scale(1)",
-        transition: rolling ? "none" : "transform 0.25s cubic-bezier(.2,1.4,.4,1)",
+        width: size, height: size, perspective: size * 5,
+        animation: rolling ? "diceHop 0.5s ease-in-out infinite" : "none",
+        filter: `drop-shadow(0 ${size * 0.09}px ${size * 0.14}px rgba(0,0,0,0.55))`,
       }}>
-        {[...Array(9)].map((_, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {pips.includes(i) && (
-              <div style={{
-                width: dot, height: dot, borderRadius: "50%",
-                background: (value === 1 || value === 4) ? "#c0392b" : "#22262c",
-                boxShadow: "inset 0 1px 2px rgba(0,0,0,0.35)",
-              }} />
-            )}
-          </div>
-        ))}
+        <div style={{
+          width: "100%", height: "100%", position: "relative",
+          transformStyle: "preserve-3d",
+          transform: rot,
+          transition: rolling ? "transform 0.28s linear" : "transform 1.15s cubic-bezier(.16,.9,.28,1)",
+        }}>
+          {faces.map(f => (
+            <div key={f.n} style={{ ...faceStyle(f.n), transform: f.tf }}>
+              {[...Array(9)].map((_, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {(LAYOUT[f.n] || []).includes(i) && (
+                    <div style={{
+                      width: dot, height: dot, borderRadius: "50%",
+                      background: (f.n === 1 || f.n === 4) ? "#c0392b" : "#22262c",
+                      boxShadow: "inset 0 1px 1px rgba(255,255,255,0.5), 0 1px 1px rgba(0,0,0,0.25)",
+                    }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     );
   };
@@ -4448,8 +4478,8 @@ input, select { padding: 10px 14px; }
 
             {/* サイコロ */}
             <div style={{ display: "flex", gap: 16, justifyContent: "center", marginBottom: 20, minHeight: 76 }}>
-              <Die value={diceVals[0]} rolling={diceRolling} />
-              <Die value={diceVals[1]} rolling={diceRolling} />
+              <Die value={diceVals[0]} rolling={diceRolling} spin={diceSpin} />
+              <Die value={diceVals[1]} rolling={diceRolling} spin={diceSpin + 1} />
             </div>
 
             {/* 合計 */}
@@ -7210,23 +7240,18 @@ input, select { padding: 10px 14px; }
           setOyaDice(null);
           try { if (navigator.vibrate) navigator.vibrate(20); } catch {}
           let n = 0;
+          const base = (oyaDice?.spin || 0) + 1;
           const spin = setInterval(() => {
-            setOyaDice({ d1: 1 + Math.floor(Math.random() * 6), d2: 1 + Math.floor(Math.random() * 6), sum: 0 });
-            if (++n > 12) {
+            setOyaDice({ d1: 1 + Math.floor(Math.random() * 6), d2: 1 + Math.floor(Math.random() * 6), sum: 0, spin: base + n });
+            if (++n > 8) {
               clearInterval(spin);
               const a = 1 + Math.floor(Math.random() * 6), b = 1 + Math.floor(Math.random() * 6);
-              setOyaDice({ d1: a, d2: b, sum: a + b });
+              setOyaDice({ d1: a, d2: b, sum: a + b, spin: base + n });
               setOyaRolling(false);
             }
-          }, 70);
+          }, 90);
         };
-        const pip = (v) => (
-          <div style={{
-            width: 58, height: 58, borderRadius: 10, background: "#fdfdf7",
-            color: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 30, fontWeight: 900, boxShadow: "0 3px 10px rgba(0,0,0,0.45)",
-          }}>{v || "?"}</div>
-        );
+        const oyaSpin = oyaDice?.spin || 0;
         return (
           <div style={card}>
             <Back onClick={() => setSetupStep(1)} />
@@ -7251,8 +7276,9 @@ input, select { padding: 10px 14px; }
               border: `2px solid ${t.gd}55`, background: "linear-gradient(160deg, #1f5c3d, #14402b)",
               marginBottom: 12,
             }}>
-              <div style={{ display: "flex", gap: 14, justifyContent: "center" }}>
-                {pip(oyaDice?.d1)}{pip(oyaDice?.d2)}
+              <div style={{ display: "flex", gap: 22, justifyContent: "center", padding: "6px 0 2px" }}>
+                <Die value={oyaDice?.d1 || 1} size={62} rolling={oyaRolling} spin={oyaSpin} />
+                <Die value={oyaDice?.d2 || 1} size={62} rolling={oyaRolling} spin={oyaSpin + 1} />
               </div>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontWeight: 700, marginTop: 12 }}>
                 {oyaRolling ? "振っています…" : oyaDice?.sum ? "もう一度振る" : "タップしてサイコロを振る"}
@@ -8317,8 +8343,8 @@ input, select { padding: 10px 14px; }
                       textAlign: "center", whiteSpace: "nowrap",
                     }}>
                       <div style={{ display: "flex", gap: 7, justifyContent: "center", marginBottom: 5 }}>
-                        <Die value={diceVals[0]} size={23} rolling={diceRolling} />
-                        <Die value={diceVals[1]} size={23} rolling={diceRolling} />
+                        <Die value={diceVals[0]} size={26} rolling={diceRolling} spin={diceSpin} />
+                        <Die value={diceVals[1]} size={26} rolling={diceRolling} spin={diceSpin + 1} />
                       </div>
                       {diceSettled && (
                         <div style={{ fontSize: 14, fontWeight: 900, color: "#fff" }}>
@@ -8336,8 +8362,8 @@ input, select { padding: 10px 14px; }
                   transform: `rotate(${(PC === 3 ? [0, -90, 90] : [0, -90, 180, 90])[(dealerIdx - seatRot + PC) % PC] ?? 0}deg)`,
                   transition: "transform 0.4s cubic-bezier(.3,1.2,.4,1)",
                 }}>
-                  <Die value={diceVals[0]} size={24} />
-                  <Die value={diceVals[1]} size={24} />
+                  <Die value={diceVals[0]} size={26} spin={diceSpin} />
+                  <Die value={diceVals[1]} size={26} spin={diceSpin + 1} />
                 </button>
               )}
             </div>
