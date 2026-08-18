@@ -7729,47 +7729,51 @@ input, select { padding: 10px 14px; }
       {setupStep === 4 && (
         <div>
           <div style={card}>
-            <div style={question}>対局設定の確認</div>
+            <div style={{ ...question, marginBottom: 10 }}>対局設定の確認</div>
 
-            <div style={{ fontSize: 13, lineHeight: 2 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${t.bd}33`, padding: "6px 0" }}>
-                <span style={{ color: t.dm }}>対局日</span>
-                <span style={{ fontWeight: 600 }}>{gameDate}</span>
+            <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+              <div style={{
+                display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 8,
+                fontSize: 13, fontWeight: 700, color: t.tx,
+                borderBottom: `1px solid ${t.bd}33`, paddingBottom: 8, marginBottom: 4,
+              }}>
+                <span>{gameDate}</span>
+                <span style={{ color: t.dm }}>|</span>
+                <span style={{ color: t.gd }}>{MATCH_LABEL(matchType)}</span>
+                <span style={{ color: t.dm }}>|</span>
+                <span>{PC === 3 ? "三人麻雀" : "四人麻雀"}</span>
+                <span style={{ color: t.dm }}>|</span>
+                <span>{(rules.startPoints ?? 25000).toLocaleString()} / {(rules.returnPoints ?? 30000).toLocaleString()}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${t.bd}33`, padding: "6px 0" }}>
-                <span style={{ color: t.dm }}>形式</span>
-                <span style={{ fontWeight: 600 }}>{MATCH_LABEL(matchType)}</span>
-              </div>
-              <div style={{ borderBottom: `1px solid ${t.bd}33`, padding: "6px 0 10px" }}>
-                <span style={{ color: t.dm }}>プレイヤー</span>
+              <div style={{ borderBottom: `1px solid ${t.bd}33`, padding: "2px 0 8px" }}>
                 {/* 卓の並びで表示（手前が起家。実際に座る位置と同じ配置） */}
                 {(() => {
                   const seatBox = (i) => (
                     <div style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                      padding: "9px 6px", borderRadius: 10, minWidth: 0,
-                      background: i === 0 ? t.gdS : "rgba(255,255,255,0.05)",
-                      border: `1px solid ${i === 0 ? t.gd : "rgba(255,255,255,0.18)"}`,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                      padding: "6px 6px", borderRadius: 9, minWidth: 0,
+                      background: i === 0 ? "rgba(234,179,8,0.2)" : "rgba(0,0,0,0.45)",
+                      border: `1px solid ${i === 0 ? t.gd : "rgba(255,255,255,0.25)"}`,
                     }}>
                       <span style={{
-                        fontSize: 15, fontWeight: 900, lineHeight: 1,
-                        color: i === 0 ? "#1a1a1a" : t.tx,
-                        background: i === 0 ? t.gd : t.sf,
-                        border: `1px solid ${i === 0 ? t.gd : t.bd}`,
-                        borderRadius: 5, padding: "3px 8px",
+                        fontSize: 13, fontWeight: 900, lineHeight: 1,
+                        color: i === 0 ? "#1a1a1a" : "#fff",
+                        background: i === 0 ? t.gd : "rgba(0,0,0,0.5)",
+                        border: `1px solid ${i === 0 ? t.gd : "rgba(255,255,255,0.3)"}`,
+                        borderRadius: 5, padding: "2px 7px",
                       }}>{WINDS[i]}</span>
                       <span style={{
-                        fontSize: 13, fontWeight: 700, color: t.tx, maxWidth: 92,
+                        fontSize: 12, fontWeight: 700, color: "#fff", maxWidth: 78,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>{players[i]}</span>
                     </div>
                   );
                   return (
                     <div style={{
-                      marginTop: 10, maxWidth: 300, marginLeft: "auto", marginRight: "auto",
-                      aspectRatio: "1 / 1", borderRadius: 16, position: "relative",
-                      background: "linear-gradient(160deg, #16452f, #103526)",
-                      border: "2px solid #24583f",
+                      marginTop: 4, maxWidth: 250, marginLeft: "auto", marginRight: "auto",
+                      aspectRatio: "1 / 1", borderRadius: 14, position: "relative",
+                      backgroundImage: `url(${TABLE_IMG})`, backgroundSize: "100% 100%",
+                      backgroundColor: "#103526",
                     }}>
                       {/* 西（向かい） */}
                       <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)" }}>{seatBox(2)}</div>
@@ -7790,20 +7794,15 @@ input, select { padding: 10px 14px; }
                     </div>
                   );
                 })()}
-                <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8, lineHeight: 1.7 }}>
+                <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 5 }}>
                   手前が東（起家）。この向きで座ります
                 </div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${t.bd}33`, padding: "6px 0" }}>
-                <span style={{ color: t.dm }}>持ち点 / 返し</span>
-                <span style={{ fontWeight: 600 }}>{rules.startPoints.toLocaleString()} / {rules.returnPoints.toLocaleString()}</span>
-              </div>
-              <div style={{ padding: "6px 0" }}>
-                <span style={{ color: t.dm }}>ルール</span>
-                <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+              <div style={{ padding: "6px 0 0" }}>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap", justifyContent: "center" }}>
                   {(() => {
                     const chip = (label) => (
-                      <span key={label} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 12, background: t.sf, border: `1px solid ${t.bd}` }}>{label}</span>
+                      <span key={label} style={{ padding: "3px 8px", borderRadius: 6, fontSize: 11, background: t.sf, border: `1px solid ${t.bd}` }}>{label}</span>
                     );
                     const renchan = rules.agariRenchan ? "あがり連荘" : rules.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘";
                     return [
