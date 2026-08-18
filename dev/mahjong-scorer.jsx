@@ -47,6 +47,7 @@ function getLimitName(han) {
 }
 
 const WINDS = ["東", "南", "西", "北"];
+const TABLE_IMG = "assets/table.jpg";   // 麻雀卓の画像
 // 人数に応じた席風（三麻は北家なし）
 const SEATS_OF = (pc) => pc === 3 ? ["東", "南", "西"] : WINDS;
 // 三人麻雀（連盟ルール）の既定値
@@ -4912,8 +4913,9 @@ input, select { padding: 10px 14px; }
       }}>
         <div onClick={(e) => e.stopPropagation()} style={{
           position: "relative", width: "min(94vw, 94vh, 560px)", aspectRatio: "1 / 1",
-          borderRadius: 20, background: "linear-gradient(160deg, #1f5c3d, #14402b)",
-          border: `2px solid ${t.bd}`, overflow: "hidden",
+          borderRadius: 18, backgroundImage: `url(${TABLE_IMG})`,
+          backgroundSize: "100% 100%", backgroundColor: "#14402b",
+          overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
         }}>
           {/* 矢印 */}
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
@@ -8171,8 +8173,10 @@ input, select { padding: 10px 14px; }
           width: "100%", height: "auto", maxWidth: "100%", maxHeight: "100%",
           flex: "0 1 auto", margin: "auto",
           containerType: "size",
-          background: "linear-gradient(160deg, #16452f, #103526)",
-          borderRadius: 24, border: "3px solid #24583f", overflow: "hidden",
+          backgroundImage: `url(${TABLE_IMG})`,
+          backgroundSize: "100% 100%", backgroundColor: "#103526",
+          borderRadius: 18, overflow: "hidden",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
         }}>
           {PC === 3 ? (
             <>
