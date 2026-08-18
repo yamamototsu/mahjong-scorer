@@ -471,6 +471,9 @@ export default function MahjongScorer() {
   // 設定画面の「ルールの初期値」は下書き → 確定ボタンで保存
   const [draftRules, setDraftRules] = useState(loadDefaultRules);
   const [rulesSaved, setRulesSaved] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);  // ルール詳細の展開
+  // 前回のルールが無い（初回）ときは最初から開いておく
+  React.useEffect(() => { if (!lastRules) setRulesOpen(true); }, [lastRules]);
   const rulesDirty = JSON.stringify(draftRules) !== JSON.stringify(defaultRules);
   const editDraft = (patch) => { setDraftRules(d => ({ ...d, ...patch })); setRulesSaved(false); };
   const commitDraftRules = () => {
@@ -7387,12 +7390,25 @@ input, select { padding: 10px 14px; }
                   background: same ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
                 }}>{same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"}</button>
                 <div style={{ fontSize: 10, color: t.dm, marginTop: 7, textAlign: "center" }}>
-                  変更したい場合は、下の項目をそのまま設定してください
+                  変更したい場合は、下の「ルールを変更する」から
                 </div>
               </div>
             );
           })()}
 
+          {/* ルールの詳細は折りたたみ（変更したいときだけ開く） */}
+          <button onClick={() => setRulesOpen(v => !v)} style={{
+            width: "100%", padding: "13px 10px", borderRadius: 11, cursor: "pointer",
+            border: `1px solid ${rulesOpen ? t.ac : t.bd}`,
+            background: rulesOpen ? t.acS : t.sf,
+            color: rulesOpen ? t.ac : t.tx, fontSize: 14, fontWeight: 800, marginBottom: 10,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          }}>
+            <span>{rulesOpen ? "ルールの詳細を閉じる" : "ルールを変更する"}</span>
+            <span style={{ fontSize: 12, transform: rulesOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
+          </button>
+
+          {rulesOpen && (<>
           <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>流局したときの親</div>
             <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>誰もアガらずに流局した場合、親を続けるかどうか</div>
@@ -7510,6 +7526,8 @@ input, select { padding: 10px 14px; }
           </div>
 
           <RuleHelp />
+          </>)}
+
 
           <div style={{ marginTop: 16 }}>
             <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
