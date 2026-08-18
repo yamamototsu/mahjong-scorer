@@ -8139,22 +8139,27 @@ input, select { padding: 10px 14px; }
           </>
         ) : tmWinStep ? (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.ac, textAlign: "center", marginBottom: 2 }}>
-              {tmWinStep === "winner"
-                ? (multiRonMax > 1 ? "① あがった人をタップ（複数可）" : "① あがった人をタップ")
-                : (ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ or ホウジュウした人をタップ")}
+            <div style={{
+              fontSize: 13, fontWeight: 700, color: t.ac, textAlign: "center", marginBottom: 6,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap",
+            }}>
+              {tmWinStep === "winner" ? (
+                <>
+                  <span>① あがった人をタップ</span>
+                  <span style={{
+                    fontSize: 11, fontWeight: 800, color: t.dm, padding: "2px 8px",
+                    borderRadius: 6, border: `1px solid ${t.bd}`, background: t.sf,
+                  }}>{multiRonMax >= 3 ? "トリプルロン" : multiRonMax === 2 ? "ダブロン" : "頭ハネ"}</span>
+                </>
+              ) : (
+                <span>{ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ or ホウジュウした人をタップ"}</span>
+              )}
             </div>
-            <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 6 }}>
-              {tmWinStep === "winner"
-                ? (multiRonMax >= 3
-                    ? "トリプルロンあり — 3人まで選べます"
-                    : multiRonMax === 2
-                      ? "ダブロンあり — 2人まで。3人目も選べますが警告が出ます"
-                      : "頭ハネ — 本来は1人だけ。複数選ぶと警告が出ます")
-                : (ronPick.length >= 2
-                    ? `${ronPick.length}人でロン。放銃者に近い人から順に手を入力します`
-                    : "")}
-            </div>
+            {tmWinStep === "how" && ronPick.length >= 2 && (
+              <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 6 }}>
+                {ronPick.length}人でロン。放銃者に近い人から順に手を入力します
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               {tmWinStep === "how" && (
                 <button style={{ ...smallBtn(), flex: 1 }} onClick={() => {
