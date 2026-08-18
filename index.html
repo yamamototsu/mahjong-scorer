@@ -685,6 +685,10 @@ function MahjongScorer() {
   const [rules, setRules] = useState(loadDefaultRules);
   const [draftRules, setDraftRules] = useState(loadDefaultRules);
   const [rulesSaved, setRulesSaved] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  React.useEffect(() => {
+    if (!lastRules) setRulesOpen(true);
+  }, [lastRules]);
   const rulesDirty = JSON.stringify(draftRules) !== JSON.stringify(defaultRules);
   const editDraft = patch => {
     setDraftRules(d => ({
@@ -14834,8 +14838,32 @@ input, select { padding: 10px 14px; }
         marginTop: 7,
         textAlign: "center"
       }
-    }, "変更したい場合は、下の項目をそのまま設定してください"));
-  })(), React.createElement("div", {
+    }, "変更したい場合は、下の「ルールを変更する」から"));
+  })(), React.createElement("button", {
+    onClick: () => setRulesOpen(v => !v),
+    style: {
+      width: "100%",
+      padding: "13px 10px",
+      borderRadius: 11,
+      cursor: "pointer",
+      border: `1px solid ${rulesOpen ? t.ac : t.bd}`,
+      background: rulesOpen ? t.acS : t.sf,
+      color: rulesOpen ? t.ac : t.tx,
+      fontSize: 14,
+      fontWeight: 800,
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8
+    }
+  }, React.createElement("span", null, rulesOpen ? "ルールの詳細を閉じる" : "ルールを変更する"), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      transform: rulesOpen ? "rotate(180deg)" : "none",
+      transition: "transform 0.2s"
+    }
+  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, React.createElement("div", {
     style: {
       marginBottom: 8
     }
@@ -15134,7 +15162,7 @@ input, select { padding: 10px 14px; }
       ...r,
       ...patch
     }))
-  })), React.createElement(RuleHelp, null), React.createElement("div", {
+  })), React.createElement(RuleHelp, null)), React.createElement("div", {
     style: {
       marginTop: 16
     }
