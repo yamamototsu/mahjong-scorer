@@ -959,6 +959,16 @@ export default function MahjongScorer() {
     setTableMode(true);   // 卓上モードで開始
     setTmWinStep(null);
     setTmDrawMode(false);
+    // 開始の演出（リーグ名／第N戦、または日付＋席順）
+    setStartSplash({
+      league: activeLg ? activeLg.name : null,
+      gameNo: activeLg ? ((activeLg.games || []).length + 1) : null,
+      matchType,
+      date: gameDate,
+      seats: SEATS_OF(pcNow).map((w, i) => ({ w, name: cfg.players[i] })),
+    });
+    if (splashTimer.current) clearTimeout(splashTimer.current);
+    splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
   }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
 
   // ── Theme ──
@@ -2263,6 +2273,18 @@ export default function MahjongScorer() {
 *, *::before, *::after { box-sizing: border-box; }
 button { padding: 8px 12px; }
 input, select { padding: 10px 14px; }
+@keyframes splashIn {
+  0% { opacity: 0; transform: translateY(14px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes splashLine {
+  0% { transform: scaleX(0); opacity: 0; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+@keyframes splashRow {
+  0% { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
 @keyframes dicePrompt {
   0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }
@@ -4168,6 +4190,8 @@ input, select { padding: 10px 14px; }
   const [rankPeek, setRankPeek] = useState(null);         // 長押しで順位・点差を表示するプレイヤーのindex
   const [showPayView, setShowPayView] = useState(false);  // 卓上表示（点数の受け渡しを矢印で表示）
   const [yakuInfo, setYakuInfo] = useState(null);         // 長押しで説明を出す役
+  const [startSplash, setStartSplash] = useState(null);   // 対局開始の演出 { league, gameNo, matchType, date, seats }
+  const splashTimer = React.useRef(null);
   const yakuPressTimer = React.useRef(null);
   const yakuPressFired = React.useRef(false);
   const yakuPressHandlers = (y) => ({
@@ -4775,6 +4799,78 @@ input, select { padding: 10px 14px; }
     );
   };
 
+  // 対局開始の演出（数秒で自動的に消えて対局画面へ）
+  const StartSplash = () => {
+    if (!startSplash) return null;
+    const sp = startSplash;
+    const d = new Date(sp.date);
+    const dateLabel = isNaN(d) ? sp.date
+      : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    const close = () => { if (splashTimer.current) clearTimeout(splashTimer.current); setStartSplash(null); };
+    return (
+      <div onClick={close} style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 300,
+        background: "radial-gradient(circle at 50% 38%, #14402b 0%, #0a0f14 62%, #05080b 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+      }}>
+        <div style={{ width: "100%", maxWidth: 420, textAlign: "center", animation: "splashIn 0.55s ease-out both" }}>
+          <div style={{ fontSize: 30, marginBottom: 10, opacity: 0.9 }}>🀄</div>
+
+          {sp.league ? (
+            <>
+              <div style={{
+                fontSize: 26, fontWeight: 900, color: "#fff", lineHeight: 1.35,
+                letterSpacing: "0.04em", textShadow: "0 2px 20px rgba(0,0,0,0.6)",
+              }}>{sp.league}</div>
+              <div style={{
+                height: 2, background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
+                margin: "16px auto", width: "78%", animation: "splashLine 0.7s 0.2s ease-out both",
+              }} />
+              <div style={{ fontSize: 21, fontWeight: 800, color: t.gd, letterSpacing: "0.1em" }}>
+                第{sp.gameNo}戦　{MATCH_LABEL(sp.matchType)}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 17, fontWeight: 700, color: "rgba(255,255,255,0.8)", letterSpacing: "0.08em" }}>
+                {dateLabel}
+              </div>
+              <div style={{
+                fontSize: 30, fontWeight: 900, color: t.gd, marginTop: 6,
+                letterSpacing: "0.14em", textShadow: "0 2px 20px rgba(0,0,0,0.6)",
+              }}>{MATCH_LABEL(sp.matchType)}</div>
+              <div style={{
+                height: 2, background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
+                margin: "18px auto", width: "78%", animation: "splashLine 0.7s 0.2s ease-out both",
+              }} />
+              <div style={{ display: "inline-block", textAlign: "left" }}>
+                {sp.seats.map((x, k) => (
+                  <div key={k} style={{
+                    display: "flex", alignItems: "center", gap: 14, padding: "6px 0",
+                    animation: `splashRow 0.45s ${0.35 + k * 0.12}s ease-out both`,
+                  }}>
+                    <span style={{
+                      fontSize: 20, fontWeight: 900, fontFamily: "serif", width: 34, textAlign: "center",
+                      color: k === 0 ? "#1a1a1a" : "#fff",
+                      background: k === 0 ? t.gd : "rgba(255,255,255,0.1)",
+                      border: `1px solid ${k === 0 ? t.gd : "rgba(255,255,255,0.25)"}`,
+                      borderRadius: 7, padding: "3px 0",
+                    }}>{x.w}</span>
+                    <span style={{ fontSize: 21, fontWeight: 800, color: "#fff" }}>{x.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 24 }}>
+            タップでスキップ
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // 卓上表示: 誰から誰へいくら動くかを、卓の配置＋矢印で見せる
   const PayTableView = () => {
     if (!showPayView || gWinner === null || !gResult) return null;
@@ -5148,7 +5244,7 @@ input, select { padding: 10px 14px; }
         {homeCat === "play" && (
           <>
             {menuItem("▶", "東風戦・半荘戦・全荘戦", "1回きりの対局。成績は履歴に残ります", () => {
-              setView("game"); setGameStarted(false); setGameFinished(false); setSetupStep(0);
+              setView("game"); setGameStarted(false); setGameFinished(false); setSetupStep(3);
               setActiveLeagueId(null); setReviewing(false); setShowScoreFix(false);
               // 対局日は自動で今日にする
               {
@@ -6953,7 +7049,7 @@ input, select { padding: 10px 14px; }
           <Back onClick={() => {
             // リーグ戦は出場者選択（リーグ側）へ戻す
             if (activeLeagueId) { resetSeatDraw(); setView("leaguestart"); }
-            else setSetupStep(3);
+            else setSetupStep(0);
           }} />
           <Dots total={activeLeagueId ? 3 : 5} cur={activeLeagueId ? 0 : 2} />
           <div style={question}>席決め</div>
@@ -7183,9 +7279,48 @@ input, select { padding: 10px 14px; }
       {/* Step 3: ルール設定 */}
       {setupStep === 3 && (
         <div style={card}>
-          <Back onClick={() => setSetupStep(0)} />
-          <Dots total={5} cur={1} />
-          <div style={question}>ルール設定</div>
+          <Back onClick={() => { setView("menu"); }} />
+          <Dots total={5} cur={0} />
+          <div style={question}>人数・試合形式・ルール</div>
+          {/* 人数（四人麻雀 / 三人麻雀） */}
+          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8 }}>人数</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[[4, "四人麻雀", "東南西北"], [3, "三人麻雀", "東南西"]].map(([n, lb, sub]) => (
+              <button key={n} onClick={() => {
+                if (n === playerCount) return;
+                setPlayerCount(n);
+                setSeatDone(false); setSeatTiles([]); setSeatTurn(0);
+                // 三人麻雀は連盟ルールを初期値にする（4人に戻すと元の既定へ）
+                if (n === 3) setRules(r => ({ ...r, ...SANMA_DEFAULT_RULES }));
+                else setRules({ ...defaultRules });
+              }} style={{
+                flex: 1, padding: "13px 6px", borderRadius: 11, cursor: "pointer",
+                border: `2px solid ${playerCount === n ? t.ac : t.bd}`,
+                background: playerCount === n ? t.acS : "transparent",
+                color: playerCount === n ? t.ac : t.dm,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 800 }}>{lb}</div>
+                <div style={{ fontSize: 10, marginTop: 3, opacity: 0.85 }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* 試合形式 */}
+          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8 }}>試合形式</div>
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            {[["tonpu", "東風戦", "東場のみ"], ["hanchan", "半荘戦", "東＋南場"], ["zenchan", "全荘戦", "東南西北"]].map(([k, lb, sub]) => (
+              <button key={k} onClick={() => setMatchType(k)} style={{
+                flex: 1, padding: "13px 4px", borderRadius: 11, cursor: "pointer",
+                border: `2px solid ${matchType === k ? t.ac : t.bd}`,
+                background: matchType === k ? t.acS : "transparent",
+                color: matchType === k ? t.ac : t.dm,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" }}>{lb}</div>
+                <div style={{ fontSize: 10, marginTop: 3, opacity: 0.85, whiteSpace: "nowrap" }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+
 
           {/* 前回と同じルールで始める */}
           {lastRules && (() => {
@@ -7207,10 +7342,10 @@ input, select { padding: 10px 14px; }
                   {same ? "✓ 前回と同じルールです" : "前回のルール"}
                 </div>
                 <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginBottom: 11 }}>{sum}</div>
-                <button onClick={() => { setRules({ ...lastRules }); resetSeatDraw(); setSetupStep(1); }} style={{
+                <button onClick={() => { setRules({ ...lastRules }); setSetupStep(0); }} style={{
                   width: "100%", padding: "13px 10px", borderRadius: 10, cursor: "pointer", border: "none",
                   background: same ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
-                }}>{same ? "このまま席決めへ進む" : "前回と同じルールで席決めへ"}</button>
+                }}>{same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"}</button>
                 <div style={{ fontSize: 10, color: t.dm, marginTop: 7, textAlign: "center" }}>
                   変更したい場合は、下の項目をそのまま設定してください
                 </div>
@@ -7337,7 +7472,11 @@ input, select { padding: 10px 14px; }
           <RuleHelp />
 
           <div style={{ marginTop: 16 }}>
-            <button style={actionBtn("p")} onClick={() => { resetSeatDraw(); setSetupStep(1); }}>席決めへ</button>
+            <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
+              onClick={() => setSetupStep(0)}>メンバー決定へ</button>
+            {!matchType && (
+              <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8 }}>試合形式を選んでください</div>
+            )}
           </div>
         </div>
       )}
@@ -7345,47 +7484,9 @@ input, select { padding: 10px 14px; }
       {/* Step 0: 参加者 */}
       {setupStep === 0 && (
         <div style={card}>
-          <Dots total={5} cur={0} />
-          <div style={question}>試合形式と参加者</div>
-          {/* 人数（四人麻雀 / 三人麻雀） */}
-          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8 }}>人数</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-            {[[4, "四人麻雀", "東南西北"], [3, "三人麻雀", "東南西"]].map(([n, lb, sub]) => (
-              <button key={n} onClick={() => {
-                if (n === playerCount) return;
-                setPlayerCount(n);
-                setSeatDone(false); setSeatTiles([]); setSeatTurn(0);
-                // 三人麻雀は連盟ルールを初期値にする（4人に戻すと元の既定へ）
-                if (n === 3) setRules(r => ({ ...r, ...SANMA_DEFAULT_RULES }));
-                else setRules({ ...defaultRules });
-              }} style={{
-                flex: 1, padding: "13px 6px", borderRadius: 11, cursor: "pointer",
-                border: `2px solid ${playerCount === n ? t.ac : t.bd}`,
-                background: playerCount === n ? t.acS : "transparent",
-                color: playerCount === n ? t.ac : t.dm,
-              }}>
-                <div style={{ fontSize: 14, fontWeight: 800 }}>{lb}</div>
-                <div style={{ fontSize: 10, marginTop: 3, opacity: 0.85 }}>{sub}</div>
-              </button>
-            ))}
-          </div>
-
-          {/* 試合形式 */}
-          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8 }}>試合形式</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-            {[["tonpu", "東風戦", "東場のみ"], ["hanchan", "半荘戦", "東＋南場"], ["zenchan", "全荘戦", "東南西北"]].map(([k, lb, sub]) => (
-              <button key={k} onClick={() => setMatchType(k)} style={{
-                flex: 1, padding: "13px 4px", borderRadius: 11, cursor: "pointer",
-                border: `2px solid ${matchType === k ? t.ac : t.bd}`,
-                background: matchType === k ? t.acS : "transparent",
-                color: matchType === k ? t.ac : t.dm,
-              }}>
-                <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" }}>{lb}</div>
-                <div style={{ fontSize: 10, marginTop: 3, opacity: 0.85, whiteSpace: "nowrap" }}>{sub}</div>
-              </button>
-            ))}
-          </div>
-
+          <Back onClick={() => setSetupStep(3)} />
+          <Dots total={5} cur={1} />
+          <div style={question}>メンバー決定</div>
           <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 6 }}>名前の欄をタップして選択</div>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
@@ -7610,9 +7711,9 @@ input, select { padding: 10px 14px; }
                   .map(x => (x || "").trim())
                   .filter(x => x && !presetNames.includes(x) && !/^[A-D]プレーヤー$/.test(x));
                 if (adds.length) savePresetNames([...presetNames, ...Array.from(new Set(adds))]);
-                setSetupStep(3);
+                resetSeatDraw(); setSetupStep(1);
               }}
-            >ルール設定へ</button>
+            >席決めへ</button>
             {!matchType && (
               <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8 }}>
                 試合形式を選んでください
@@ -8284,6 +8385,7 @@ input, select { padding: 10px 14px; }
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
         </div>
+        <StartSplash />
         <PayTableView />
         <RankPeekOverlay />
         <PlayerHistoryModal />
@@ -8386,6 +8488,7 @@ input, select { padding: 10px 14px; }
       <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 10, marginTop: -8 }}>
         点数を長押しすると順位と点差が見られます
       </div>
+      <StartSplash />
       <PayTableView />
       <RankPeekOverlay />
       <PlayerHistoryModal />
