@@ -4934,11 +4934,11 @@ input, select { padding: 10px 14px; }
     // 席の配置（卓上モードと同じ: 手前/右/(向かい)/左）
     const slotOf = (i) => (i - seatRot + PC) % PC;
     const POS4 = [
-      { x: 50, y: 79, rot: 0 }, { x: 79, y: 50, rot: -90 },
-      { x: 50, y: 21, rot: 180 }, { x: 21, y: 50, rot: 90 },
+      { x: 50, y: 82, rot: 0 }, { x: 83, y: 50, rot: -90 },
+      { x: 50, y: 18, rot: 180 }, { x: 17, y: 50, rot: 90 },
     ];
     const POS3 = [
-      { x: 50, y: 79, rot: 0 }, { x: 77, y: 36, rot: -90 }, { x: 23, y: 36, rot: 90 },
+      { x: 50, y: 82, rot: 0 }, { x: 81, y: 33, rot: -90 }, { x: 19, y: 33, rot: 90 },
     ];
     const posOf = (i) => (PC === 3 ? POS3 : POS4)[slotOf(i)];
     const win = posOf(gWinner);
@@ -4967,8 +4967,8 @@ input, select { padding: 10px 14px; }
               const dx = win.x - p0.x, dy = win.y - p0.y;
               const len = Math.sqrt(dx * dx + dy * dy) || 1;
               // 端を少し縮めてパネルに重ならないように
-              const x1 = p0.x + (dx / len) * 17, y1 = p0.y + (dy / len) * 17;
-              const x2 = win.x - (dx / len) * 19, y2 = win.y - (dy / len) * 19;
+              const x1 = p0.x + (dx / len) * 15, y1 = p0.y + (dy / len) * 15;
+              const x2 = win.x - (dx / len) * 17, y2 = win.y - (dy / len) * 17;
               return <line key={k} x1={x1} y1={y1} x2={x2} y2={y2} stroke={t.gd} strokeWidth="0.7" markerEnd="url(#payArrow)" opacity="0.9" />;
             })}
           </svg>
@@ -4976,8 +4976,9 @@ input, select { padding: 10px 14px; }
           {/* 中央: 局とアガリ内容 */}
           <div style={{
             position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-            textAlign: "center", padding: "10px 14px", borderRadius: 14,
-            background: "rgba(0,0,0,0.45)", border: `1px solid ${t.bd}`, minWidth: "36%",
+            textAlign: "center", padding: "8px 10px", borderRadius: 14,
+            background: "rgba(0,0,0,0.55)", border: `1px solid ${t.bd}`,
+            width: "38%", boxSizing: "border-box",
           }}>
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
               {roundWind}{dealerIdx + 1}局{honba > 0 ? ` ${honba}本場` : ""}
@@ -4985,12 +4986,12 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
               {gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`} / {gTsumo ? "ツモ" : "ロン"}
             </div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: t.gd, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: 24, fontWeight: 900, color: t.gd, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
               +{total.toLocaleString()}
             </div>
             {pool > 0 && (
-              <div style={{ fontSize: 11, color: t.ac, fontWeight: 700 }}>
-                （リーチ棒 {pool / 1000}本 +{pool.toLocaleString()} 含む）
+              <div style={{ fontSize: 10, color: t.ac, fontWeight: 700, lineHeight: 1.5 }}>
+                リーチ棒{pool / 1000}本<br />+{pool.toLocaleString()}含む
               </div>
             )}
           </div>
@@ -5008,13 +5009,13 @@ input, select { padding: 10px 14px; }
                 textAlign: "center", padding: "8px 10px", borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
-                width: "31%", height: "21%", boxSizing: "border-box",
+                width: "27%", height: "20%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
               }}>
-                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 700 }}>
-                  {SEAT_WINDS[(i - dealerIdx + PC) % PC]}{i === dealerIdx ? "（親）" : ""}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{players[i]}</div>
+                <div style={{
+                  fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.2,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%",
+                }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: 10, color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
                 <div style={{
                   fontSize: 19, fontWeight: 900, fontVariantNumeric: "tabular-nums",
                   color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
