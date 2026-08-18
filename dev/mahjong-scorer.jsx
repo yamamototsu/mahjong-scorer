@@ -259,6 +259,25 @@ export default function MahjongScorer() {
   };
   const seatTimer = React.useRef(null);
   // 席決め: 伏せた4枚の牌を1人ずつ引く
+  // 画面の向き（横向きでは幅を広げて牌を大きく見せる）
+  const [vp, setVp] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 390,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+  const isLandscape = vp.w > vp.h && vp.w >= 600;
+  // 横向きのときは牌を大きく（画面幅に応じて最大2.2倍まで）
+  const tileScale = isLandscape ? Math.min(2.2, Math.max(1.3, vp.w / 440)) : 1;
+
   const [gameConfig, setGameConfig] = useState(null); // saved config after setup
   const [gameStarted, setGameStarted] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);  // 4=四人麻雀 / 3=三人麻雀（セットアップ用）
@@ -3112,7 +3131,7 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "flex-end", marginBottom: 4 }}>
         {fig.tiles.split(" ").map((grp, gi) => (
           <div key={gi} style={{ display: "flex", gap: 1.5, marginRight: 6 }}>
-            {parseFigTiles(grp).map(([l, s], i) => <Tile key={i} label={l} sub={s} size={size} />)}
+            {parseFigTiles(grp).map(([l, s], i) => <Tile key={i} label={l} sub={s} size={Math.round(size * tileScale)} />)}
           </div>
         ))}
       </div>
@@ -3120,7 +3139,8 @@ input, select { padding: 10px 14px; }
     </div>
   );
 
-  const YakuHand = ({ name, size = 19 }) => {
+  const YakuHand = ({ name, size }) => {
+    size = size || Math.round(19 * tileScale);
     const src = YAKU_EXAMPLES[name];
     if (!src) return null;
     const groups = src.split(" ").map(parseTileGroup);
@@ -9643,7 +9663,8 @@ input, select { padding: 10px 14px; }
       <div style={{
         minHeight: "100vh", background: t.bg, color: t.tx,
         fontFamily: "'Noto Sans JP','Hiragino Kaku Gothic ProN',system-ui,sans-serif",
-        maxWidth: 440, margin: "0 auto", overflowX: "hidden", width: "100%",
+        maxWidth: isLandscape ? Math.min(vp.w - 24, 900) : 440,
+        margin: "0 auto", overflowX: "hidden", width: "100%",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         paddingLeft: "env(safe-area-inset-left, 0px)",
