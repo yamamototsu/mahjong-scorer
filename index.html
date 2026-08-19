@@ -15465,9 +15465,22 @@ input, select { padding: 10px 14px; }
     style: {
       fontSize: 12,
       color: t.dm,
-      marginBottom: 8
+      marginBottom: 8,
+      display: "flex",
+      alignItems: "center",
+      gap: 6
     }
-  }, "試合形式"), React.createElement("div", {
+  }, React.createElement("span", null, "試合形式"), !matchType && React.createElement("span", {
+    style: {
+      fontSize: 10,
+      fontWeight: 800,
+      color: t.gd,
+      background: t.gdS,
+      border: `1px solid ${t.gd}55`,
+      borderRadius: 5,
+      padding: "1px 6px"
+    }
+  }, "未選択")), React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -15524,7 +15537,9 @@ input, select { padding: 10px 14px; }
         marginBottom: 11
       }
     }, sum), React.createElement("button", {
+      disabled: !matchType,
       onClick: () => {
+        if (!matchType) return;
         setRules({
           ...lastRules
         });
@@ -15534,8 +15549,9 @@ input, select { padding: 10px 14px; }
         width: "100%",
         padding: "13px 10px",
         borderRadius: 10,
-        cursor: "pointer",
         border: "none",
+        cursor: matchType ? "pointer" : "not-allowed",
+        opacity: matchType ? 1 : 0.4,
         background: same ? t.gn : t.ac,
         color: "#fff",
         fontSize: 14,
@@ -15543,12 +15559,13 @@ input, select { padding: 10px 14px; }
       }
     }, same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"), React.createElement("div", {
       style: {
-        fontSize: 10,
-        color: t.dm,
+        fontSize: matchType ? 10 : 11,
         marginTop: 7,
-        textAlign: "center"
+        textAlign: "center",
+        color: matchType ? t.dm : t.gd,
+        fontWeight: matchType ? 400 : 800
       }
-    }, "変更したい場合は、下の「ルールを変更する」から"));
+    }, matchType ? "変更したい場合は、下の「ルールを変更する」から" : "↑ 試合形式（東風戦・半荘戦・全荘戦）を選んでください"));
   })(), React.createElement("button", {
     onClick: () => setRulesOpen(v => !v),
     style: {

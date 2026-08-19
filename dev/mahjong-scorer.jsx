@@ -7748,7 +7748,15 @@ input, select { padding: 10px 14px; }
           </div>
 
           {/* 試合形式 */}
-          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8 }}>試合形式</div>
+          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+            <span>試合形式</span>
+            {!matchType && (
+              <span style={{
+                fontSize: 10, fontWeight: 800, color: t.gd, background: t.gdS,
+                border: `1px solid ${t.gd}55`, borderRadius: 5, padding: "1px 6px",
+              }}>未選択</span>
+            )}
+          </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
             {[["tonpu", "東風戦", "東場のみ"], ["hanchan", "半荘戦", "東＋南場"], ["zenchan", "全荘戦", "東南西北"]].map(([k, lb, sub]) => (
               <button key={k} onClick={() => setMatchType(k)} style={{
@@ -7784,12 +7792,18 @@ input, select { padding: 10px 14px; }
                   {same ? "✓ 前回と同じルールです" : "前回のルール"}
                 </div>
                 <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginBottom: 11 }}>{sum}</div>
-                <button onClick={() => { setRules({ ...lastRules }); setSetupStep(0); }} style={{
-                  width: "100%", padding: "13px 10px", borderRadius: 10, cursor: "pointer", border: "none",
+                <button disabled={!matchType}
+                  onClick={() => { if (!matchType) return; setRules({ ...lastRules }); setSetupStep(0); }} style={{
+                  width: "100%", padding: "13px 10px", borderRadius: 10, border: "none",
+                  cursor: matchType ? "pointer" : "not-allowed",
+                  opacity: matchType ? 1 : 0.4,
                   background: same ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
                 }}>{same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"}</button>
-                <div style={{ fontSize: 10, color: t.dm, marginTop: 7, textAlign: "center" }}>
-                  変更したい場合は、下の「ルールを変更する」から
+                <div style={{
+                  fontSize: matchType ? 10 : 11, marginTop: 7, textAlign: "center",
+                  color: matchType ? t.dm : t.gd, fontWeight: matchType ? 400 : 800,
+                }}>
+                  {matchType ? "変更したい場合は、下の「ルールを変更する」から" : "↑ 試合形式（東風戦・半荘戦・全荘戦）を選んでください"}
                 </div>
               </div>
             );
