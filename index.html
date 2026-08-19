@@ -162,7 +162,7 @@ function validFuOptions(han, isTsumo) {
 }
 const DEFAULT_PRESET_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 function MahjongScorer() {
-  const [view, setView] = useState("home");
+  const [view, setView] = useState("title");
   const [gameHistory, setGameHistory] = useState([]);
   const [suspendedGame, setSuspendedGame] = useState(null);
   const [setupStep, setSetupStep] = useState(0);
@@ -10957,6 +10957,239 @@ input, select { padding: 10px 14px; }
     setScores(newScores);
     setEditingRoundIdx(null);
   }, [rounds, gameConfig]);
+  const renderTitle = () => {
+    const resumeGame = () => {
+      setGameConfig(suspendedGame.config);
+      setPlayerCount(suspendedGame.config.playerCount || 4);
+      setPlayers(suspendedGame.players);
+      setScores(suspendedGame.scores);
+      setRounds(suspendedGame.rounds);
+      setDealerIdx(suspendedGame.dealerIdx);
+      setRoundWind(suspendedGame.roundWind);
+      setHonba(suspendedGame.honba);
+      setRiichiBets(suspendedGame.riichiBets);
+      setGameStarted(true);
+      setGameFinished(false);
+      setTableMode(true);
+      setView("game");
+    };
+    const startPlay = () => {
+      setActiveLeagueId(null);
+      setView("game");
+      setGameStarted(false);
+      setGameFinished(false);
+      setSetupStep(3);
+    };
+    const subBtn = (icon, label, sub, onClick) => React.createElement("button", {
+      onClick: onClick,
+      style: {
+        flex: 1,
+        minWidth: 0,
+        padding: "13px 6px",
+        borderRadius: 13,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.card,
+        color: t.tx,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 3
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 19,
+        lineHeight: 1
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        fontSize: 12,
+        fontWeight: 800,
+        whiteSpace: "nowrap"
+      }
+    }, label), React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: t.dm,
+        whiteSpace: "nowrap"
+      }
+    }, sub));
+    return React.createElement("div", {
+      style: {
+        ...body,
+        minHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        paddingTop: 8
+      }
+    }, React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 22
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 40,
+        lineHeight: 1,
+        animation: "bootTile 0.7s cubic-bezier(.2,1.4,.4,1) both"
+      }
+    }, "🀄"), React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "center",
+        gap: 3,
+        marginTop: 10
+      }
+    }, ["ポ", "ン", "ヅ", "ケ"].map((c, i) => React.createElement("span", {
+      key: i,
+      style: {
+        fontSize: 40,
+        fontWeight: 900,
+        color: "#fff",
+        lineHeight: 1.15,
+        animation: `bootChar 0.45s ${0.12 + i * 0.09}s cubic-bezier(.2,1.1,.35,1) both`,
+        textShadow: "0 0 22px rgba(234,179,8,0.28), 0 3px 12px rgba(0,0,0,0.6)"
+      }
+    }, c))), React.createElement("div", {
+      style: {
+        height: 2,
+        width: 180,
+        margin: "12px auto 9px",
+        background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
+        animation: "bootLine 0.6s 0.5s ease-out both"
+      }
+    }), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.gd,
+        letterSpacing: "0.18em"
+      }
+    }, "麻雀スコアラー"), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        marginTop: 4
+      }
+    }, "卓の真ん中に置いて使えます")), suspendedGame && React.createElement("button", {
+      onClick: resumeGame,
+      style: {
+        width: "100%",
+        padding: "14px 12px",
+        borderRadius: 14,
+        cursor: "pointer",
+        marginBottom: 10,
+        border: `2px solid ${t.gd}`,
+        background: t.gdS,
+        color: t.tx,
+        textAlign: "left",
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 20
+      }
+    }, "⏸"), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        color: t.gd
+      }
+    }, "保留中の対局を再開"), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, suspendedGame.config.date, " ", MATCH_LABEL_SHORT(suspendedGame.config.matchType), " — ", suspendedGame.players.join("・"))), React.createElement("span", {
+      style: {
+        color: t.gd,
+        fontSize: 18
+      }
+    }, "›")), React.createElement("button", {
+      onClick: startPlay,
+      style: {
+        width: "100%",
+        padding: "20px 12px",
+        borderRadius: 16,
+        cursor: "pointer",
+        marginBottom: 12,
+        border: "none",
+        background: t.ac,
+        color: "#fff",
+        boxShadow: "0 8px 24px rgba(91,155,255,0.28)"
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 19,
+        fontWeight: 900,
+        letterSpacing: "0.05em"
+      }
+    }, "対局をはじめる"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        opacity: 0.9,
+        marginTop: 3
+      }
+    }, "東風戦・半荘戦・全荘戦 / 四人・三人麻雀")), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 8
+      }
+    }, subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league")), subBtn("🔢", "1局戦", "点数計算", () => {
+      resetCalc();
+      setView("calc");
+    }), subBtn("📋", "履歴", `${gameHistory.length}件`, () => {
+      setActiveLeagueId(null);
+      setView("history");
+    })), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, subBtn("🎓", "練習問題", "点数・役・符", () => {
+      setView("home");
+      setHomeCat("practice");
+    }), subBtn("🎴", "始め方", "図解で解説", () => {
+      setView("startguide");
+      setGuideStep(0);
+    }), subBtn("⚙️", "設定", "ルール初期値", () => {
+      setDraftRules({
+        ...defaultRules
+      });
+      setRulesSaved(false);
+      setView("home");
+      setHomeCat("settings");
+    })), React.createElement("button", {
+      onClick: () => {
+        setHomeCat(null);
+        setView("home");
+      },
+      style: {
+        width: "100%",
+        marginTop: 14,
+        padding: "11px 8px",
+        borderRadius: 11,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: "transparent",
+        color: t.dm,
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "すべてのメニュー"));
+  };
   const renderHome = () => {
     const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
       onClick: onClick,
@@ -19500,7 +19733,7 @@ input, select { padding: 10px 14px; }
       paddingRight: "env(safe-area-inset-right, 0px)",
       boxSizing: "border-box"
     }
-  }, !(view === "game" && tableMode && gameStarted && !gameFinished) && !(view === "home" && homeCat === null) && React.createElement("div", {
+  }, view !== "title" && !(view === "game" && tableMode && gameStarted && !gameFinished) && !(view === "home" && homeCat === null) && React.createElement("div", {
     style: {
       padding: "12px 14px 10px",
       borderBottom: `1px solid ${t.bd}`,
@@ -19539,13 +19772,16 @@ input, select { padding: 10px 14px; }
       gap: 6,
       cursor: "pointer"
     },
-    onClick: () => setView("home")
+    onClick: () => {
+      setHomeCat(null);
+      setView("title");
+    }
   }, "🀄 ", React.createElement("span", null, "ポンヅケ")), React.createElement("span", {
     style: {
       width: 62,
       flexShrink: 0
     }
-  })), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), showFuHelp && React.createElement(FuHelpModal, null)));
+  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), showFuHelp && React.createElement(FuHelpModal, null)));
 }
 
 ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));
