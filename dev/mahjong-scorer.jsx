@@ -278,6 +278,13 @@ export default function MahjongScorer() {
   // 横向きのときは牌を大きく（画面幅に応じて最大2.2倍まで）
   const tileScale = isLandscape ? Math.min(2.2, Math.max(1.3, vp.w / 440)) : 1;
 
+  // 起動時のオープニング演出（このセッションで最初の1回だけ）
+  const [booting, setBooting] = useState(true);
+  React.useEffect(() => {
+    const tm = setTimeout(() => setBooting(false), 2600);
+    return () => clearTimeout(tm);
+  }, []);
+
   const [gameConfig, setGameConfig] = useState(null); // saved config after setup
   const [gameStarted, setGameStarted] = useState(false);
   const [playerCount, setPlayerCount] = useState(4);  // 4=四人麻雀 / 3=三人麻雀（セットアップ用）
@@ -2296,6 +2303,36 @@ export default function MahjongScorer() {
 *, *::before, *::after { box-sizing: border-box; }
 button { padding: 8px 12px; }
 input, select { padding: 10px 14px; }
+@keyframes bootTile {
+  0%   { opacity: 0; transform: translateY(-38px) rotate(-25deg) scale(0.7); }
+  55%  { opacity: 1; transform: translateY(6px) rotate(6deg) scale(1.06); }
+  75%  { transform: translateY(-3px) rotate(-2deg) scale(0.99); }
+  100% { opacity: 1; transform: translateY(0) rotate(0deg) scale(1); }
+}
+@keyframes bootChar {
+  0%   { opacity: 0; transform: translateY(24px) scale(0.8); filter: blur(6px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes bootLine {
+  0%   { transform: scaleX(0); opacity: 0; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+@keyframes bootSub {
+  0%   { opacity: 0; transform: translateY(10px); letter-spacing: 0.5em; }
+  100% { opacity: 0.9; transform: translateY(0); letter-spacing: 0.22em; }
+}
+@keyframes bootGlow {
+  0%, 100% { text-shadow: 0 0 18px rgba(234,179,8,0.35), 0 3px 14px rgba(0,0,0,0.7); }
+  50%      { text-shadow: 0 0 34px rgba(234,179,8,0.7), 0 3px 14px rgba(0,0,0,0.7); }
+}
+@keyframes bootFade {
+  0%, 72% { opacity: 1; }
+  100%    { opacity: 0; visibility: hidden; }
+}
+@keyframes titlePop {
+  0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 @keyframes diceHop {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-14%) scale(1.05); }
@@ -4930,6 +4967,47 @@ input, select { padding: 10px 14px; }
     );
   };
 
+  // 起動時のオープニング（タップでスキップ）
+  const BootSplash = () => {
+    if (!booting) return null;
+    const chars = ["ポ", "ン", "ヅ", "ケ"];
+    return (
+      <div onClick={() => setBooting(false)} style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 400,
+        background: "radial-gradient(circle at 50% 42%, #164a32 0%, #0a0f14 60%, #05080b 100%)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        animation: "bootFade 2.6s ease-in forwards",
+      }}>
+        <div style={{ fontSize: 46, animation: "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both", lineHeight: 1 }}>🀄</div>
+
+        <div style={{ display: "flex", gap: 4, marginTop: 14 }}>
+          {chars.map((c, i) => (
+            <span key={i} style={{
+              fontSize: 46, fontWeight: 900, color: "#fff", letterSpacing: "0.02em",
+              animation: `bootChar 0.5s ${0.35 + i * 0.13}s cubic-bezier(.2,1.1,.35,1) both, bootGlow 2.2s ${1.1 + i * 0.05}s ease-in-out infinite`,
+            }}>{c}</span>
+          ))}
+        </div>
+
+        <div style={{
+          height: 2, width: 190, marginTop: 14,
+          background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
+          animation: "bootLine 0.7s 0.95s ease-out both",
+        }} />
+
+        <div style={{
+          marginTop: 12, fontSize: 12, fontWeight: 700, color: t.gd,
+          animation: "bootSub 0.8s 1.2s ease-out both",
+        }}>麻雀スコアラー</div>
+
+        <div style={{
+          marginTop: 22, fontSize: 10, color: "rgba(255,255,255,0.4)",
+          animation: "bootSub 0.8s 1.6s ease-out both",
+        }}>卓の真ん中に置いて使えます</div>
+      </div>
+    );
+  };
+
   // 卓上表示: 誰から誰へいくら動くかを、卓の配置＋矢印で見せる
   const PayTableView = () => {
     if (!showPayView || gWinner === null || !gResult) return null;
@@ -5257,9 +5335,23 @@ input, select { padding: 10px 14px; }
     if (homeCat === null) {
       return (
         <div style={body}>
-          <div style={{ textAlign: "center", padding: "20px 0 22px" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 900, margin: "0 0 4px" }}>🀄 麻雀スコアラー</h1>
-            <p style={{ fontSize: 13, color: t.dm, margin: 0 }}>かんたん点数計算 & 対局管理</p>
+          <div style={{ textAlign: "center", padding: "18px 0 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+              <span style={{ fontSize: 26, animation: "titlePop 0.45s cubic-bezier(.2,1.3,.4,1) both" }}>🀄</span>
+              {["ポ", "ン", "ヅ", "ケ"].map((c, i) => (
+                <span key={i} style={{
+                  fontSize: 30, fontWeight: 900, lineHeight: 1.2, color: t.tx,
+                  animation: `titlePop 0.42s ${0.08 + i * 0.09}s cubic-bezier(.2,1.3,.4,1) both`,
+                }}>{c}</span>
+              ))}
+            </div>
+            <div style={{
+              height: 2, width: 150, margin: "10px auto 8px",
+              background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
+              animation: "bootLine 0.6s 0.45s ease-out both",
+            }} />
+            <p style={{ fontSize: 12, color: t.dm, margin: 0, letterSpacing: "0.12em", fontWeight: 700 }}>麻雀スコアラー</p>
+            <p style={{ fontSize: 11, color: t.dm, margin: "3px 0 0" }}>かんたん点数計算 &amp; 対局管理</p>
           </div>
 
           {suspendedGame && menuItem("⏸", "保留中の対局を再開",
@@ -8493,6 +8585,7 @@ input, select { padding: 10px 14px; }
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
         </div>
+        <BootSplash />
         <StartSplash />
         <PayTableView />
         <RankPeekOverlay />
@@ -8596,6 +8689,7 @@ input, select { padding: 10px 14px; }
       <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 10, marginTop: -8 }}>
         点数を長押しすると順位と点差が見られます
       </div>
+      <BootSplash />
       <StartSplash />
       <PayTableView />
       <RankPeekOverlay />
@@ -9687,7 +9781,7 @@ input, select { padding: 10px 14px; }
               }}>← 戻る</button>
           ) : <span style={{ width: 62, flexShrink: 0 }} />}
           <h1 style={{ flex: 1, fontSize: 17, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer" }}
-            onClick={() => setView("home")}>🀄 <span>麻雀スコアラー</span></h1>
+            onClick={() => setView("home")}>🀄 <span>ポンヅケ</span></h1>
           <span style={{ width: 62, flexShrink: 0 }} />
         </div>
         )}
