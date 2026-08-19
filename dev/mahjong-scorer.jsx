@@ -5585,6 +5585,11 @@ input, select { padding: 10px 14px; }
           {menuItem("⚙️", "設定", "プレイヤー名・ルールの初期値", () => {
             setDraftRules({ ...defaultRules }); setRulesSaved(false); setHomeCat("settings");
           })}
+
+          <button onClick={() => setView("title")} style={{
+            width: "100%", marginTop: 14, padding: "11px 8px", borderRadius: 11, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 12, fontWeight: 700,
+          }}>← タイトルへ</button>
         </div>
       );
     }
