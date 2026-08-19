@@ -47,6 +47,17 @@ function getLimitName(han) {
 }
 
 const WINDS = ["東", "南", "西", "北"];
+// レート（1ptあたりのゴールド）。0.01〜10 をリールから選ぶ
+const RATE_VALUES = (() => {
+  const out = [0];
+  for (let v = 1; v <= 9; v++) out.push(Math.round(v) / 100);        // 0.01〜0.09
+  for (let v = 10; v <= 95; v += 5) out.push(Math.round(v) / 100);   // 0.10〜0.95
+  for (let v = 100; v <= 1000; v += 50) out.push(Math.round(v) / 100); // 1.0〜10.0
+  return out;
+})();
+const RATE_LABEL = (r) => !r ? "なし" : (r < 1 ? r.toFixed(2) : (r % 1 === 0 ? String(r) : r.toFixed(1)));
+const GOLD = (pt, rate) => Math.round(pt * rate * 100) / 100;
+const GOLD_LABEL = (g) => (g % 1 === 0 ? String(g) : g.toFixed(2).replace(/0$/, ""));
 const TABLE_IMG = "assets/table.jpg";   // 麻雀卓の画像
 // 人数に応じた席風（三麻は北家なし）
 const SEATS_OF = (pc) => pc === 3 ? ["東", "南", "西"] : WINDS;
@@ -466,6 +477,7 @@ export default function MahjongScorer() {
     kiriage: false,         // 切り上げ満貫（4翻30符・3翻60符を満貫扱い）
     doubleYakuman: false,   // ダブル役満（役満の複合を2倍・3倍で計算）
     honbaUnit: 300,         // 1本場の点数（三麻連盟ルールは600）
+    rate: 0,                // レート（1ptあたりのゴールド）。0=なし
     kazoeYakuman: true,     // 数え役満（OFFなら11翻以上は三倍満どまり）
     orasYame: true,         // オーラスで親がトップなら終了（アガリやめ・テンパイやめ）
     multiRon: "atamahane",  // 複数ロン: "atamahane"=頭ハネ / "double"=ダブロンまで / "triple"=トリプルロンまで
@@ -3252,6 +3264,93 @@ input, select { padding: 10px 14px; }
   const [guideStep, setGuideStep] = useState(0);
 
   // 卓の図（4席 + 山）
+  // ── 回転リール（縦スクロールで値を選ぶ） ──
+  const ReelPicker = ({ values, value, onChange, labelOf, height = 132, itemH = 44 }) => {
+    const ref = React.useRef(null);
+    const settle = React.useRef(null);
+    const idx = Math.max(0, values.indexOf(value));
+    // 初期位置を選択値に合わせる
+    React.useEffect(() => {
+      const el = ref.current;
+      if (el) el.scrollTop = idx * itemH;
+    }, []);
+    const pad = (height - itemH) / 2;
+    const onScroll = () => {
+      const el = ref.current;
+      if (!el) return;
+      if (settle.current) clearTimeout(settle.current);
+      settle.current = setTimeout(() => {
+        const i = Math.max(0, Math.min(values.length - 1, Math.round(el.scrollTop / itemH)));
+        el.scrollTo({ top: i * itemH, behavior: "smooth" });
+        if (values[i] !== value) {
+          try { if (navigator.vibrate) navigator.vibrate(6); } catch {}
+          onChange(values[i]);
+        }
+      }, 90);
+    };
+    return (
+      <div style={{ position: "relative", height, borderRadius: 12, background: t.sf, border: `1px solid ${t.bd}`, overflow: "hidden" }}>
+        {/* 中央の選択枠 */}
+        <div style={{
+          position: "absolute", top: pad, left: 8, right: 8, height: itemH, borderRadius: 9,
+          border: `2px solid ${t.ac}`, background: t.acS, pointerEvents: "none", zIndex: 2,
+        }} />
+        {/* 上下のフェード */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: pad, zIndex: 3, pointerEvents: "none",
+          background: `linear-gradient(${t.sf}, ${t.sf}00)` }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: pad, zIndex: 3, pointerEvents: "none",
+          background: `linear-gradient(${t.sf}00, ${t.sf})` }} />
+        <div ref={ref} onScroll={onScroll} style={{
+          height: "100%", overflowY: "auto", scrollSnapType: "y mandatory",
+          WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+        }}>
+          <div style={{ height: pad }} />
+          {values.map((v, i) => (
+            <div key={i} onClick={() => { const el = ref.current; if (el) el.scrollTo({ top: i * itemH, behavior: "smooth" }); onChange(v); }}
+              style={{
+                height: itemH, display: "flex", alignItems: "center", justifyContent: "center",
+                scrollSnapAlign: "start", cursor: "pointer",
+                fontSize: v === value ? 22 : 17,
+                fontWeight: v === value ? 900 : 700,
+                color: v === value ? t.ac : t.dm,
+                opacity: v === value ? 1 : 0.55,
+                transition: "font-size 0.15s, color 0.15s, opacity 0.15s",
+                fontVariantNumeric: "tabular-nums",
+              }}>{labelOf ? labelOf(v) : v}</div>
+          ))}
+          <div style={{ height: pad }} />
+        </div>
+      </div>
+    );
+  };
+
+  // レート設定のカード（ルール編集用）
+  const RateSetting = ({ rate, onChange }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>レート（ゴールド）</div>
+      <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
+        1ptあたりのゴールド。精算画面にゴールドの増減が表示されます
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <ReelPicker values={RATE_VALUES} value={rate || 0} onChange={onChange} labelOf={RATE_LABEL} />
+        </div>
+        <div style={{ width: 108, textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: t.dm }}>1pt =</div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: rate ? t.gd : t.dm, lineHeight: 1.3 }}>
+            {RATE_LABEL(rate || 0)}
+          </div>
+          <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>{rate ? "ゴールド" : ""}</div>
+          {!!rate && (
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.6 }}>
+              例) +20pt<br />= {GOLD_LABEL(GOLD(20, rate))} ゴールド
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const TableDiagram = ({ highlight, dice1, dice2, breakPos, labels }) => {
     const seatStyle = (pos, on) => {
       const base = {
@@ -5686,6 +5785,7 @@ input, select { padding: 10px 14px; }
 
               <div style={{ marginTop: 16 }}>
                 <UmaOkaSettings rules={draftRules} onChange={editDraft} compact />
+                <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })} />
               </div>
 
               <RuleHelp />
@@ -9344,12 +9444,28 @@ input, select { padding: 10px 14px; }
                     <span style={{ fontSize: 15, fontWeight: 900, width: 24, color: o.rank === 1 ? t.gd : t.dm }}>{o.rank}</span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>{players[o.i]}</span>
                   </div>
-                  <span style={{
-                    fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
-                    color: o.pt > 0 ? t.gn : o.pt < 0 ? t.rd : t.tx,
-                  }}>{o.pt > 0 ? "+" : ""}{o.pt}</span>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{
+                      fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                      color: o.pt > 0 ? t.gn : o.pt < 0 ? t.rd : t.tx,
+                    }}>{o.pt > 0 ? "+" : ""}{o.pt}</span>
+                    {!!(gameConfig?.rules?.rate) && (
+                      <div style={{
+                        fontSize: 12, fontWeight: 800, marginTop: 1, fontVariantNumeric: "tabular-nums",
+                        color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm,
+                      }}>
+                        {o.pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate))}
+                        <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>G</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
+              {!!(gameConfig?.rules?.rate) && (
+                <div style={{ fontSize: 10, color: t.dm, textAlign: "right", marginTop: 6 }}>
+                  レート 1pt = {RATE_LABEL(gameConfig.rules.rate)} ゴールド
+                </div>
+              )}
             </div>
           );
         })()}
@@ -9402,6 +9518,14 @@ input, select { padding: 10px 14px; }
                     width: 54, textAlign: "right", fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums",
                     color: res[i].pt > 0 ? t.gn : res[i].pt < 0 ? t.rd : t.tx,
                   }}>{res[i].pt > 0 ? "+" : ""}{res[i].pt}</span>
+                  {!!(lg.rules?.rate) && (
+                    <span style={{
+                      width: 62, textAlign: "right", fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                      color: res[i].pt > 0 ? t.gd : res[i].pt < 0 ? t.rd : t.dm,
+                    }}>{res[i].pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(res[i].pt, lg.rules.rate))}
+                      <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>G</span>
+                    </span>
+                  )}
                 </div>
               ))}
               <div style={{ fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.7 }}>
