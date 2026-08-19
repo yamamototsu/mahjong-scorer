@@ -2117,13 +2117,15 @@ export default function MahjongScorer() {
             </div>
           );
         })()}
-        <div style={{ fontSize: 14, fontWeight: 800, textAlign: "center", marginBottom: 6 }}>役を選んで翻数を計算</div>
-        <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 6 }}>役を長押しすると説明が見られます</div>
-        {lockedRiichi && (
-          <div style={{ fontSize: 11, color: t.rd, textAlign: "center", marginBottom: 8, fontWeight: 700 }}>
-            🔴 リーチ宣言済み{isTsumo ? "・ツモ" : ""}のため自動でチェック済み（門前固定）
-          </div>
-        )}
+        {/* 上部: 確定・キャンセル（スクロールせずに押せる） */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <button style={{ ...actionBtn(), flex: 1, marginBottom: 0, padding: "12px 8px" }} onClick={onCancel}>キャンセル</button>
+          <button style={{ ...actionBtn("p"), flex: 1.6, marginBottom: 0, padding: "12px 8px", opacity: total > 0 && pickedYaku.length > 0 ? 1 : 0.4 }}
+            disabled={total === 0 || pickedYaku.length === 0}
+            onClick={() => onConfirm(total)}>
+            {pickedYaku.length === 0 ? "役を選択" : total >= 13 ? `${YAKUMAN_LABEL(total)}で確定` : `${total}翻で確定`}
+          </button>
+        </div>
 
         {/* 門前/鳴き（切替可能・リーチ確定時はロック） */}
         <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
