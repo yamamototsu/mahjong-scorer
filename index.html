@@ -4179,6 +4179,13 @@ function MahjongScorer() {
                 return !conf.includes(n);
               });
               next = [...next, y.name];
+              const dragons = ["役牌 白（ハク）", "役牌 發（ハツ）", "役牌 中（チュン）"];
+              if (dragons.every(d => next.includes(d))) {
+                next = ["大三元（ダイサンゲン）"];
+                try {
+                  if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+                } catch {}
+              }
             }
             const rOn = lockedRiichi || next.includes("リーチ（立直）") || next.includes("ダブル立直（ダブルリーチ）");
             if (!rOn) {
