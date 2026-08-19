@@ -2240,6 +2240,12 @@ export default function MahjongScorer() {
                             return !conf.includes(n);
                           });
                           next = [...next, y.name];
+                          // 白・發・中がそろったら大三元（役満）へ自動昇格
+                          const dragons = ["役牌 白（ハク）", "役牌 發（ハツ）", "役牌 中（チュン）"];
+                          if (dragons.every(d => next.includes(d))) {
+                            next = ["大三元（ダイサンゲン）"];
+                            try { if (navigator.vibrate) navigator.vibrate([20, 40, 20]); } catch {}
+                          }
                         }
                         // リーチが外れたら一発・裏ドラも自動で外す
                         const rOn = lockedRiichi || next.includes("リーチ（立直）") || next.includes("ダブル立直（ダブルリーチ）");
