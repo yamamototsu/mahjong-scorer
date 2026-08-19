@@ -13,10 +13,10 @@ html = f'''<!DOCTYPE html>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="麻雀スコアラー">
+<meta name="apple-mobile-web-app-title" content="ポンヅケ">
 <meta name="theme-color" content="#0c1117">
-<meta name="description" content="麻雀の点数計算と対局スコア管理アプリ">
-<title>\U0001f004 麻雀スコアラー</title>
+<meta name="description" content="ポンヅケ｜卓の真ん中に置いて使う麻雀スコアラー。点数計算と対局スコア管理">
+<title>\U0001f004 ポンヅケ｜麻雀スコアラー</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="icon" type="image/svg+xml" href="icon.svg">

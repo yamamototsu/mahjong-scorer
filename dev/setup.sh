@@ -12,6 +12,7 @@ curl -sf "$RAW/dev/mahjong-scorer.jsx" -o /mnt/user-data/outputs/mahjong-scorer.
 curl -sf "$RAW/index.html"             -o /mnt/user-data/outputs/index.html
 curl -sf "$RAW/dev/compile.js"         -o /home/claude/compile.js
 curl -sf "$RAW/dev/validate.js"        -o /home/claude/validate.js
+curl -sf "$RAW/dev/ssr-test.js"        -o /home/claude/ssr-test.js
 curl -sf "$RAW/dev/build-html.py"      -o /home/claude/build-html.py
 curl -sf "$RAW/dev/upload.py"          -o /home/claude/upload.py
 curl -sf "$RAW/dev/deploy.sh"          -o /home/claude/deploy.sh
@@ -20,11 +21,14 @@ echo "   $(wc -l < /mnt/user-data/outputs/mahjong-scorer.jsx) 行のソースを
 
 echo "▶ 2/4 Babel を用意"
 mkdir -p /home/claude/babelcheck && cd /home/claude/babelcheck
-npm install @babel/core @babel/preset-react --silent --no-fund --no-audit 2>/dev/null
+# .npmrc に prefix が設定されていると node_modules が作られないため init + --prefix が必須
+npm init -y > /dev/null 2>&1
+npm install @babel/core @babel/preset-react --silent --no-fund --no-audit --prefix /home/claude/babelcheck 2>/dev/null
 
 echo "▶ 3/4 検証用の React を用意"
 mkdir -p /home/claude/prev && cd /home/claude/prev
-npm install react@18.2.0 react-dom@18.2.0 --silent --no-fund --no-audit 2>/dev/null
+npm init -y > /dev/null 2>&1
+npm install react@18.2.0 react-dom@18.2.0 --silent --no-fund --no-audit --prefix /home/claude/prev 2>/dev/null
 
 echo "▶ 4/4 ビルドを確認"
 cd /home/claude
@@ -33,4 +37,5 @@ echo ""
 echo "✓ 準備完了"
 echo ""
 echo "  編集: /mnt/user-data/outputs/mahjong-scorer.jsx"
+echo "  検証: node validate.js && python3 build-html.py && node ssr-test.js"
 echo "  反映: export GH_TOKEN='...' && bash /home/claude/deploy.sh \"コミットメッセージ\""

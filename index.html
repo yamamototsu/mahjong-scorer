@@ -7106,13 +7106,17 @@ input, select { padding: 10px 14px; }
         setLast(rate);
         onChange(0);
       } else {
-        try { navigator.vibrate && navigator.vibrate(8); } catch (e) {}
+        try {
+          navigator.vibrate && navigator.vibrate(8);
+        } catch (e) {}
         onChange(last || 0.1);
       }
     };
     const ex = n => GOLD_LABEL(GOLD(n / 1000, rate));
     return React.createElement("div", {
-      style: { marginBottom: 16 }
+      style: {
+        marginBottom: 16
+      }
     }, React.createElement("div", {
       onClick: toggle,
       style: {
@@ -7122,7 +7126,7 @@ input, select { padding: 10px 14px; }
         cursor: "pointer",
         padding: "12px 14px",
         borderRadius: 12,
-        border: "1px solid " + (on ? t.ac : t.bd),
+        border: `1px solid ${on ? t.ac : t.bd}`,
         background: on ? t.acS : "transparent",
         transition: "background 0.15s, border-color 0.15s"
       }
@@ -7136,53 +7140,100 @@ input, select { padding: 10px 14px; }
         alignItems: "center",
         justifyContent: "center",
         background: on ? t.ac : "transparent",
-        border: "2px solid " + (on ? t.ac : t.dm),
+        border: `2px solid ${on ? t.ac : t.dm}`,
         color: "#fff",
         fontSize: 13,
         fontWeight: 900,
         lineHeight: 1
       }
     }, on ? "✓" : ""), React.createElement("div", null, React.createElement("div", {
-      style: { fontSize: 14, fontWeight: 700, color: t.tx }
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: t.tx
+      }
     }, "レート換算する"), React.createElement("div", {
-      style: { fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.6 }
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginTop: 2,
+        lineHeight: 1.6
+      }
     }, "精算画面にゴールドの増減が表示されます"))), on && React.createElement("div", {
-      style: { marginTop: 14 }
+      style: {
+        marginTop: 14
+      }
     }, React.createElement("div", {
-      style: { fontSize: 14, fontWeight: 700, marginBottom: 4 }
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        marginBottom: 4
+      }
     }, "レート（ゴールド）"), React.createElement("div", {
-      style: { fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 8,
+        lineHeight: 1.7
+      }
     }, "1点あたりのゴールド"), React.createElement("div", {
-      style: { display: "flex", alignItems: "center", gap: 10 }
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
     }, React.createElement("div", {
-      style: { flex: 1 }
+      style: {
+        flex: 1
+      }
     }, React.createElement(ReelPicker, {
       values: RATE_POS,
       value: rate || 0.1,
       onChange: onChange,
       labelOf: RATE_LABEL
     })), React.createElement("div", {
-      style: { width: 126, textAlign: "center" }
+      style: {
+        width: 126,
+        textAlign: "center"
+      }
     }, React.createElement("div", {
-      style: { fontSize: 10, color: t.dm }
+      style: {
+        fontSize: 10,
+        color: t.dm
+      }
     }, "1点 ="), React.createElement("div", {
-      style: { fontSize: 20, fontWeight: 900, color: t.gd, lineHeight: 1.3 }
+      style: {
+        fontSize: 20,
+        fontWeight: 900,
+        color: t.gd,
+        lineHeight: 1.3
+      }
     }, RATE_LABEL(rate)), React.createElement("div", {
-      style: { fontSize: 11, color: t.dm, fontWeight: 700 }
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        fontWeight: 700
+      }
     }, "ゴールド"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
         marginTop: 8,
         paddingTop: 8,
-        borderTop: "1px solid " + t.bd,
+        borderTop: `1px solid ${t.bd}`,
         lineHeight: 1.8,
         fontVariantNumeric: "tabular-nums"
       }
     }, React.createElement("div", null, "1,000点 = ", React.createElement("span", {
-      style: { color: t.gd, fontWeight: 800 }
+      style: {
+        color: t.gd,
+        fontWeight: 800
+      }
     }, ex(1000), "G")), React.createElement("div", null, "30,000点 = ", React.createElement("span", {
-      style: { color: t.gd, fontWeight: 800 }
+      style: {
+        color: t.gd,
+        fontWeight: 800
+      }
     }, ex(30000), "G")))))));
   };
   const TableDiagram = ({
