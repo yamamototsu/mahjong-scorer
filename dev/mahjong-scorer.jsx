@@ -7550,13 +7550,16 @@ input, select { padding: 10px 14px; }
           </>)}
 
 
-          <div style={{ marginTop: 16 }}>
-            <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
-              onClick={() => setSetupStep(0)}>メンバー決定へ</button>
-            {!matchType && (
-              <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8 }}>試合形式を選んでください</div>
-            )}
-          </div>
+          {/* 詳細を開いているときだけ、下にも進むボタンを出す */}
+          {(rulesOpen || !lastRules) && (
+            <div style={{ marginTop: 16 }}>
+              <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
+                onClick={() => setSetupStep(0)}>メンバー決定へ</button>
+              {!matchType && (
+                <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8 }}>試合形式を選んでください</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
