@@ -6962,14 +6962,14 @@ input, select { padding: 10px 14px; }
     const seatStyle = (pos, on) => {
       const base = {
         position: "absolute",
-        minWidth: 54,
-        height: 30,
-        padding: "0 9px",
-        borderRadius: 8,
+        minWidth: 44,
+        height: 25,
+        padding: "0 8px",
+        borderRadius: 7,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: 800,
         whiteSpace: "nowrap",
         lineHeight: 1,
@@ -7012,25 +7012,25 @@ input, select { padding: 10px 14px; }
       };
       if (pos === "S") return {
         ...base,
-        bottom: 42,
+        bottom: 34,
         left: "50%",
         transform: "translateX(-50%)"
       };
       if (pos === "E") return {
         ...base,
-        right: 42,
+        right: 34,
         top: "50%",
         transform: "translateY(-50%) rotate(90deg)"
       };
       if (pos === "N") return {
         ...base,
-        top: 42,
+        top: 34,
         left: "50%",
         transform: "translateX(-50%)"
       };
       return {
         ...base,
-        left: 42,
+        left: 34,
         top: "50%",
         transform: "translateY(-50%) rotate(90deg)"
       };
@@ -7052,11 +7052,11 @@ input, select { padding: 10px 14px; }
       style: {
         position: "relative",
         width: "100%",
-        maxWidth: 280,
-        height: 240,
-        margin: "0 auto 12px",
+        maxWidth: 220,
+        height: 190,
+        margin: "0 auto 10px",
         background: "#1a4d3a",
-        borderRadius: 14,
+        borderRadius: 12,
         border: `3px solid #2a5d4a`
       }
     }, ["S", "E", "N", "W"].map(pos => React.createElement("div", {
@@ -8051,7 +8051,7 @@ input, select { padding: 10px 14px; }
         height: 4,
         background: t.bd,
         borderRadius: 2,
-        marginBottom: 16
+        marginBottom: 10
       }
     }, React.createElement("div", {
       style: {
@@ -8062,37 +8062,82 @@ input, select { padding: 10px 14px; }
         transition: "width 0.3s"
       }
     })), React.createElement("div", {
-      style: card
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, React.createElement("button", {
+      style: {
+        ...actionBtn(),
+        flex: 1,
+        marginBottom: 0,
+        padding: "11px 8px",
+        opacity: guideStep === 0 ? 0.4 : 1
+      },
+      disabled: guideStep === 0,
+      onClick: () => {
+        setGuideStep(guideStep - 1);
+        try {
+          window.scrollTo(0, 0);
+        } catch {}
+      }
+    }, "← 前へ"), guideStep < GUIDE_STEPS.length - 1 ? React.createElement("button", {
+      style: {
+        ...actionBtn("p"),
+        flex: 1.4,
+        marginBottom: 0,
+        padding: "11px 8px"
+      },
+      onClick: () => {
+        setGuideStep(guideStep + 1);
+        try {
+          window.scrollTo(0, 0);
+        } catch {}
+      }
+    }, "次へ →") : React.createElement("button", {
+      style: {
+        ...actionBtn("p"),
+        flex: 1.4,
+        marginBottom: 0,
+        padding: "11px 8px"
+      },
+      onClick: () => setView("home")
+    }, "完了")), React.createElement("div", {
+      style: {
+        ...card,
+        padding: 14
+      }
     }, React.createElement("div", {
       style: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 800,
-        marginBottom: 14,
+        marginBottom: 8,
         textAlign: "center"
       }
     }, s.title), s.diagram && s.diagram(), s.body.map((b, i) => React.createElement("div", {
       key: i,
       style: {
-        fontSize: 14,
-        lineHeight: 1.8,
+        fontSize: 13,
+        lineHeight: 1.7,
         color: t.tx,
-        marginBottom: 12
+        marginBottom: 8
       }
     }, b)), s.box && React.createElement("div", {
       style: {
         background: t.sf,
         borderRadius: 10,
-        padding: 14,
-        marginBottom: 12
+        padding: "10px 12px",
+        marginBottom: 8
       }
     }, s.box.map((item, i) => React.createElement("div", {
       key: i,
       style: {
-        fontSize: 13,
-        lineHeight: 1.9,
+        fontSize: 12.5,
+        lineHeight: 1.7,
         color: t.tx,
         display: "flex",
-        gap: 8
+        gap: 7
       }
     }, React.createElement("span", {
       style: {
@@ -8103,42 +8148,17 @@ input, select { padding: 10px 14px; }
       style: {
         background: t.gdS,
         borderRadius: 10,
-        padding: 12,
+        padding: "9px 11px",
         border: `1px solid ${t.gd}33`,
-        marginBottom: 4
+        marginBottom: 0
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
+        fontSize: 11.5,
         color: t.gd,
-        lineHeight: 1.7
+        lineHeight: 1.6
       }
-    }, "💡 ", s.note))), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8
-      }
-    }, React.createElement("button", {
-      style: {
-        ...actionBtn(),
-        flex: 1,
-        opacity: guideStep === 0 ? 0.4 : 1
-      },
-      disabled: guideStep === 0,
-      onClick: () => setGuideStep(guideStep - 1)
-    }, "← 前へ"), guideStep < GUIDE_STEPS.length - 1 ? React.createElement("button", {
-      style: {
-        ...actionBtn("p"),
-        flex: 1
-      },
-      onClick: () => setGuideStep(guideStep + 1)
-    }, "次へ →") : React.createElement("button", {
-      style: {
-        ...actionBtn("p"),
-        flex: 1
-      },
-      onClick: () => setView("home")
-    }, "完了")));
+    }, "💡 ", s.note))));
   };
   const renderTable = () => {
     const fuList = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
