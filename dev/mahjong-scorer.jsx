@@ -97,7 +97,7 @@ function validFuOptions(han, isTsumo) {
 const DEFAULT_PRESET_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 
 export default function MahjongScorer() {
-  const [view, setView] = useState("home");
+  const [view, setView] = useState("title");
   const [gameHistory, setGameHistory] = useState([]); // completed games
   const [suspendedGame, setSuspendedGame] = useState(null); // paused game
 
@@ -5409,6 +5409,110 @@ input, select { padding: 10px 14px; }
     });
     setRounds(newRounds); setScores(newScores); setEditingRoundIdx(null);
   }, [rounds, gameConfig]);
+  // ── タイトル画面（アプリを開いて最初に出るページ） ──
+  const renderTitle = () => {
+    const resumeGame = () => {
+      setGameConfig(suspendedGame.config);
+      setPlayerCount(suspendedGame.config.playerCount || 4);
+      setPlayers(suspendedGame.players);
+      setScores(suspendedGame.scores);
+      setRounds(suspendedGame.rounds);
+      setDealerIdx(suspendedGame.dealerIdx);
+      setRoundWind(suspendedGame.roundWind);
+      setHonba(suspendedGame.honba);
+      setRiichiBets(suspendedGame.riichiBets);
+      setGameStarted(true); setGameFinished(false);
+      setTableMode(true);
+      setView("game");
+    };
+    const startPlay = () => {
+      setActiveLeagueId(null);
+      setView("game"); setGameStarted(false); setGameFinished(false); setSetupStep(3);
+    };
+    const subBtn = (icon, label, sub, onClick) => (
+      <button onClick={onClick} style={{
+        flex: 1, minWidth: 0, padding: "13px 6px", borderRadius: 13, cursor: "pointer",
+        border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+      }}>
+        <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 9, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
+      </button>
+    );
+    return (
+      <div style={{ ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8 }}>
+        {/* ロゴ */}
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <div style={{ fontSize: 40, lineHeight: 1, animation: "bootTile 0.7s cubic-bezier(.2,1.4,.4,1) both" }}>🀄</div>
+          <div style={{ display: "flex", justifyContent: "center", gap: 3, marginTop: 10 }}>
+            {["ポ", "ン", "ヅ", "ケ"].map((c, i) => (
+              <span key={i} style={{
+                fontSize: 40, fontWeight: 900, color: "#fff", lineHeight: 1.15,
+                animation: `bootChar 0.45s ${0.12 + i * 0.09}s cubic-bezier(.2,1.1,.35,1) both`,
+                textShadow: "0 0 22px rgba(234,179,8,0.28), 0 3px 12px rgba(0,0,0,0.6)",
+              }}>{c}</span>
+            ))}
+          </div>
+          <div style={{
+            height: 2, width: 180, margin: "12px auto 9px",
+            background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
+            animation: "bootLine 0.6s 0.5s ease-out both",
+          }} />
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.gd, letterSpacing: "0.18em" }}>麻雀スコアラー</div>
+          <div style={{ fontSize: 10, color: t.dm, marginTop: 4 }}>卓の真ん中に置いて使えます</div>
+        </div>
+
+        {/* 保留中があれば最優先で出す */}
+        {suspendedGame && (
+          <button onClick={resumeGame} style={{
+            width: "100%", padding: "14px 12px", borderRadius: 14, cursor: "pointer", marginBottom: 10,
+            border: `2px solid ${t.gd}`, background: t.gdS, color: t.tx, textAlign: "left",
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <span style={{ fontSize: 20 }}>⏸</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: t.gd }}>保留中の対局を再開</div>
+              <div style={{ fontSize: 10, color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {suspendedGame.config.date} {MATCH_LABEL_SHORT(suspendedGame.config.matchType)} — {suspendedGame.players.join("・")}
+              </div>
+            </span>
+            <span style={{ color: t.gd, fontSize: 18 }}>›</span>
+          </button>
+        )}
+
+        {/* メイン */}
+        <button onClick={startPlay} style={{
+          width: "100%", padding: "20px 12px", borderRadius: 16, cursor: "pointer", marginBottom: 12,
+          border: "none", background: t.ac, color: "#fff",
+          boxShadow: "0 8px 24px rgba(91,155,255,0.28)",
+        }}>
+          <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: "0.05em" }}>対局をはじめる</div>
+          <div style={{ fontSize: 11, opacity: 0.9, marginTop: 3 }}>東風戦・半荘戦・全荘戦 / 四人・三人麻雀</div>
+        </button>
+
+        {/* サブメニュー */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          {subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league"))}
+          {subBtn("🔢", "1局戦", "点数計算", () => { resetCalc(); setView("calc"); })}
+          {subBtn("📋", "履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {subBtn("🎓", "練習問題", "点数・役・符", () => { setView("home"); setHomeCat("practice"); })}
+          {subBtn("🎴", "始め方", "図解で解説", () => { setView("startguide"); setGuideStep(0); })}
+          {subBtn("⚙️", "設定", "ルール初期値", () => {
+            setDraftRules({ ...defaultRules }); setRulesSaved(false); setView("home"); setHomeCat("settings");
+          })}
+        </div>
+
+        <button onClick={() => { setHomeCat(null); setView("home"); }} style={{
+          width: "100%", marginTop: 14, padding: "11px 8px", borderRadius: 11, cursor: "pointer",
+          border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 12, fontWeight: 700,
+        }}>すべてのメニュー</button>
+      </div>
+    );
+  };
+
   const renderHome = () => {
     const menuItem = (icon, label, sub, onClick, highlight) => (
       <button
@@ -9895,7 +9999,7 @@ input, select { padding: 10px 14px; }
         paddingRight: "env(safe-area-inset-right, 0px)",
         boxSizing: "border-box",
       }}>
-        {!(view === "game" && tableMode && gameStarted && !gameFinished) && !(view === "home" && homeCat === null) && (
+        {view !== "title" && !(view === "game" && tableMode && gameStarted && !gameFinished) && !(view === "home" && homeCat === null) && (
         <div style={{ padding: "12px 14px 10px", borderBottom: `1px solid ${t.bd}`, display: "flex", alignItems: "center", gap: 8 }}>
           {/* 結果画面は記録前なので、うっかり離脱しないよう戻るを出さない */}
           {view !== "home" && !(view === "game" && gameFinished) ? (
@@ -9908,10 +10012,11 @@ input, select { padding: 10px 14px; }
               }}>← 戻る</button>
           ) : <span style={{ width: 62, flexShrink: 0 }} />}
           <h1 style={{ flex: 1, fontSize: 17, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer" }}
-            onClick={() => setView("home")}>🀄 <span>ポンヅケ</span></h1>
+            onClick={() => { setHomeCat(null); setView("title"); }}>🀄 <span>ポンヅケ</span></h1>
           <span style={{ width: 62, flexShrink: 0 }} />
         </div>
         )}
+        {view === "title" && renderTitle()}
         {view === "home" && renderHome()}
         {view === "calc" && renderCalc()}
         {view === "game" && renderGame()}
