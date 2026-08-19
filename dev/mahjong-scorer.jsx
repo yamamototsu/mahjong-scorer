@@ -3255,9 +3255,9 @@ input, select { padding: 10px 14px; }
   const TableDiagram = ({ highlight, dice1, dice2, breakPos, labels }) => {
     const seatStyle = (pos, on) => {
       const base = {
-        position: "absolute", minWidth: 54, height: 30, padding: "0 9px", borderRadius: 8,
+        position: "absolute", minWidth: 44, height: 25, padding: "0 8px", borderRadius: 7,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1,
+        fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", lineHeight: 1,
         border: `2px solid ${on ? t.gd : t.bd}`,
         background: on ? "#12181f" : t.sf,
         color: on ? t.gd : t.tx,
@@ -3272,10 +3272,10 @@ input, select { padding: 10px 14px; }
     // 山（各辺に小さな牌の列）
     const wallStyle = (pos) => {
       const base = { position: "absolute", display: "flex", gap: 1 };
-      if (pos === "S") return { ...base, bottom: 42, left: "50%", transform: "translateX(-50%)" };
-      if (pos === "E") return { ...base, right: 42, top: "50%", transform: "translateY(-50%) rotate(90deg)" };
-      if (pos === "N") return { ...base, top: 42, left: "50%", transform: "translateX(-50%)" };
-      return { ...base, left: 42, top: "50%", transform: "translateY(-50%) rotate(90deg)" };
+      if (pos === "S") return { ...base, bottom: 34, left: "50%", transform: "translateX(-50%)" };
+      if (pos === "E") return { ...base, right: 34, top: "50%", transform: "translateY(-50%) rotate(90deg)" };
+      if (pos === "N") return { ...base, top: 34, left: "50%", transform: "translateX(-50%)" };
+      return { ...base, left: 34, top: "50%", transform: "translateY(-50%) rotate(90deg)" };
     };
     const wallTile = (i, pos) => {
       const isBreak = breakPos && breakPos.side === pos && breakPos.idx === i;
@@ -3288,8 +3288,8 @@ input, select { padding: 10px 14px; }
       );
     };
     return (
-      <div style={{ position: "relative", width: "100%", maxWidth: 280, height: 240, margin: "0 auto 12px",
-        background: "#1a4d3a", borderRadius: 14, border: `3px solid #2a5d4a` }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 220, height: 190, margin: "0 auto 10px",
+        background: "#1a4d3a", borderRadius: 12, border: `3px solid #2a5d4a` }}>
         {["S","E","N","W"].map(pos => (
           <div key={"w"+pos} style={wallStyle(pos)}>
             {[...Array(11)].map((_, i) => wallTile(i, pos))}
@@ -3794,23 +3794,37 @@ input, select { padding: 10px 14px; }
           <button style={{ background: "none", border: "none", color: t.dm, fontSize: 12, cursor: "pointer" }}
             onClick={() => setView("home")}>✕ 閉じる</button>
         </div>
-        <div style={{ height: 4, background: t.bd, borderRadius: 2, marginBottom: 16 }}>
+        <div style={{ height: 4, background: t.bd, borderRadius: 2, marginBottom: 10 }}>
           <div style={{ height: 4, background: t.ac, borderRadius: 2, width: `${((guideStep + 1) / GUIDE_STEPS.length) * 100}%`, transition: "width 0.3s" }} />
         </div>
 
-        <div style={card}>
-          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 14, textAlign: "center" }}>{s.title}</div>
+        {/* 進むボタンは上に置いて、スクロールせずに次へ進めるようにする */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button style={{ ...actionBtn(), flex: 1, marginBottom: 0, padding: "11px 8px", opacity: guideStep === 0 ? 0.4 : 1 }}
+            disabled={guideStep === 0}
+            onClick={() => { setGuideStep(guideStep - 1); try { window.scrollTo(0, 0); } catch {} }}>← 前へ</button>
+          {guideStep < GUIDE_STEPS.length - 1 ? (
+            <button style={{ ...actionBtn("p"), flex: 1.4, marginBottom: 0, padding: "11px 8px" }}
+              onClick={() => { setGuideStep(guideStep + 1); try { window.scrollTo(0, 0); } catch {} }}>次へ →</button>
+          ) : (
+            <button style={{ ...actionBtn("p"), flex: 1.4, marginBottom: 0, padding: "11px 8px" }}
+              onClick={() => setView("home")}>完了</button>
+          )}
+        </div>
+
+        <div style={{ ...card, padding: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8, textAlign: "center" }}>{s.title}</div>
 
           {s.diagram && s.diagram()}
 
           {s.body.map((b, i) => (
-            <div key={i} style={{ fontSize: 14, lineHeight: 1.8, color: t.tx, marginBottom: 12 }}>{b}</div>
+            <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: t.tx, marginBottom: 8 }}>{b}</div>
           ))}
 
           {s.box && (
-            <div style={{ background: t.sf, borderRadius: 10, padding: 14, marginBottom: 12 }}>
+            <div style={{ background: t.sf, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
               {s.box.map((item, i) => (
-                <div key={i} style={{ fontSize: 13, lineHeight: 1.9, color: t.tx, display: "flex", gap: 8 }}>
+                <div key={i} style={{ fontSize: 12.5, lineHeight: 1.7, color: t.tx, display: "flex", gap: 7 }}>
                   <span style={{ color: t.ac, flexShrink: 0 }}>•</span>
                   <span>{item}</span>
                 </div>
@@ -3819,20 +3833,9 @@ input, select { padding: 10px 14px; }
           )}
 
           {s.note && (
-            <div style={{ background: t.gdS, borderRadius: 10, padding: 12, border: `1px solid ${t.gd}33`, marginBottom: 4 }}>
-              <div style={{ fontSize: 12, color: t.gd, lineHeight: 1.7 }}>💡 {s.note}</div>
+            <div style={{ background: t.gdS, borderRadius: 10, padding: "9px 11px", border: `1px solid ${t.gd}33`, marginBottom: 0 }}>
+              <div style={{ fontSize: 11.5, color: t.gd, lineHeight: 1.6 }}>💡 {s.note}</div>
             </div>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={{ ...actionBtn(), flex: 1, opacity: guideStep === 0 ? 0.4 : 1 }}
-            disabled={guideStep === 0}
-            onClick={() => setGuideStep(guideStep - 1)}>← 前へ</button>
-          {guideStep < GUIDE_STEPS.length - 1 ? (
-            <button style={{ ...actionBtn("p"), flex: 1 }} onClick={() => setGuideStep(guideStep + 1)}>次へ →</button>
-          ) : (
-            <button style={{ ...actionBtn("p"), flex: 1 }} onClick={() => setView("home")}>完了</button>
           )}
         </div>
       </div>
