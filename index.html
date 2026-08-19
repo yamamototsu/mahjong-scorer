@@ -11318,7 +11318,21 @@ input, select { padding: 10px 14px; }
         });
         setRulesSaved(false);
         setHomeCat("settings");
-      }));
+      }), React.createElement("button", {
+        onClick: () => setView("title"),
+        style: {
+          width: "100%",
+          marginTop: 14,
+          padding: "11px 8px",
+          borderRadius: 11,
+          cursor: "pointer",
+          border: `1px solid ${t.bd}`,
+          background: "transparent",
+          color: t.dm,
+          fontSize: 12,
+          fontWeight: 700
+        }
+      }, "← タイトルへ"));
     }
     const CATS = {
       play: {
