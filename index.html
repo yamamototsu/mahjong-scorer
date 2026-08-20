@@ -17401,15 +17401,7 @@ input, select { padding: 10px 14px; }
           opacity: 0.85,
           marginRight: 4
         }
-      }, "合計"), diceVals[0] + diceVals[1]), wallTargetIdx >= 0 && React.createElement("div", {
-        style: {
-          fontSize: 11,
-          fontWeight: 800,
-          color: "#7dd3fc",
-          marginTop: 2,
-          whiteSpace: "nowrap"
-        }
-      }, SEAT_WINDS[(wallTargetIdx - dealerIdx + PC) % PC], " ", players[wallTargetIdx], " の山"))));
+      }, "合計"), diceVals[0] + diceVals[1]))));
     })(), !tmWinStep && !tmDrawMode && !(diceRolling || diceSettled) && (() => {
       const rolled = diceRoundKey === `${roundWind}${dealerIdx}-${honba}-${rounds.length}`;
       const rot = rotOf(dealerIdx);
