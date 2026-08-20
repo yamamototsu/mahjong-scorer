@@ -8255,19 +8255,29 @@ input, select { padding: 10px 14px; }
                       backgroundImage: `url(${TABLE_IMG})`, backgroundSize: "100% 100%",
                       backgroundColor: "#103526",
                     }}>
-                      {/* 西（向かい） */}
-                      <div style={{ position: "absolute", top: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox(2)}</div>
-                      {/* 北（左） */}
-                      <div style={{ position: "absolute", left: "7%", top: "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox(3)}</div>
-                      {/* 南（右） */}
-                      <div style={{ position: "absolute", right: "7%", top: "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox(1)}</div>
-                      {/* 東（手前・起家） */}
-                      <div style={{ position: "absolute", bottom: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox(0)}</div>
+                      {/* 向かい（三人麻雀ではなし） */}
+                      {PC === 4 && (
+                        <div style={{ position: "absolute", top: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox((2 + seatRot) % PC)}</div>
+                      )}
+                      {/* 左 */}
+                      <div style={{ position: "absolute", left: "7%", top: PC === 3 ? "34%" : "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox(((PC === 3 ? 2 : 3) + seatRot) % PC)}</div>
+                      {/* 右 */}
+                      <div style={{ position: "absolute", right: "7%", top: PC === 3 ? "34%" : "50%", transform: "translateY(-50%)", maxWidth: "34%" }}>{seatBox((1 + seatRot) % PC)}</div>
+                      {/* 手前 */}
+                      <div style={{ position: "absolute", bottom: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox((0 + seatRot) % PC)}</div>
+                      {/* 表示の向きを回転 */}
+                      <button onClick={() => setSeatRot(r => (r + PC - 1) % PC)} aria-label="表示を回転" style={{
+                        position: "absolute", right: "3%", bottom: "3%", width: 36, height: 36, borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,0.35)", background: "rgba(0,0,0,0.55)",
+                        color: "#fff", fontSize: 17, cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>🔄</button>
                     </div>
                   );
                 })()}
-                <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 5 }}>
-                  手前が東（起家）。この向きで座ります
+                <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 5, lineHeight: 1.7 }}>
+                  手前: <b style={{ color: seatRot === 0 ? t.gd : t.tx }}>{players[(0 + seatRot) % PC]}</b>
+                  {seatRot === 0 ? "（東・起家）" : ""} ・ 🔄で表示の向きを回せます（対局画面にも反映）
                 </div>
               </div>
               <div style={{ padding: "6px 0 0" }}>
