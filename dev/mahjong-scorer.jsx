@@ -477,7 +477,8 @@ export default function MahjongScorer() {
     kiriage: false,         // 切り上げ満貫（4翻30符・3翻60符を満貫扱い）
     doubleYakuman: false,   // ダブル役満（役満の複合を2倍・3倍で計算）
     honbaUnit: 300,         // 1本場の点数（三麻連盟ルールは600）
-    rate: 0,                // レート（1ptあたりのゴールド）。0=なし
+    rate: 0,                // レート（1点あたりの単位）。0=なし
+    rateUnit: "G",          // レートの単位名（3文字以内）
     kazoeYakuman: true,     // 数え役満（OFFなら11翻以上は三倍満どまり）
     orasYame: true,         // オーラスで親がトップなら終了（アガリやめ・テンパイやめ）
     multiRon: "atamahane",  // 複数ロン: "atamahane"=頭ハネ / "double"=ダブロンまで / "triple"=トリプルロンまで
@@ -3405,9 +3406,12 @@ input, select { padding: 10px 14px; }
   };
 
   // レート設定のカード（ルール編集用）
-  const RateSetting = ({ rate, onChange }) => {
+  const RateSetting = ({ rate, onChange, unit, onUnitChange }) => {
     const on = !!rate;
+    const U = unit || "G";
     const g = (pts) => GOLD_LABEL(Math.round(pts * (rate || 0) * 100) / 100);
+    const [unitDraft, setUnitDraft] = React.useState(U);
+    React.useEffect(() => { setUnitDraft(U); }, [U]);
     return (
       <div style={{ marginBottom: 16 }}>
         {/* レート精算をするかどうか */}
@@ -3425,9 +3429,34 @@ input, select { padding: 10px 14px; }
         </div>
 
         {on && (<>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（G）</div>
+          <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, background: t.sf, border: `1px solid ${t.bd}` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 6 }}>レート単位を変える</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input value={unitDraft} maxLength={3}
+                onChange={(e) => setUnitDraft(e.target.value.slice(0, 3))}
+                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                placeholder="G"
+                style={{
+                  flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 9,
+                  border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
+                  fontSize: 16, fontWeight: 800, textAlign: "center", outline: "none",
+                }} />
+              <button
+                onClick={() => { const v = (unitDraft || "").trim().slice(0, 3) || "G"; setUnitDraft(v); onUnitChange && onUnitChange(v); }}
+                disabled={(unitDraft || "").trim() === U}
+                style={{
+                  padding: "10px 18px", borderRadius: 9, border: "none", cursor: "pointer",
+                  background: (unitDraft || "").trim() === U ? t.bd : t.ac,
+                  color: (unitDraft || "").trim() === U ? t.dm : "#fff",
+                  fontSize: 14, fontWeight: 800, flexShrink: 0,
+                }}>決定</button>
+            </div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>3文字以内（例: G、pt、円、枚）</div>
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（{U}）</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
-            1点あたりのゴールド。精算画面にゴールドの増減が表示されます
+1点あたりの{U}。精算画面に{U}の増減が表示されます
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1 }}>
@@ -3436,13 +3465,13 @@ input, select { padding: 10px 14px; }
             <div style={{ width: 118, textAlign: "center" }}>
               <div style={{ fontSize: 10, color: t.dm }}>1点 =</div>
               <div style={{ fontSize: 20, fontWeight: 900, color: t.gd, lineHeight: 1.3 }}>{RATE_LABEL(rate)}</div>
-              <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>G</div>
+              <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>{U}</div>
               <div style={{
                 fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.8,
                 paddingTop: 6, borderTop: `1px solid ${t.bd}`,
               }}>
-                1,000点 = <b style={{ color: t.gd }}>{g(1000)}G</b><br />
-                30,000点 = <b style={{ color: t.gd }}>{g(30000)}G</b>
+                1,000点 = <b style={{ color: t.gd }}>{g(1000)}{U}</b><br />
+                30,000点 = <b style={{ color: t.gd }}>{g(30000)}{U}</b>
               </div>
             </div>
           </div>
@@ -5472,7 +5501,7 @@ input, select { padding: 10px 14px; }
                     </span>
                     <span style={{ fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums",
                       color: ptOf[r.i] > 0 ? t.gd : ptOf[r.i] < 0 ? t.rd : t.dm }}>
-                      {ptOf[r.i] > 0 ? "+" : ""}{GOLD_LABEL(GOLD(ptOf[r.i], rate))}<span style={{ fontSize: 10, marginLeft: 2, opacity: 0.8 }}>G</span>
+                      {ptOf[r.i] > 0 ? "+" : ""}{GOLD_LABEL(GOLD(ptOf[r.i], rate))}<span style={{ fontSize: 10, marginLeft: 2, opacity: 0.8 }}>{gameConfig?.rules?.rateUnit || "G"}</span>
                     </span>
                   </span>
                 ) : (
@@ -5495,7 +5524,7 @@ input, select { padding: 10px 14px; }
               background: rankPeekGold ? t.gdS : "transparent",
               color: t.gd, fontSize: 12, fontWeight: 800,
             }} onClick={() => setRankPeekGold(v => !v)}>
-              {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}G）`}
+              {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`}
             </button>
           )}
           {rankPeekGold && ptOf && (
@@ -6124,10 +6153,11 @@ input, select { padding: 10px 14px; }
               </div>
             )}
 
-            {secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} G` : "レート計算なし")}
+            {secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${draftRules.rateUnit || "G"}` : "レート計算なし")}
             {setOpen === "rate" && (
               <div style={{ ...card, padding: 16, marginTop: 4 }}>
-                <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })} />
+                <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })}
+                  unit={draftRules.rateUnit} onUnitChange={(u) => editDraft({ rateUnit: u })} />
               </div>
             )}
 
@@ -8108,6 +8138,8 @@ input, select { padding: 10px 14px; }
 
           <div style={{ marginTop: 18, marginBottom: 8 }}>
             <UmaOkaSettings rules={rules} onChange={(patch) => setRules(r => ({ ...r, ...patch }))} />
+            <RateSetting rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
+              unit={rules.rateUnit} onUnitChange={(u) => setRules(r => ({ ...r, rateUnit: u }))} />
           </div>
 
           <RuleHelp />
@@ -9851,7 +9883,7 @@ input, select { padding: 10px 14px; }
                         color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm,
                       }}>
                         {o.pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate))}
-                        <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>G</span>
+                        <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>{gameConfig.rules.rateUnit || "G"}</span>
                       </div>
                     )}
                   </div>
@@ -9859,7 +9891,7 @@ input, select { padding: 10px 14px; }
               ))}
               {!!(gameConfig?.rules?.rate) && (
                 <div style={{ fontSize: 10, color: t.dm, textAlign: "right", marginTop: 6 }}>
-                  レート 1点 = {RATE_LABEL(gameConfig.rules.rate)} G
+                  レート 1点 = {RATE_LABEL(gameConfig.rules.rate)} {gameConfig.rules.rateUnit || "G"}
                 </div>
               )}
             </div>
@@ -9919,7 +9951,7 @@ input, select { padding: 10px 14px; }
                       width: 62, textAlign: "right", fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums",
                       color: res[i].pt > 0 ? t.gd : res[i].pt < 0 ? t.rd : t.dm,
                     }}>{res[i].pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(res[i].pt, lg.rules.rate))}
-                      <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>G</span>
+                      <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>{lg.rules.rateUnit || "G"}</span>
                     </span>
                   )}
                 </div>
