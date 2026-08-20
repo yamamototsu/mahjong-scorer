@@ -8813,11 +8813,6 @@ input, select { padding: 10px 14px; }
                             <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.85, marginRight: 4 }}>合計</span>
                             {diceVals[0] + diceVals[1]}
                           </div>
-                          {wallTargetIdx >= 0 && (
-                            <div style={{ fontSize: 11, fontWeight: 800, color: "#7dd3fc", marginTop: 2, whiteSpace: "nowrap" }}>
-                              {SEAT_WINDS[(wallTargetIdx - dealerIdx + PC) % PC]} {players[wallTargetIdx]} の山
-                            </div>
-                          )}
                         </>
                       )}
                     </div>
