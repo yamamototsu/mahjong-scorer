@@ -4389,6 +4389,27 @@ input, select { padding: 10px 14px; }
   const [playerDetail, setPlayerDetail] = useState(null); // 変動履歴を表示するプレイヤーのindex
   const [rankPeek, setRankPeek] = useState(null);         // 長押しで順位・点差を表示するプレイヤーのindex
   const [rankPeekGold, setRankPeekGold] = useState(false); // 順位ビューでレート換算を表示
+  const [setOpen, setSetOpen] = useState(null); // 設定画面のアコーディオン（開いている項目）
+  const secHdr = (id, icon, title, sub) => (
+    <button key={"sec-" + id} onClick={() => setSetOpen(v => (v === id ? null : id))} style={{
+      ...card, width: "100%", padding: 14, marginTop: 4,
+      display: "flex", alignItems: "center", gap: 10, cursor: "pointer", textAlign: "left",
+      border: `1px solid ${setOpen === id ? t.ac : t.bd}`,
+    }}>
+      <span style={{
+        fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+      }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: t.tx }}>{title}</span>
+        <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2 }}>{sub}</span>
+      </span>
+      <span style={{
+        color: setOpen === id ? t.ac : t.dm, fontSize: 13, flexShrink: 0,
+        transform: setOpen === id ? "rotate(180deg)" : "none", transition: "transform 0.2s",
+      }}>▼</span>
+    </button>
+  );
   const [showPayView, setShowPayView] = useState(false);  // 卓上表示（点数の受け渡しを矢印で表示）
   const [yakuInfo, setYakuInfo] = useState(null);         // 長押しで説明を出す役
   const [startSplash, setStartSplash] = useState(null);   // 対局開始の演出 { league, gameNo, matchType, date, seats }
@@ -5779,6 +5800,8 @@ input, select { padding: 10px 14px; }
 
         {homeCat === "settings" && (
           <>
+            {secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`)}
+            {setOpen === "players" && (<>
             {menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
               setView("names"); setNewNameInput(""); setEditNameIdx(null);
             })}
@@ -5917,7 +5940,10 @@ input, select { padding: 10px 14px; }
                   }}>＋ グループを作る</button>
               )}
             </div>
+            </>)}
 
+            {secHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値")}
+            {setOpen === "rules" && (<>
             {/* ルールのデフォルト */}
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -6019,37 +6045,27 @@ input, select { padding: 10px 14px; }
                 </div>
               ))}
 
-              <div style={{ marginTop: 16 }}>
-                <UmaOkaSettings rules={draftRules} onChange={editDraft} compact />
-                <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })} />
-              </div>
-
               <RuleHelp />
 
-              {/* 確定 */}
-              <button
-                onClick={commitDraftRules}
-                disabled={!rulesDirty}
-                style={{
-                  width: "100%", marginTop: 16, padding: "14px 8px", borderRadius: 11, border: "none",
-                  background: rulesSaved ? t.gn : rulesDirty ? t.ac : t.bd,
-                  color: rulesDirty || rulesSaved ? "#fff" : t.dm,
-                  fontSize: 15, fontWeight: 800,
-                  cursor: rulesDirty ? "pointer" : "default",
-                  transition: "background 0.2s",
-                }}
-              >{rulesSaved ? "✓ 保存しました" : rulesDirty ? "確定して保存" : "変更はありません"}</button>
-              {rulesDirty && (
-                <button
-                  onClick={() => { setDraftRules({ ...defaultRules }); setRulesSaved(false); }}
-                  style={{ ...actionBtn(), marginTop: 8, fontSize: 12, color: t.dm }}
-                >変更を取り消す</button>
-              )}
-
-              <button style={{ ...actionBtn(), marginTop: 8, fontSize: 12, color: t.dm }}
-                onClick={() => { setDraftRules({ ...FACTORY_RULES }); setRulesSaved(false); }}>初期状態に戻す</button>
             </div>
+            </>)}
 
+            {secHdr("uma", "🏅", "ウマ・オカ設定", "順位点・持ち点・返し点")}
+            {setOpen === "uma" && (
+              <div style={{ ...card, padding: 16, marginTop: 4 }}>
+                <UmaOkaSettings rules={draftRules} onChange={editDraft} compact />
+              </div>
+            )}
+
+            {secHdr("rate", "💰", "レート設定", `1pt = ${RATE_LABEL(draftRules.rate || 0)}${draftRules.rate ? " ゴールド" : ""}`)}
+            {setOpen === "rate" && (
+              <div style={{ ...card, padding: 16, marginTop: 4 }}>
+                <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })} />
+              </div>
+            )}
+
+            {secHdr("dice", "🎲", "サイコロ設定", "表示時間と効果音")}
+            {setOpen === "dice" && (<>
             {/* サイコロ設定 */}
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -6088,7 +6104,10 @@ input, select { padding: 10px 14px; }
                 </button>
               </div>
             </div>
+            </>)}
 
+            {secHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
+            {setOpen === "screen" && (<>
             {/* 画面スリープ防止 */}
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -6118,6 +6137,33 @@ input, select { padding: 10px 14px; }
                 </div>
               )}
             </div>
+            </>)}
+
+            {/* ルール類の保存（変更があるときだけ表示） */}
+            {(rulesDirty || rulesSaved) && (
+              <div style={{ ...card, padding: 14, marginTop: 8 }}>
+                <button
+                  onClick={commitDraftRules}
+                  disabled={!rulesDirty}
+                  style={{
+                    width: "100%", padding: "14px 8px", borderRadius: 11, border: "none",
+                    background: rulesSaved ? t.gn : rulesDirty ? t.ac : t.bd,
+                    color: rulesDirty || rulesSaved ? "#fff" : t.dm,
+                    fontSize: 15, fontWeight: 800,
+                    cursor: rulesDirty ? "pointer" : "default",
+                    transition: "background 0.2s",
+                  }}
+                >{rulesSaved ? "✓ 保存しました" : rulesDirty ? "変更を確定して保存" : "変更はありません"}</button>
+                {rulesDirty && (
+                  <button
+                    onClick={() => { setDraftRules({ ...defaultRules }); setRulesSaved(false); }}
+                    style={{ ...actionBtn(), marginTop: 8, marginBottom: 0, fontSize: 12, color: t.dm }}
+                  >変更を取り消す</button>
+                )}
+              </div>
+            )}
+            <button style={{ ...actionBtn(), marginTop: 8, fontSize: 12, color: t.dm }}
+              onClick={() => { setDraftRules({ ...FACTORY_RULES }); setRulesSaved(false); }}>ルールを初期状態に戻す</button>
           </>
         )}
 
