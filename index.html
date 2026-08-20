@@ -16401,7 +16401,7 @@ input, select { padding: 10px 14px; }
     return React.createElement("div", {
       style: {
         marginTop: 4,
-        maxWidth: 250,
+        maxWidth: 300,
         marginLeft: "auto",
         marginRight: "auto",
         aspectRatio: "1 / 1",
@@ -16448,19 +16448,21 @@ input, select { padding: 10px 14px; }
       "aria-label": "表示を回転",
       style: {
         position: "absolute",
-        right: "3%",
-        bottom: "3%",
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.35)",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%,-50%)",
+        width: 46,
+        height: 46,
+        borderRadius: 23,
+        border: "1.5px solid rgba(255,255,255,0.4)",
         background: "rgba(0,0,0,0.55)",
         color: "#fff",
-        fontSize: 17,
+        fontSize: 21,
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
-        justifyContent: "center"
+        justifyContent: "center",
+        boxShadow: "0 3px 12px rgba(0,0,0,0.45)"
       }
     }, "🔄"));
   })(), React.createElement("div", {
