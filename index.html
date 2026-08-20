@@ -16562,7 +16562,32 @@ input, select { padding: 10px 14px; }
       resetSeatDraw();
       setSetupStep(1);
     }
-  }, "席決めへ"), !matchType && React.createElement("div", {
+  }, "席決めへ"), React.createElement("button", {
+    style: {
+      ...actionBtn(),
+      marginTop: 8,
+      marginBottom: 0,
+      border: `1px solid ${t.gn}66`,
+      color: t.gn,
+      fontWeight: 800,
+      opacity: players.slice(0, PC).every(p => p.trim()) && matchType ? 1 : 0.4
+    },
+    disabled: !players.slice(0, PC).every(p => p.trim()) || !matchType,
+    onClick: () => {
+      const adds = players.slice(0, PC).map(x => (x || "").trim()).filter(x => x && !presetNames.includes(x) && !/^[A-D]プレーヤー$/.test(x));
+      if (adds.length) savePresetNames([...presetNames, ...Array.from(new Set(adds))]);
+      setSeatRot(0);
+      startGame();
+    }
+  }, "⚡ クイックスタート"), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      textAlign: "center",
+      marginTop: 6,
+      lineHeight: 1.6
+    }
+  }, "席決め・親決め・確認をスキップして、この並びのまま開始します"), !matchType && React.createElement("div", {
     style: {
       fontSize: 11,
       color: t.dm,
