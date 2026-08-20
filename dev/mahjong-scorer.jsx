@@ -55,9 +55,9 @@ const RATE_VALUES = (() => {
   for (let v = 100; v <= 1000; v += 50) out.push(Math.round(v) / 100); // 1.0〜10.0
   return out;
 })();
-const RATE_LABEL = (r) => !r ? "なし" : (r < 1 ? r.toFixed(2) : (r % 1 === 0 ? String(r) : r.toFixed(1)));
-const GOLD = (pt, rate) => Math.round(pt * 1000 * rate * 100) / 100;  // ptは1000点単位
-const GOLD_LABEL = (g) => (g % 1 === 0 ? String(g) : g.toFixed(2).replace(/0$/, ""));
+const RATE_LABEL = (r) => !r ? "なし" : String(parseFloat(Number(r).toFixed(3)));
+const GOLD = (pt, rate) => Math.round(pt * 1000 * rate * 1000) / 1000;  // ptは1000点単位
+const GOLD_LABEL = (g) => (g % 1 === 0 ? g.toLocaleString() : parseFloat(g.toFixed(3)).toLocaleString());
 const TABLE_IMG = "assets/table.jpg";   // 麻雀卓の画像
 // 人数に応じた席風（三麻は北家なし）
 const SEATS_OF = (pc) => pc === 3 ? ["東", "南", "西"] : WINDS;
@@ -3411,6 +3411,10 @@ input, select { padding: 10px 14px; }
     const U = unit || "G";
     const [unitDraft, setUnitDraft] = React.useState(U);
     React.useEffect(() => { setUnitDraft(U); }, [U]);
+    const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
+    React.useEffect(() => { if (rate) setRateDraft(String(rate)); }, [rate]);
+    const rateNum = parseFloat(rateDraft);
+    const rateValid = !isNaN(rateNum) && rateNum >= 0.001 && rateNum <= 10;
     return (
       <div style={{ marginBottom: 16 }}>
         {/* レート精算をするかどうか */}
@@ -3455,17 +3459,49 @@ input, select { padding: 10px 14px; }
 
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（{U}）</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
-1点あたりの{U}。精算画面に{U}の増減が表示されます
+            1点あたりの{U}。精算画面に{U}の増減が表示されます
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <ReelPicker values={RATE_VALUES.filter(v => v > 0)} value={rate} onChange={onChange} labelOf={RATE_LABEL} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input value={rateDraft}
+              inputMode="decimal"
+              onChange={(e) => setRateDraft(e.target.value.replace(/[^0-9.]/g, "").slice(0, 6))}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              placeholder="0.1"
+              style={{
+                flex: 1, minWidth: 0, padding: "12px 12px", borderRadius: 9,
+                border: `1px solid ${rateValid ? t.bd : t.rd}`, background: t.card, color: t.tx,
+                fontSize: 20, fontWeight: 900, textAlign: "center", outline: "none",
+              }} />
+            <span style={{ fontSize: 14, fontWeight: 800, color: t.gd, flexShrink: 0 }}>{U}</span>
+            <button
+              onClick={() => { if (rateValid) onChange(rateNum); }}
+              disabled={!rateValid || rateNum === rate}
+              style={{
+                padding: "12px 18px", borderRadius: 9, border: "none", cursor: "pointer",
+                background: (rateValid && rateNum !== rate) ? t.ac : t.bd,
+                color: (rateValid && rateNum !== rate) ? "#fff" : t.dm,
+                fontSize: 14, fontWeight: 800, flexShrink: 0,
+              }}>決定</button>
+          </div>
+          <div style={{ fontSize: 10, color: rateValid ? t.dm : t.rd, marginTop: 6 }}>
+            {rateValid ? "0.001 〜 10 の範囲で入力" : "0.001 〜 10 の範囲で入力してください"}
+          </div>
+
+          <div style={{
+            marginTop: 12, padding: "10px 12px", borderRadius: 10,
+            background: t.sf, border: `1px solid ${t.bd}`,
+          }}>
+            <div style={{ fontSize: 11, color: t.dm, fontWeight: 700, marginBottom: 6 }}>
+              点数例（1点 = {RATE_LABEL(rate)}{U}）
             </div>
-            <div style={{ width: 118, textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: t.dm }}>1点 =</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: t.gd, lineHeight: 1.3 }}>{RATE_LABEL(rate)}</div>
-              <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>{U}</div>
-            </div>
+            {[1000, 10000, 30000].map(pts => (
+              <div key={pts} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, lineHeight: 2 }}>
+                <span style={{ color: t.dm }}>{pts.toLocaleString()}点</span>
+                <span style={{ color: t.gd, fontWeight: 800 }}>
+                  {GOLD_LABEL(Math.round(pts * rate * 1000) / 1000)}{U}
+                </span>
+              </div>
+            ))}
           </div>
         </>)}
       </div>
