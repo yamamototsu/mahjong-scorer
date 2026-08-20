@@ -4388,6 +4388,7 @@ input, select { padding: 10px 14px; }
   const [seatRot, setSeatRot] = useState(0); // 卓の回転（0-3）自分を手前に持ってくる
   const [playerDetail, setPlayerDetail] = useState(null); // 変動履歴を表示するプレイヤーのindex
   const [rankPeek, setRankPeek] = useState(null);         // 長押しで順位・点差を表示するプレイヤーのindex
+  const [rankPeekGold, setRankPeekGold] = useState(false); // 順位ビューでレート換算を表示
   const [showPayView, setShowPayView] = useState(false);  // 卓上表示（点数の受け渡しを矢印で表示）
   const [yakuInfo, setYakuInfo] = useState(null);         // 長押しで説明を出す役
   const [startSplash, setStartSplash] = useState(null);   // 対局開始の演出 { league, gameNo, matchType, date, seats }
@@ -4419,6 +4420,7 @@ input, select { padding: 10px 14px; }
       longPressTimer.current = setTimeout(() => {
         longPressFired.current = true;
         try { if (navigator.vibrate) navigator.vibrate(12); } catch {}
+        setRankPeekGold(false);
         setRankPeek(i);
       }, 500);
     },
@@ -5323,6 +5325,20 @@ input, select { padding: 10px 14px; }
     // 同点は起家に近い席が上位
     const ranked = scores.map((v, i) => ({ i, v })).sort((a, b) => (b.v - a.v) || (a.i - b.i));
     const myRank = ranked.findIndex(r => r.i === pi) + 1;
+    // レート換算: いま終局した場合のポイント（ウマ・オカ込み）→ゴールド
+    const rate = gameConfig?.rules?.rate || 0;
+    const rs = gameConfig?.rules || {};
+    let ptOf = null;
+    if (rate > 0) {
+      const sp = rs.startPoints ?? 25000, rp = rs.returnPoints ?? 30000;
+      const uma = (rs.uma && rs.uma.length === PC) ? rs.uma : Array(PC).fill(0);
+      const okaPool = (rp - sp) * PC;
+      const gosha = (v) => { const sg = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return sg * (a - f > 0.5 ? f + 1 : f); };
+      ptOf = {};
+      ranked.forEach((r, rank) => {
+        ptOf[r.i] = gosha((r.v - rp + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0);
+      });
+    }
     return (
       <div
         onClick={() => setRankPeek(null)}
@@ -5361,15 +5377,44 @@ input, select { padding: 10px 14px; }
                   borderRadius: 5, boxSizing: "border-box",
                 }}>{SEAT_WINDS[(r.i - dealerIdx + PC) % PC]}</span>
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{players[r.i]}</span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: r.v < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums" }}>{r.v.toLocaleString()}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, width: 66, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums",
-                  color: me ? t.dm : diff > 0 ? t.rd : diff < 0 ? t.gn : t.dm }}>
-                  {me ? "—" : (diff > 0 ? "+" : "") + diff.toLocaleString()}
-                </span>
+                {rankPeekGold && ptOf ? (
+                  <span style={{ textAlign: "right", flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: t.dm, fontVariantNumeric: "tabular-nums", display: "block" }}>
+                      {ptOf[r.i] > 0 ? "+" : ""}{ptOf[r.i]}pt
+                    </span>
+                    <span style={{ fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                      color: ptOf[r.i] > 0 ? t.gd : ptOf[r.i] < 0 ? t.rd : t.dm }}>
+                      {ptOf[r.i] > 0 ? "+" : ""}{GOLD_LABEL(GOLD(ptOf[r.i], rate))}<span style={{ fontSize: 10, marginLeft: 2, opacity: 0.8 }}>G</span>
+                    </span>
+                  </span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: r.v < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums" }}>{r.v.toLocaleString()}</span>
+                    <span style={{ fontSize: 12, fontWeight: 800, width: 66, textAlign: "right", flexShrink: 0, fontVariantNumeric: "tabular-nums",
+                      color: me ? t.dm : diff > 0 ? t.rd : diff < 0 ? t.gn : t.dm }}>
+                      {me ? "—" : (diff > 0 ? "+" : "") + diff.toLocaleString()}
+                    </span>
+                  </>
+                )}
               </div>
             );
           })}
 
+          {rate > 0 && (
+            <button style={{
+              width: "100%", marginTop: 8, padding: "11px 8px", borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${rankPeekGold ? t.gd : t.gd + "55"}`,
+              background: rankPeekGold ? t.gdS : "transparent",
+              color: t.gd, fontSize: 12, fontWeight: 800,
+            }} onClick={() => setRankPeekGold(v => !v)}>
+              {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1pt = ${RATE_LABEL(rate)}G）`}
+            </button>
+          )}
+          {rankPeekGold && ptOf && (
+            <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
+              いま終局した場合のポイント（ウマ・オカ込み）をゴールドに換算した値です
+            </div>
+          )}
           <button style={{
             width: "100%", marginTop: 8, padding: "10px 8px", borderRadius: 9, cursor: "pointer",
             border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700,
