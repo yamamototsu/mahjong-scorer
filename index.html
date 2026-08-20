@@ -9132,6 +9132,7 @@ input, select { padding: 10px 14px; }
   const [seatRot, setSeatRot] = useState(0);
   const [playerDetail, setPlayerDetail] = useState(null);
   const [rankPeek, setRankPeek] = useState(null);
+  const [rankPeekGold, setRankPeekGold] = useState(false);
   const [showPayView, setShowPayView] = useState(false);
   const [yakuInfo, setYakuInfo] = useState(null);
   const [startSplash, setStartSplash] = useState(null);
@@ -9172,6 +9173,7 @@ input, select { padding: 10px 14px; }
         try {
           if (navigator.vibrate) navigator.vibrate(12);
         } catch {}
+        setRankPeekGold(false);
         setRankPeek(i);
       }, 500);
     },
@@ -10673,6 +10675,25 @@ input, select { padding: 10px 14px; }
       v
     })).sort((a, b) => b.v - a.v || a.i - b.i);
     const myRank = ranked.findIndex(r => r.i === pi) + 1;
+    const rate = gameConfig?.rules?.rate || 0;
+    const rs = gameConfig?.rules || {};
+    let ptOf = null;
+    if (rate > 0) {
+      const sp = rs.startPoints ?? 25000,
+        rp = rs.returnPoints ?? 30000;
+      const uma = rs.uma && rs.uma.length === PC ? rs.uma : Array(PC).fill(0);
+      const okaPool = (rp - sp) * PC;
+      const gosha = v => {
+        const sg = v < 0 ? -1 : 1,
+          a = Math.abs(v),
+          f = Math.floor(a);
+        return sg * (a - f > 0.5 ? f + 1 : f);
+      };
+      ptOf = {};
+      ranked.forEach((r, rank) => {
+        ptOf[r.i] = gosha((r.v - rp + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0);
+      });
+    }
     return React.createElement("div", {
       onClick: () => setRankPeek(null),
       style: {
@@ -10767,7 +10788,33 @@ input, select { padding: 10px 14px; }
           textOverflow: "ellipsis",
           whiteSpace: "nowrap"
         }
-      }, players[r.i]), React.createElement("span", {
+      }, players[r.i]), rankPeekGold && ptOf ? React.createElement("span", {
+        style: {
+          textAlign: "right",
+          flexShrink: 0
+        }
+      }, React.createElement("span", {
+        style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: t.dm,
+          fontVariantNumeric: "tabular-nums",
+          display: "block"
+        }
+      }, ptOf[r.i] > 0 ? "+" : "", ptOf[r.i], "pt"), React.createElement("span", {
+        style: {
+          fontSize: 15,
+          fontWeight: 900,
+          fontVariantNumeric: "tabular-nums",
+          color: ptOf[r.i] > 0 ? t.gd : ptOf[r.i] < 0 ? t.rd : t.dm
+        }
+      }, ptOf[r.i] > 0 ? "+" : "", GOLD_LABEL(GOLD(ptOf[r.i], rate)), React.createElement("span", {
+        style: {
+          fontSize: 10,
+          marginLeft: 2,
+          opacity: 0.8
+        }
+      }, "G"))) : React.createElement(React.Fragment, null, React.createElement("span", {
         style: {
           fontSize: 15,
           fontWeight: 800,
@@ -10784,8 +10831,30 @@ input, select { padding: 10px 14px; }
           fontVariantNumeric: "tabular-nums",
           color: me ? t.dm : diff > 0 ? t.rd : diff < 0 ? t.gn : t.dm
         }
-      }, me ? "—" : (diff > 0 ? "+" : "") + diff.toLocaleString()));
-    }), React.createElement("button", {
+      }, me ? "—" : (diff > 0 ? "+" : "") + diff.toLocaleString())));
+    }), rate > 0 && React.createElement("button", {
+      style: {
+        width: "100%",
+        marginTop: 8,
+        padding: "11px 8px",
+        borderRadius: 9,
+        cursor: "pointer",
+        border: `1px solid ${rankPeekGold ? t.gd : t.gd + "55"}`,
+        background: rankPeekGold ? t.gdS : "transparent",
+        color: t.gd,
+        fontSize: 12,
+        fontWeight: 800
+      },
+      onClick: () => setRankPeekGold(v => !v)
+    }, rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1pt = ${RATE_LABEL(rate)}G）`), rankPeekGold && ptOf && React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        textAlign: "center",
+        marginTop: 6,
+        lineHeight: 1.6
+      }
+    }, "いま終局した場合のポイント（ウマ・オカ込み）をゴールドに換算した値です"), React.createElement("button", {
       style: {
         width: "100%",
         marginTop: 8,
