@@ -3846,7 +3846,20 @@ function MahjongScorer() {
         onClick: onCancel
       }, "キャンセル"));
     }
-    return React.createElement("div", null, yakuInfo && (() => {
+    return React.createElement("div", {
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 160,
+        background: t.bg,
+        display: "flex",
+        flexDirection: "column",
+        paddingTop: "env(safe-area-inset-top)"
+      }
+    }, yakuInfo && (() => {
       const y = yakuInfo;
       const m = y.name.match(/^(.+?)（(.+?)）$/);
       const base = m ? m[1] : y.name,
@@ -3920,14 +3933,10 @@ function MahjongScorer() {
       }, "閉じる")));
     })(), React.createElement("div", {
       style: {
-        position: "sticky",
-        top: 0,
-        zIndex: 12,
-        margin: "-4px -4px 10px",
-        padding: "10px 10px 8px",
+        flexShrink: 0,
+        padding: "10px 12px 8px",
         background: t.card,
-        borderBottom: `1px solid ${t.bd}`,
-        borderRadius: 12
+        borderBottom: `1px solid ${t.bd}`
       }
     }, React.createElement("div", {
       style: {
@@ -4017,6 +4026,11 @@ function MahjongScorer() {
         whiteSpace: "nowrap"
       }
     }, "裏ドラ", pickerUra))))), React.createElement("div", {
+      style: {
+        flexShrink: 0,
+        padding: "10px 12px 0"
+      }
+    }, React.createElement("div", {
       style: {
         display: "flex",
         gap: 5,
@@ -4172,11 +4186,13 @@ function MahjongScorer() {
         lineHeight: 1,
         padding: 0
       }
-    }, "+")))))), React.createElement("div", {
+    }, "+"))))))), React.createElement("div", {
       style: {
-        maxHeight: 420,
+        flex: "1 1 auto",
+        minHeight: 0,
         overflowY: "auto",
-        marginBottom: 10
+        padding: "10px 12px 4px",
+        WebkitOverflowScrolling: "touch"
       }
     }, CATS.map(cat => {
       const list = YAKU_DATA.filter(y => catOf(y) === cat && ctxOk(y));
@@ -4320,12 +4336,10 @@ function MahjongScorer() {
       })));
     })), React.createElement("div", {
       style: {
-        position: "sticky",
-        bottom: 0,
-        zIndex: 12,
-        margin: "8px -4px 0",
-        padding: "10px 4px calc(8px + env(safe-area-inset-bottom))",
-        background: `linear-gradient(to top, ${t.card} 72%, transparent)`,
+        flexShrink: 0,
+        padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+        background: t.card,
+        borderTop: `1px solid ${t.bd}`,
         display: "flex",
         gap: 8
       }
