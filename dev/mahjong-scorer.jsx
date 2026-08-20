@@ -8094,11 +8094,11 @@ input, select { padding: 10px 14px; }
           </>)}
 
 
-          {/* 詳細を開いているとき、または形式を選んだあとは下にも進むボタンを出す */}
-          {(rulesOpen || !lastRules || matchType) && (
+          {/* 詳細を開いているときだけ、下の進むボタンを出す */}
+          {(rulesOpen || !lastRules) && (
             <div style={{ marginTop: 16 }}>
               <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
-                onClick={() => setSetupStep(0)}>メンバー決定へ</button>
+                onClick={() => { setRulesOpen(false); setSetupStep(0); }}>ルール確定・メンバー選択へ</button>
               {!matchType && (
                 <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8 }}>試合形式を選んでください</div>
               )}
