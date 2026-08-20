@@ -7210,7 +7210,6 @@ input, select { padding: 10px 14px; }
   }) => {
     const on = !!rate;
     const U = unit || "G";
-    const g = pts => GOLD_LABEL(Math.round(pts * (rate || 0) * 100) / 100);
     const [unitDraft, setUnitDraft] = React.useState(U);
     React.useEffect(() => {
       setUnitDraft(U);
@@ -7329,7 +7328,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginTop: 6
       }
-    }, "3文字以内（例: G、pt、円、枚）")), React.createElement("div", {
+    }, "3文字以内")), React.createElement("div", {
       style: {
         fontSize: 13,
         fontWeight: 700,
@@ -7380,24 +7379,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         fontWeight: 700
       }
-    }, U), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 8,
-        lineHeight: 1.8,
-        paddingTop: 6,
-        borderTop: `1px solid ${t.bd}`
-      }
-    }, "1,000点 = ", React.createElement("b", {
-      style: {
-        color: t.gd
-      }
-    }, g(1000), U), React.createElement("br", null), "30,000点 = ", React.createElement("b", {
-      style: {
-        color: t.gd
-      }
-    }, g(30000), U))))));
+    }, U)))));
   };
   const TableDiagram = ({
     highlight,
