@@ -10207,7 +10207,8 @@ input, select { padding: 10px 14px; }
         {view !== "title" && !(view === "game" && tableMode && gameStarted && !gameFinished) && !(view === "home" && homeCat === null) && (
         <div style={{ padding: "12px 14px 10px", borderBottom: `1px solid ${t.bd}`, display: "flex", alignItems: "center", gap: 8 }}>
           {/* 結果画面は記録前なので、うっかり離脱しないよう戻るを出さない */}
-          {view !== "home" && !(view === "game" && gameFinished) ? (
+          {view !== "home" && !(view === "game" && gameFinished)
+            && !(view === "game" && !gameStarted) ? (
             <button
               onClick={() => setView("home")}
               style={{
