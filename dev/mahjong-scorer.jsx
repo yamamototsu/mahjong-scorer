@@ -8250,7 +8250,7 @@ input, select { padding: 10px 14px; }
                   );
                   return (
                     <div style={{
-                      marginTop: 4, maxWidth: 250, marginLeft: "auto", marginRight: "auto",
+                      marginTop: 4, maxWidth: 300, marginLeft: "auto", marginRight: "auto",
                       aspectRatio: "1 / 1", borderRadius: 14, position: "relative",
                       backgroundImage: `url(${TABLE_IMG})`, backgroundSize: "100% 100%",
                       backgroundColor: "#103526",
@@ -8267,10 +8267,12 @@ input, select { padding: 10px 14px; }
                       <div style={{ position: "absolute", bottom: "7%", left: "50%", transform: "translateX(-50%)", maxWidth: "40%" }}>{seatBox((0 + seatRot) % PC)}</div>
                       {/* 表示の向きを回転 */}
                       <button onClick={() => setSeatRot(r => (r + PC - 1) % PC)} aria-label="表示を回転" style={{
-                        position: "absolute", right: "3%", bottom: "3%", width: 36, height: 36, borderRadius: 10,
-                        border: "1px solid rgba(255,255,255,0.35)", background: "rgba(0,0,0,0.55)",
-                        color: "#fff", fontSize: 17, cursor: "pointer",
+                        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+                        width: 46, height: 46, borderRadius: 23,
+                        border: "1.5px solid rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.55)",
+                        color: "#fff", fontSize: 21, cursor: "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
+                        boxShadow: "0 3px 12px rgba(0,0,0,0.45)",
                       }}>🔄</button>
                     </div>
                   );
