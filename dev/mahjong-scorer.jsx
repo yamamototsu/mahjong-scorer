@@ -3409,7 +3409,6 @@ input, select { padding: 10px 14px; }
   const RateSetting = ({ rate, onChange, unit, onUnitChange }) => {
     const on = !!rate;
     const U = unit || "G";
-    const g = (pts) => GOLD_LABEL(Math.round(pts * (rate || 0) * 100) / 100);
     const [unitDraft, setUnitDraft] = React.useState(U);
     React.useEffect(() => { setUnitDraft(U); }, [U]);
     return (
@@ -3451,7 +3450,7 @@ input, select { padding: 10px 14px; }
                   fontSize: 14, fontWeight: 800, flexShrink: 0,
                 }}>決定</button>
             </div>
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>3文字以内（例: G、pt、円、枚）</div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>3文字以内</div>
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（{U}）</div>
@@ -3466,13 +3465,6 @@ input, select { padding: 10px 14px; }
               <div style={{ fontSize: 10, color: t.dm }}>1点 =</div>
               <div style={{ fontSize: 20, fontWeight: 900, color: t.gd, lineHeight: 1.3 }}>{RATE_LABEL(rate)}</div>
               <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>{U}</div>
-              <div style={{
-                fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.8,
-                paddingTop: 6, borderTop: `1px solid ${t.bd}`,
-              }}>
-                1,000点 = <b style={{ color: t.gd }}>{g(1000)}{U}</b><br />
-                30,000点 = <b style={{ color: t.gd }}>{g(30000)}{U}</b>
-              </div>
             </div>
           </div>
         </>)}
