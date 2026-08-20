@@ -20035,7 +20035,7 @@ input, select { padding: 10px 14px; }
       alignItems: "center",
       gap: 8
     }
-  }, view !== "home" && !(view === "game" && gameFinished) ? React.createElement("button", {
+  }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) ? React.createElement("button", {
     onClick: () => setView("home"),
     style: {
       background: t.card,
