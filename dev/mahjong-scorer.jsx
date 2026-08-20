@@ -2117,14 +2117,48 @@ export default function MahjongScorer() {
             </div>
           );
         })()}
-        {/* 上部: 確定・キャンセル（スクロールせずに押せる） */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          <button style={{ ...actionBtn(), flex: 1, marginBottom: 0, padding: "12px 8px" }} onClick={onCancel}>キャンセル</button>
-          <button style={{ ...actionBtn("p"), flex: 1.6, marginBottom: 0, padding: "12px 8px", opacity: total > 0 && pickedYaku.length > 0 ? 1 : 0.4 }}
-            disabled={total === 0 || pickedYaku.length === 0}
-            onClick={() => onConfirm(total)}>
-            {pickedYaku.length === 0 ? "役を選択" : total >= 13 ? `${YAKUMAN_LABEL(total)}で確定` : `${total}翻で確定`}
-          </button>
+        {/* 上部: 今の選択内容と合計翻数（スクロールしても見えるよう固定） */}
+        <div style={{
+          position: "sticky", top: 0, zIndex: 12,
+          margin: "-4px -4px 10px", padding: "10px 10px 8px",
+          background: t.card, borderBottom: `1px solid ${t.bd}`, borderRadius: 12,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              flexShrink: 0, minWidth: 74, textAlign: "center", padding: "6px 8px", borderRadius: 10,
+              background: total >= 13 ? t.gdS : t.acS, border: `1px solid ${total >= 13 ? t.gd : t.ac}`,
+            }}>
+              <div style={{ fontSize: 9, color: t.dm, fontWeight: 700 }}>合計</div>
+              <div style={{ fontSize: total >= 13 ? 15 : 20, fontWeight: 900, color: total >= 13 ? t.gd : t.ac, lineHeight: 1.2 }}>
+                {total >= 13 ? YAKUMAN_LABEL(total) : `${total}翻`}
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexWrap: "wrap", gap: 4, alignContent: "center" }}>
+              {pickedYaku.length === 0 && pickerDora === 0 && pickerUra === 0 ? (
+                <span style={{ fontSize: 11, color: t.dm }}>役をタップして選んでください</span>
+              ) : (<>
+                {pickedYaku.map(n => {
+                  const y = YAKU_DATA.find(x => x.name === n);
+                  const h = y ? (pickerNaki && y.naki !== null ? y.naki : y.han) : 0;
+                  const short = n.replace(/（.*?）/, "");
+                  return (
+                    <span key={n} style={{
+                      fontSize: 10.5, fontWeight: 700, padding: "3px 7px", borderRadius: 6,
+                      background: t.acS, border: `1px solid ${t.ac}55`, color: t.tx, whiteSpace: "nowrap",
+                    }}>{short}<span style={{ color: t.ac, marginLeft: 3 }}>{h >= 13 ? "役満" : h}</span></span>
+                  );
+                })}
+                {pickerDora > 0 && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 7px", borderRadius: 6,
+                    background: t.gdS, border: `1px solid ${t.gd}55`, color: t.gd, whiteSpace: "nowrap" }}>ドラ{pickerDora}</span>
+                )}
+                {pickerUra > 0 && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 7px", borderRadius: 6,
+                    background: t.gdS, border: `1px solid ${t.gd}55`, color: t.gd, whiteSpace: "nowrap" }}>裏ドラ{pickerUra}</span>
+                )}
+              </>)}
+            </div>
+          </div>
         </div>
 
         {/* 門前/鳴き（切替可能・リーチ確定時はロック） */}
@@ -2284,11 +2318,19 @@ export default function MahjongScorer() {
           })}
         </div>
 
-        <button style={{ ...actionBtn("p"), opacity: total > 0 && pickedYaku.length > 0 ? 1 : 0.4 }} disabled={total === 0 || pickedYaku.length === 0}
-          onClick={() => onConfirm(total)}>
-          {pickedYaku.length === 0 ? "役を選んでください（ドラのみでは和了できません）" : total >= 13 ? `${YAKUMAN_LABEL(total)}で確定` : `${total}翻で確定`}
-        </button>
-        <button style={actionBtn()} onClick={onCancel}>キャンセル</button>
+        <div style={{
+          position: "sticky", bottom: 0, zIndex: 12,
+          margin: "8px -4px 0", padding: "10px 4px calc(8px + env(safe-area-inset-bottom))",
+          background: `linear-gradient(to top, ${t.card} 72%, transparent)`,
+          display: "flex", gap: 8,
+        }}>
+          <button style={{ ...actionBtn(), flex: 1, marginBottom: 0, padding: "14px 8px" }} onClick={onCancel}>キャンセル</button>
+          <button style={{ ...actionBtn("p"), flex: 1.7, marginBottom: 0, padding: "14px 8px", opacity: total > 0 && pickedYaku.length > 0 ? 1 : 0.4 }}
+            disabled={total === 0 || pickedYaku.length === 0}
+            onClick={() => onConfirm(total)}>
+            {pickedYaku.length === 0 ? "役を選んでください" : total >= 13 ? `${YAKUMAN_LABEL(total)}で確定` : `${total}翻で確定`}
+          </button>
+        </div>
       </div>
     );
   };
