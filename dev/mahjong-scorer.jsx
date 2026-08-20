@@ -5245,8 +5245,8 @@ input, select { padding: 10px 14px; }
               const dx = win.x - p0.x, dy = win.y - p0.y;
               const len = Math.sqrt(dx * dx + dy * dy) || 1;
               // 端を少し縮めてパネルに重ならないように
-              const x1 = p0.x + (dx / len) * 15, y1 = p0.y + (dy / len) * 15;
-              const x2 = win.x - (dx / len) * 17, y2 = win.y - (dy / len) * 17;
+              const x1 = p0.x + (dx / len) * 18, y1 = p0.y + (dy / len) * 18;
+              const x2 = win.x - (dx / len) * 20, y2 = win.y - (dy / len) * 20;
               return <line key={k} x1={x1} y1={y1} x2={x2} y2={y2} stroke={t.gd} strokeWidth="0.7" markerEnd="url(#payArrow)" opacity="0.9" />;
             })}
           </svg>
@@ -5287,12 +5287,13 @@ input, select { padding: 10px 14px; }
                 textAlign: "center", padding: "8px 10px", borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
-                width: "27%", height: "20%", boxSizing: "border-box",
+                width: "32%", height: "22%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
               }}>
                 <div style={{
-                  fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.2,
-                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%",
+                  fontSize: Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length)))),
+                  fontWeight: 800, color: "#fff", lineHeight: 1.2,
+                  whiteSpace: "nowrap", maxWidth: "100%",
                 }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: 10, color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
                 <div style={{
                   fontSize: 19, fontWeight: 900, fontVariantNumeric: "tabular-nums",
