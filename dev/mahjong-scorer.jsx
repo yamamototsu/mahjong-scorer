@@ -7776,19 +7776,41 @@ input, select { padding: 10px 14px; }
             <Back onClick={() => setSetupStep(1)} />
             <Dots total={activeLeagueId ? 3 : 5} cur={activeLeagueId ? 1 : 3} />
             <div style={question}>親決め</div>
-            <div style={{
-              padding: "14px 12px", borderRadius: 14, marginBottom: 12, textAlign: "center",
-              background: t.gdS, border: `2px solid ${t.gd}66`,
-            }}>
-              <div style={{ fontSize: 12, color: t.dm, fontWeight: 700, letterSpacing: "0.08em" }}>仮親</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px" }}>
-                {players[0]} さん
+            {oyaDice?.sum > 0 && !oyaRolling ? (
+              <div style={{
+                padding: "14px 12px", borderRadius: 14, marginBottom: 12, textAlign: "center",
+                background: t.gdS, border: `2px solid ${t.gd}`,
+              }}>
+                <div style={{ fontSize: 12, color: t.dm, fontWeight: 700 }}>
+                  出た目 <b style={{ color: t.gd, fontSize: 16 }}>{oyaDice.sum}</b>
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px" }}>
+                  {players[newDealer]} さん
+                </div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>が起家（親）です</div>
+                {newDealer > 0 && (
+                  <div style={{ fontSize: 11, color: t.dm, marginTop: 8, lineHeight: 1.7 }}>
+                    座る場所はそのままで、東南西北だけ割り当て直します
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>サイコロを振ってください</div>
-            </div>
-            <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginBottom: 12, lineHeight: 1.7 }}>
-              仮親から反時計回りに数えて、出た目の席の人が起家（最初の親）になります
-            </div>
+            ) : (
+              <>
+                <div style={{
+                  padding: "14px 12px", borderRadius: 14, marginBottom: 12, textAlign: "center",
+                  background: t.gdS, border: `2px solid ${t.gd}66`,
+                }}>
+                  <div style={{ fontSize: 12, color: t.dm, fontWeight: 700, letterSpacing: "0.08em" }}>仮親</div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px" }}>
+                    {players[0]} さん
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>サイコロを振ってください</div>
+                </div>
+                <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginBottom: 12, lineHeight: 1.7 }}>
+                  仮親から反時計回りに数えて、出た目の席の人が起家（最初の親）になります
+                </div>
+              </>
+            )}
 
             <button onClick={roll} disabled={oyaRolling} style={{
               width: "100%", padding: "22px 12px", borderRadius: 16, cursor: oyaRolling ? "default" : "pointer",
@@ -7803,23 +7825,6 @@ input, select { padding: 10px 14px; }
                 {oyaRolling ? "振っています…" : oyaDice?.sum ? "もう一度振る" : "タップしてサイコロを振る"}
               </div>
             </button>
-
-            {oyaDice?.sum > 0 && !oyaRolling && (
-              <div style={{
-                padding: 14, borderRadius: 12, marginBottom: 12,
-                background: t.gdS, border: `1px solid ${t.gd}55`, textAlign: "center",
-              }}>
-                <div style={{ fontSize: 12, color: t.dm }}>出た目 <b style={{ color: t.gd, fontSize: 16 }}>{oyaDice.sum}</b></div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: t.tx, marginTop: 6 }}>
-                  {players[newDealer]} さんが起家（親）
-                </div>
-                {newDealer > 0 && (
-                  <div style={{ fontSize: 11, color: t.dm, marginTop: 6, lineHeight: 1.7 }}>
-                    座る場所はそのままで、東南西北だけ割り当て直します
-                  </div>
-                )}
-              </div>
-            )}
 
             <button style={{ ...actionBtn("p"), opacity: oyaDice?.sum > 0 ? 1 : 0.4 }}
               disabled={!(oyaDice?.sum > 0)} onClick={applyOya}>次へ</button>
