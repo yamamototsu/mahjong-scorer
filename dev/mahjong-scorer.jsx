@@ -2087,7 +2087,11 @@ export default function MahjongScorer() {
     }
 
     return (
-      <div>
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 160,
+        background: t.bg, display: "flex", flexDirection: "column",
+        paddingTop: "env(safe-area-inset-top)",
+      }}>
         {yakuInfo && (() => {
           const y = yakuInfo;
           const m = y.name.match(/^(.+?)（(.+?)）$/);
@@ -2119,9 +2123,8 @@ export default function MahjongScorer() {
         })()}
         {/* 上部: 今の選択内容と合計翻数（スクロールしても見えるよう固定） */}
         <div style={{
-          position: "sticky", top: 0, zIndex: 12,
-          margin: "-4px -4px 10px", padding: "10px 10px 8px",
-          background: t.card, borderBottom: `1px solid ${t.bd}`, borderRadius: 12,
+          flexShrink: 0, padding: "10px 12px 8px",
+          background: t.card, borderBottom: `1px solid ${t.bd}`,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{
@@ -2161,6 +2164,7 @@ export default function MahjongScorer() {
           </div>
         </div>
 
+        <div style={{ flexShrink: 0, padding: "10px 12px 0" }}>
         {/* 門前/鳴き（切替可能・リーチ確定時はロック） */}
         <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
           <button onClick={() => switchNaki(false)} style={{
@@ -2227,8 +2231,10 @@ export default function MahjongScorer() {
           </div>
         </div>
 
-        {/* 役リスト */}
-        <div style={{ maxHeight: 420, overflowY: "auto", marginBottom: 10 }}>
+        </div>
+
+        {/* 役リスト（ここだけスクロール） */}
+        <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "10px 12px 4px", WebkitOverflowScrolling: "touch" }}>
           {CATS.map(cat => {
             const list = YAKU_DATA.filter(y => catOf(y) === cat && ctxOk(y));
             if (!list.length) return null;
@@ -2319,9 +2325,8 @@ export default function MahjongScorer() {
         </div>
 
         <div style={{
-          position: "sticky", bottom: 0, zIndex: 12,
-          margin: "8px -4px 0", padding: "10px 4px calc(8px + env(safe-area-inset-bottom))",
-          background: `linear-gradient(to top, ${t.card} 72%, transparent)`,
+          flexShrink: 0, padding: "10px 12px calc(10px + env(safe-area-inset-bottom))",
+          background: t.card, borderTop: `1px solid ${t.bd}`,
           display: "flex", gap: 8,
         }}>
           <button style={{ ...actionBtn(), flex: 1, marginBottom: 0, padding: "14px 8px" }} onClick={onCancel}>キャンセル</button>
