@@ -16411,7 +16411,7 @@ input, select { padding: 10px 14px; }
         backgroundSize: "100% 100%",
         backgroundColor: "#103526"
       }
-    }, React.createElement("div", {
+    }, PC === 4 && React.createElement("div", {
       style: {
         position: "absolute",
         top: "7%",
@@ -16419,23 +16419,23 @@ input, select { padding: 10px 14px; }
         transform: "translateX(-50%)",
         maxWidth: "40%"
       }
-    }, seatBox(2)), React.createElement("div", {
+    }, seatBox((2 + seatRot) % PC)), React.createElement("div", {
       style: {
         position: "absolute",
         left: "7%",
-        top: "50%",
+        top: PC === 3 ? "34%" : "50%",
         transform: "translateY(-50%)",
         maxWidth: "34%"
       }
-    }, seatBox(3)), React.createElement("div", {
+    }, seatBox(((PC === 3 ? 2 : 3) + seatRot) % PC)), React.createElement("div", {
       style: {
         position: "absolute",
         right: "7%",
-        top: "50%",
+        top: PC === 3 ? "34%" : "50%",
         transform: "translateY(-50%)",
         maxWidth: "34%"
       }
-    }, seatBox(1)), React.createElement("div", {
+    }, seatBox((1 + seatRot) % PC)), React.createElement("div", {
       style: {
         position: "absolute",
         bottom: "7%",
@@ -16443,15 +16443,39 @@ input, select { padding: 10px 14px; }
         transform: "translateX(-50%)",
         maxWidth: "40%"
       }
-    }, seatBox(0)));
+    }, seatBox((0 + seatRot) % PC)), React.createElement("button", {
+      onClick: () => setSeatRot(r => (r + PC - 1) % PC),
+      "aria-label": "表示を回転",
+      style: {
+        position: "absolute",
+        right: "3%",
+        bottom: "3%",
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.35)",
+        background: "rgba(0,0,0,0.55)",
+        color: "#fff",
+        fontSize: 17,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, "🔄"));
   })(), React.createElement("div", {
     style: {
       fontSize: 10,
       color: t.dm,
       textAlign: "center",
-      marginTop: 5
+      marginTop: 5,
+      lineHeight: 1.7
     }
-  }, "手前が東（起家）。この向きで座ります")), React.createElement("div", {
+  }, "手前: ", React.createElement("b", {
+    style: {
+      color: seatRot === 0 ? t.gd : t.tx
+    }
+  }, players[(0 + seatRot) % PC]), seatRot === 0 ? "（東・起家）" : "", " ・ 🔄で表示の向きを回せます（対局画面にも反映）")), React.createElement("div", {
     style: {
       padding: "6px 0 0"
     }
