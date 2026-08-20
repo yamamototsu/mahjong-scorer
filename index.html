@@ -677,6 +677,7 @@ function MahjongScorer() {
     doubleYakuman: false,
     honbaUnit: 300,
     rate: 0,
+    rateUnit: "G",
     kazoeYakuman: true,
     orasYame: true,
     multiRon: "atamahane",
@@ -7203,10 +7204,17 @@ input, select { padding: 10px 14px; }
   };
   const RateSetting = ({
     rate,
-    onChange
+    onChange,
+    unit,
+    onUnitChange
   }) => {
     const on = !!rate;
+    const U = unit || "G";
     const g = pts => GOLD_LABEL(Math.round(pts * (rate || 0) * 100) / 100);
+    const [unitDraft, setUnitDraft] = React.useState(U);
+    React.useEffect(() => {
+      setUnitDraft(U);
+    }, [U]);
     return React.createElement("div", {
       style: {
         marginBottom: 16
@@ -7257,18 +7265,84 @@ input, select { padding: 10px 14px; }
       }
     }))), on && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
+        marginBottom: 12,
+        padding: 10,
+        borderRadius: 10,
+        background: t.sf,
+        border: `1px solid ${t.bd}`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.tx,
+        marginBottom: 6
+      }
+    }, "レート単位を変える"), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        alignItems: "center"
+      }
+    }, React.createElement("input", {
+      value: unitDraft,
+      maxLength: 3,
+      onChange: e => setUnitDraft(e.target.value.slice(0, 3)),
+      onKeyDown: e => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      },
+      placeholder: "G",
+      style: {
+        flex: 1,
+        minWidth: 0,
+        padding: "10px 12px",
+        borderRadius: 9,
+        border: `1px solid ${t.bd}`,
+        background: t.card,
+        color: t.tx,
+        fontSize: 16,
+        fontWeight: 800,
+        textAlign: "center",
+        outline: "none"
+      }
+    }), React.createElement("button", {
+      onClick: () => {
+        const v = (unitDraft || "").trim().slice(0, 3) || "G";
+        setUnitDraft(v);
+        onUnitChange && onUnitChange(v);
+      },
+      disabled: (unitDraft || "").trim() === U,
+      style: {
+        padding: "10px 18px",
+        borderRadius: 9,
+        border: "none",
+        cursor: "pointer",
+        background: (unitDraft || "").trim() === U ? t.bd : t.ac,
+        color: (unitDraft || "").trim() === U ? t.dm : "#fff",
+        fontSize: 14,
+        fontWeight: 800,
+        flexShrink: 0
+      }
+    }, "決定")), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        marginTop: 6
+      }
+    }, "3文字以内（例: G、pt、円、枚）")), React.createElement("div", {
+      style: {
         fontSize: 13,
         fontWeight: 700,
         marginBottom: 4
       }
-    }, "レート単位（G）"), React.createElement("div", {
+    }, "レート単位（", U, "）"), React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
         marginBottom: 8,
         lineHeight: 1.7
       }
-    }, "1点あたりのゴールド。精算画面にゴールドの増減が表示されます"), React.createElement("div", {
+    }, "1点あたりの", U, "。精算画面に", U, "の増減が表示されます"), React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
@@ -7306,7 +7380,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         fontWeight: 700
       }
-    }, "G"), React.createElement("div", {
+    }, U), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -7319,11 +7393,11 @@ input, select { padding: 10px 14px; }
       style: {
         color: t.gd
       }
-    }, g(1000), "G"), React.createElement("br", null), "30,000点 = ", React.createElement("b", {
+    }, g(1000), U), React.createElement("br", null), "30,000点 = ", React.createElement("b", {
       style: {
         color: t.gd
       }
-    }, g(30000), "G"))))));
+    }, g(30000), U))))));
   };
   const TableDiagram = ({
     highlight,
@@ -11035,7 +11109,7 @@ input, select { padding: 10px 14px; }
           marginLeft: 2,
           opacity: 0.8
         }
-      }, "G"))) : React.createElement(React.Fragment, null, React.createElement("span", {
+      }, gameConfig?.rules?.rateUnit || "G"))) : React.createElement(React.Fragment, null, React.createElement("span", {
         style: {
           fontSize: 15,
           fontWeight: 800,
@@ -11067,7 +11141,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 800
       },
       onClick: () => setRankPeekGold(v => !v)
-    }, rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}G）`), rankPeekGold && ptOf && React.createElement("div", {
+    }, rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`), rankPeekGold && ptOf && React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -12300,7 +12374,7 @@ input, select { padding: 10px 14px; }
       rules: draftRules,
       onChange: editDraft,
       compact: true
-    })), secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} G` : "レート計算なし"), setOpen === "rate" && React.createElement("div", {
+    })), secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${draftRules.rateUnit || "G"}` : "レート計算なし"), setOpen === "rate" && React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -12310,6 +12384,10 @@ input, select { padding: 10px 14px; }
       rate: draftRules.rate || 0,
       onChange: v => editDraft({
         rate: v
+      }),
+      unit: draftRules.rateUnit,
+      onUnitChange: u => editDraft({
+        rateUnit: u
       })
     })), secHdr("dice", "🎲", "サイコロ設定", "表示時間と効果音"), setOpen === "dice" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
@@ -16214,6 +16292,17 @@ input, select { padding: 10px 14px; }
       ...r,
       ...patch
     }))
+  }), React.createElement(RateSetting, {
+    rate: rules.rate || 0,
+    onChange: v => setRules(r => ({
+      ...r,
+      rate: v
+    })),
+    unit: rules.rateUnit,
+    onUnitChange: u => setRules(r => ({
+      ...r,
+      rateUnit: u
+    }))
   })), React.createElement(RuleHelp, null)), (rulesOpen || !lastRules) && React.createElement("div", {
     style: {
       marginTop: 16
@@ -19479,14 +19568,14 @@ input, select { padding: 10px 14px; }
           marginLeft: 2,
           opacity: 0.8
         }
-      }, "G"))))), !!gameConfig?.rules?.rate && React.createElement("div", {
+      }, gameConfig.rules.rateUnit || "G"))))), !!gameConfig?.rules?.rate && React.createElement("div", {
         style: {
           fontSize: 10,
           color: t.dm,
           textAlign: "right",
           marginTop: 6
         }
-      }, "レート 1点 = ", RATE_LABEL(gameConfig.rules.rate), " G"));
+      }, "レート 1点 = ", RATE_LABEL(gameConfig.rules.rate), " ", gameConfig.rules.rateUnit || "G"));
     })(), React.createElement("div", {
       style: card
     }, React.createElement("div", {
@@ -19609,7 +19698,7 @@ input, select { padding: 10px 14px; }
           marginLeft: 2,
           opacity: 0.8
         }
-      }, "G")))), React.createElement("div", {
+      }, lg.rules.rateUnit || "G")))), React.createElement("div", {
         style: {
           fontSize: 10,
           color: t.dm,
