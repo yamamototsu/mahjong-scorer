@@ -56,7 +56,7 @@ const RATE_VALUES = (() => {
   return out;
 })();
 const RATE_LABEL = (r) => !r ? "なし" : (r < 1 ? r.toFixed(2) : (r % 1 === 0 ? String(r) : r.toFixed(1)));
-const GOLD = (pt, rate) => Math.round(pt * rate * 100) / 100;
+const GOLD = (pt, rate) => Math.round(pt * 1000 * rate * 100) / 100;  // ptは1000点単位
 const GOLD_LABEL = (g) => (g % 1 === 0 ? String(g) : g.toFixed(2).replace(/0$/, ""));
 const TABLE_IMG = "assets/table.jpg";   // 麻雀卓の画像
 // 人数に応じた席風（三麻は北家なし）
@@ -3405,31 +3405,51 @@ input, select { padding: 10px 14px; }
   };
 
   // レート設定のカード（ルール編集用）
-  const RateSetting = ({ rate, onChange }) => (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>レート（ゴールド）</div>
-      <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
-        1ptあたりのゴールド。精算画面にゴールドの増減が表示されます
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ flex: 1 }}>
-          <ReelPicker values={RATE_VALUES} value={rate || 0} onChange={onChange} labelOf={RATE_LABEL} />
-        </div>
-        <div style={{ width: 108, textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: t.dm }}>1pt =</div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: rate ? t.gd : t.dm, lineHeight: 1.3 }}>
-            {RATE_LABEL(rate || 0)}
+  const RateSetting = ({ rate, onChange }) => {
+    const on = !!rate;
+    const g = (pts) => GOLD_LABEL(Math.round(pts * (rate || 0) * 100) / 100);
+    return (
+      <div style={{ marginBottom: 16 }}>
+        {/* レート精算をするかどうか */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: on ? 12 : 0 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>レート計算</div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>点数をゴールドに換算して精算します</div>
           </div>
-          <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>{rate ? "ゴールド" : ""}</div>
-          {!!rate && (
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.6 }}>
-              例) +20pt<br />= {GOLD_LABEL(GOLD(20, rate))} ゴールド
-            </div>
-          )}
+          <button onClick={() => onChange(on ? 0 : 0.1)} style={{
+            width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
+            background: on ? t.gd : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+          }}>
+            <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+          </button>
         </div>
+
+        {on && (<>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（G）</div>
+          <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
+            1点あたりのゴールド。精算画面にゴールドの増減が表示されます
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <ReelPicker values={RATE_VALUES.filter(v => v > 0)} value={rate} onChange={onChange} labelOf={RATE_LABEL} />
+            </div>
+            <div style={{ width: 118, textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: t.dm }}>1点 =</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: t.gd, lineHeight: 1.3 }}>{RATE_LABEL(rate)}</div>
+              <div style={{ fontSize: 11, color: t.dm, fontWeight: 700 }}>G</div>
+              <div style={{
+                fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.8,
+                paddingTop: 6, borderTop: `1px solid ${t.bd}`,
+              }}>
+                1,000点 = <b style={{ color: t.gd }}>{g(1000)}G</b><br />
+                30,000点 = <b style={{ color: t.gd }}>{g(30000)}G</b>
+              </div>
+            </div>
+          </div>
+        </>)}
       </div>
-    </div>
-  );
+    );
+  };
 
   const TableDiagram = ({ highlight, dice1, dice2, breakPos, labels }) => {
     const seatStyle = (pos, on) => {
@@ -5475,7 +5495,7 @@ input, select { padding: 10px 14px; }
               background: rankPeekGold ? t.gdS : "transparent",
               color: t.gd, fontSize: 12, fontWeight: 800,
             }} onClick={() => setRankPeekGold(v => !v)}>
-              {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1pt = ${RATE_LABEL(rate)}G）`}
+              {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}G）`}
             </button>
           )}
           {rankPeekGold && ptOf && (
@@ -6104,7 +6124,7 @@ input, select { padding: 10px 14px; }
               </div>
             )}
 
-            {secHdr("rate", "💰", "レート設定", `1pt = ${RATE_LABEL(draftRules.rate || 0)}${draftRules.rate ? " ゴールド" : ""}`)}
+            {secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} G` : "レート計算なし")}
             {setOpen === "rate" && (
               <div style={{ ...card, padding: 16, marginTop: 4 }}>
                 <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })} />
@@ -9839,7 +9859,7 @@ input, select { padding: 10px 14px; }
               ))}
               {!!(gameConfig?.rules?.rate) && (
                 <div style={{ fontSize: 10, color: t.dm, textAlign: "right", marginTop: 6 }}>
-                  レート 1pt = {RATE_LABEL(gameConfig.rules.rate)} ゴールド
+                  レート 1点 = {RATE_LABEL(gameConfig.rules.rate)} G
                 </div>
               )}
             </div>
