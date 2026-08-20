@@ -16156,7 +16156,7 @@ input, select { padding: 10px 14px; }
       ...r,
       ...patch
     }))
-  })), React.createElement(RuleHelp, null)), (rulesOpen || !lastRules || matchType) && React.createElement("div", {
+  })), React.createElement(RuleHelp, null)), (rulesOpen || !lastRules) && React.createElement("div", {
     style: {
       marginTop: 16
     }
@@ -16166,8 +16166,11 @@ input, select { padding: 10px 14px; }
       opacity: matchType ? 1 : 0.4
     },
     disabled: !matchType,
-    onClick: () => setSetupStep(0)
-  }, "メンバー決定へ"), !matchType && React.createElement("div", {
+    onClick: () => {
+      setRulesOpen(false);
+      setSetupStep(0);
+    }
+  }, "ルール確定・メンバー選択へ"), !matchType && React.createElement("div", {
     style: {
       fontSize: 11,
       color: t.dm,
