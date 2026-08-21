@@ -376,7 +376,11 @@ export default function MahjongScorer() {
   const [lgDraft, setLgDraft] = useState(null);        // 作成・編集中のリーグ
   const [lgPick, setLgPick] = useState([]);            // その対局に出る4人
   const [lgMatchType, setLgMatchType] = useState("hanchan"); // 形式は対局ごとに決める
-  const [showUmaHelp, setShowUmaHelp] = useState(false); // ウマ・オカの説明を開く
+  const [showUmaHelp, setShowUmaHelp] = useState(false); // ウマ・オカの説明を開く（リーグ作成）
+  // 説明パネルの開閉は親のstateに置く（子コンポーネント内のstateだと
+  // 親の再レンダーで再マウントされ、開いてもすぐ閉じてしまうため）
+  const [ruleHelpOpen, setRuleHelpOpen] = useState(false);   // ルールの説明（設定・セットアップ共用）
+  const [umaOkaHelpOpen, setUmaOkaHelpOpen] = useState(false); // ウマ・オカとは（設定・セットアップ共用）
 
   const curLeague = leagues.find(l => l.id === leagueId) || null;
 
@@ -1028,7 +1032,7 @@ export default function MahjongScorer() {
   const pSelBtn = (on) => ({ padding: "14px 8px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center", flex: 1, transition: "all 0.1s" });
   // 対局ルールの説明（設定・セットアップ・リーグで共用）
   const RuleHelp = () => {
-    const [open, setOpen] = React.useState(false);
+    const open = ruleHelpOpen, setOpen = setRuleHelpOpen;
     const item = (title, body) => (
       <div style={{ padding: "11px 0", borderBottom: `1px solid ${t.bd}44` }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: t.tx, marginBottom: 4 }}>{title}</div>
@@ -1038,9 +1042,9 @@ export default function MahjongScorer() {
     return (
       <div style={{ marginTop: 12 }}>
         <button onClick={() => setOpen(v => !v)} style={{
-          width: "100%", padding: "11px 8px", borderRadius: 9, cursor: "pointer",
+          width: "100%", padding: "13px 8px", borderRadius: 9, cursor: "pointer",
           border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
-          fontSize: 12, fontWeight: 700,
+          fontSize: 15, fontWeight: 700,
         }}>{open ? "ルールの説明を閉じる" : "それぞれのルールの説明を見る"}</button>
 
         {open && (
@@ -1087,7 +1091,7 @@ export default function MahjongScorer() {
     const pcU = (r.uma && r.uma.length === 3) || isSanma ? 3 : 4;
     const uma = r.uma || (pcU === 3 ? [0, 0, 0] : [0, 0, 0, 0]);
     const oka = (rp - sp) * pcU / 1000;
-    const [open, setOpen] = React.useState(false);
+    const open = umaOkaHelpOpen, setOpen = setUmaOkaHelpOpen;
 
     // 説明用の例（持ち点に合わせて合計が合うようにする）
     const demo = (pcU === 3 ? [15000, 0, -15000] : [15000, 7000, -7000, -15000]).map(o => sp + o);
@@ -1108,8 +1112,8 @@ export default function MahjongScorer() {
         </div>
 
         <button onClick={() => setOpen(v => !v)} style={{
-          width: "100%", marginBottom: 10, padding: "10px 8px", borderRadius: 9, cursor: "pointer",
-          border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700,
+          width: "100%", marginBottom: 10, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
+          border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 15, fontWeight: 700,
         }}>{open ? "説明を閉じる" : "ウマ・オカとは"}</button>
 
         {open && (
@@ -2316,7 +2320,7 @@ export default function MahjongScorer() {
                           ) : (h >= 13 ? "役満" : `${h}翻`)}
                         </div>
                         {pickerNaki && y.naki !== null && y.naki < y.han && (
-                          <div style={{ fontSize: 8, color: t.gn, opacity: 0.85, marginTop: 1 }}>食い下がり</div>
+                          <div style={{ fontSize: 10, color: t.gn, opacity: 0.85, marginTop: 1 }}>食い下がり</div>
                         )}
                       </button>
                     );
@@ -5713,8 +5717,8 @@ input, select { padding: 10px 14px; }
         display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
       }}>
         <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ fontSize: 9, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
     return (
@@ -6587,8 +6591,8 @@ input, select { padding: 10px 14px; }
 
           {/* 解説 */}
           <button onClick={() => setShowUmaHelp(v => !v)} style={{
-            width: "100%", marginTop: 10, padding: "10px 8px", borderRadius: 9, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700,
+            width: "100%", marginTop: 10, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 15, fontWeight: 700,
           }}>{showUmaHelp ? "説明を閉じる" : "ウマ・オカとは"}</button>
 
           {showUmaHelp && (() => {
@@ -8474,8 +8478,8 @@ input, select { padding: 10px 14px; }
                 <span style={{ color: t.gd }}>{MATCH_LABEL(matchType)}</span>
                 <span style={{ color: t.dm }}>|</span>
                 <span>{PC === 3 ? "三人麻雀" : "四人麻雀"}</span>
-                <span style={{ color: t.dm }}>|</span>
-                <span>{(rules.startPoints ?? 25000).toLocaleString()} / {(rules.returnPoints ?? 30000).toLocaleString()}</span>
+                {/* 持ち点/返し点は常に2行目へ（折り返しで区切りの「|」だけが行末に残るのを防ぐ） */}
+                <span style={{ width: "100%", textAlign: "center" }}>{(rules.startPoints ?? 25000).toLocaleString()} / {(rules.returnPoints ?? 30000).toLocaleString()}</span>
               </div>
               <div style={{ borderBottom: `1px solid ${t.bd}33`, padding: "2px 0 8px" }}>
                 {/* 卓の並びで表示（手前が起家。実際に座る位置と同じ配置） */}
