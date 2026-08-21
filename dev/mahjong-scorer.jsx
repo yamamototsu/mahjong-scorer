@@ -332,7 +332,9 @@ export default function MahjongScorer() {
   };
   const drawSeatTile = (pos) => {
     if (seatDone || seatTiles[pos]?.by !== null) return;
-    const next = seatTiles.map((s, i) => i === pos ? { ...s, by: seatTurn } : s);
+    // 引いた人の名前も控える（全員引き終わると players が席順に並べ替わり、
+    // 元の添字 by では別人を指してしまうため）
+    const next = seatTiles.map((s, i) => i === pos ? { ...s, by: seatTurn, byName: players[seatTurn] } : s);
     setSeatTiles(next);
     try { if (navigator.vibrate) navigator.vibrate(10); } catch {}
     if (seatTurn + 1 >= PC) {
@@ -1116,8 +1118,8 @@ export default function MahjongScorer() {
             <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
               順位に応じてやりとりするポイントです。今の設定「
               <span style={{ color: t.ac, fontWeight: 700 }}>{(pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}</span>
-              」だと、1位が{uma[0] >= 0 ? "+" : ""}{uma[0]}、2位が{uma[1] >= 0 ? "+" : ""}{uma[1]}、
-              3位が{uma[2]}{pcU === 4 ? `、4位が${uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
+              」だと、1位が{uma[0] > 0 ? "+" : ""}{uma[0]}、2位が{uma[1] > 0 ? "+" : ""}{uma[1]}、
+              3位が{uma[2] > 0 ? "+" : ""}{uma[2]}{pcU === 4 ? `、4位が${uma[3] > 0 ? "+" : ""}${uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
               数字が大きいほど、素点より順位の価値が高くなります。
             </div>
 
@@ -6604,8 +6606,8 @@ input, select { padding: 10px 14px; }
                   <span style={{ color: t.ac, fontWeight: 700 }}>
                     {(lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === d.umaKey)?.label || d.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}
                   </span>
-                  」だと、1位が{d.uma[0] >= 0 ? "+" : ""}{d.uma[0]}、2位が{d.uma[1] >= 0 ? "+" : ""}{d.uma[1]}、
-                  3位が{d.uma[2]}{lgPC === 4 ? `、4位が${d.uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
+                  」だと、1位が{d.uma[0] > 0 ? "+" : ""}{d.uma[0]}、2位が{d.uma[1] > 0 ? "+" : ""}{d.uma[1]}、
+                  3位が{d.uma[2] > 0 ? "+" : ""}{d.uma[2]}{lgPC === 4 ? `、4位が${d.uma[3] > 0 ? "+" : ""}${d.uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
                   数字が大きいほど素点より順位の価値が高くなります。
                 </div>
 
@@ -7777,7 +7779,7 @@ input, select { padding: 10px 14px; }
                       <span style={{
                         fontSize: 9, color: "#5a5a5a", maxWidth: 56,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>{players[s.by]}</span>
+                      }}>{s.byName ?? players[s.by]}</span>
                     </>
                   ) : (
                     <span style={{
@@ -9133,7 +9135,7 @@ input, select { padding: 10px 14px; }
                     }}>{honba}本場</span>
                     {riichiBets > 0 && (
                       <span style={{ fontSize: 12, fontWeight: 800, color: t.ac }}>
-                        供託 {riichiBets.toLocaleString()}
+                        供託{riichiBets}本
                       </span>
                     )}
                   </div>
