@@ -5074,11 +5074,17 @@ input, select { padding: 10px 14px; }
       : rs.tenpaiRenchan ? "親がテンパイなら続行、ノーテンなら流れる" : "流局しても親は続行";
     const mr = rs.multiRon === "triple" ? "トリプルロンあり"
       : rs.multiRon === "double" ? "ダブロンあり" : "頭ハネ";
+    // ウマはリーグ戦ならリーグの設定、そうでなければ対局ルールから
+    const umaArr = (lg && lg.uma && lg.uma.length === PC) ? lg.uma
+      : (rs.uma && rs.uma.length === PC) ? rs.uma : null;
+    const umaLabel = (!umaArr || umaArr.every(u => !u))
+      ? "なし" : umaArr.map(u => (u > 0 ? "+" : "") + u).join(" / ");
+    const rateUnit = rs.rateUnit || "G";
 
     return (
       <div style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 100,
-        display: "flex", alignItems: "center", justifyContent: "center",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
         padding: "20px 16px",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
@@ -5100,10 +5106,12 @@ input, select { padding: 10px 14px; }
 
           {!ruleEditMode ? (
             <>
+              {row("人数", PC === 3 ? "三人麻雀" : "四人麻雀")}
               {row("形式", MATCH_LABEL(gameConfig?.matchType))}
               {row("持ち点 / 返し点",
                 `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`,
-                `オカ ${(((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * 4 / 1000)}pt がトップへ`)}
+                `オカ ${(((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * PC / 1000)}pt がトップへ`)}
+              {row("ウマ（順位点）", umaLabel)}
               {row("流局したときの親", renchan, renchanHint)}
               {row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし",
                 rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行")}
@@ -5115,8 +5123,14 @@ input, select { padding: 10px 14px; }
                 rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null)}
               {row("ダブル役満", rs.doubleYakuman ? "あり" : "なし",
                 rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null)}
+              {row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし",
+                rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり")}
               {row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし")}
-              {lg && row("ウマ", lg.uma.map(u => (u > 0 ? "+" : "") + u).join(" / "))}
+              {row("本場", `1本 = ${HU().toLocaleString()}点`,
+                `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`)}
+              {row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います")}
+              {row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし",
+                rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)}
             </>
           ) : (() => {
             const seg = (opts, cur, onPick) => (
@@ -5193,11 +5207,7 @@ input, select { padding: 10px 14px; }
             {ruleEditMode ? "✓ 変更を終える" : "✏️ ルールを変更する"}
           </button>
 
-          <div style={{ fontSize: 11, color: "#b9c6d8", marginTop: 12, lineHeight: 1.7 }}>
-            ノーテン罰符は場で3,000点、本場は1本につき300点です
-          </div>
-
-          <button style={{ ...actionBtn("p"), marginTop: 10 }} onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); }}>閉じる</button>
+          <button style={{ ...actionBtn("p"), marginTop: 14 }} onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); }}>閉じる</button>
 
           {/* 途中終了 */}
           <div style={{ marginTop: 6, paddingTop: 14, borderTop: `1px solid ${t.bd}` }}>
