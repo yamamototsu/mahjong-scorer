@@ -5494,7 +5494,9 @@ input, select { padding: 10px 14px; }
                 }}>
                   {amt > 0 ? "+" : ""}{amt.toLocaleString()}
                 </div>
-                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.1, height: "3.2%" }}>{isWin ? "アガリ" : ""}</div>
+                {/* 高さを固定すると「アガリ」が枠からあふれて点数と重なる。
+                    4枠の高さを揃えるため、あがっていない席は空白1文字を置く */}
+                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.25 }}>{isWin ? "アガリ" : " "}</div>
               </div>
             );
           })}
