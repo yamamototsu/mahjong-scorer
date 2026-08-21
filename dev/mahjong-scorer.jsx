@@ -1115,9 +1115,9 @@ export default function MahjongScorer() {
             <div style={{ fontSize: 12, fontWeight: 800, color: t.tx, marginBottom: 6 }}>ウマとは</div>
             <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
               順位に応じてやりとりするポイントです。今の設定「
-              <span style={{ color: t.ac, fontWeight: 700 }}>{UMA_PRESETS.find(u => u.key === (r.umaKey || "none"))?.label}</span>
+              <span style={{ color: t.ac, fontWeight: 700 }}>{(pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}</span>
               」だと、1位が{uma[0] >= 0 ? "+" : ""}{uma[0]}、2位が{uma[1] >= 0 ? "+" : ""}{uma[1]}、
-              3位が{uma[2]}、4位が{uma[3]}です。合計はゼロなので、場全体のポイントは増減しません。
+              3位が{uma[2]}{pcU === 4 ? `、4位が${uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
               数字が大きいほど、素点より順位の価値が高くなります。
             </div>
 
@@ -1128,7 +1128,7 @@ export default function MahjongScorer() {
                 <> 今は持ち点と返し点が同じ{sp.toLocaleString()}点なので
                 <span style={{ color: t.gd, fontWeight: 700 }}>オカは発生しません</span>。
                 トップの取り分を増やすなら、持ち点を返し点より低くしてください
-                （例: 持ち点25,000 / 返し点30,000 で20pt）。</>
+                （例: 持ち点25,000 / 返し点30,000 で{5 * pcU}pt）。</>
               ) : (
                 <> 1人あたり{((rp - sp) / 1000)}ptを供出し、合計
                 <span style={{ color: t.gd, fontWeight: 700 }}>{oka}pt</span>がトップに乗ります。
@@ -1146,7 +1146,7 @@ export default function MahjongScorer() {
 
             <div style={{ fontSize: 12, fontWeight: 800, color: t.tx, marginBottom: 7 }}>今の設定での例</div>
             <div style={{ fontSize: 10, color: t.dm, marginBottom: 7 }}>
-              終局時の素点が {demo.map(x => x.toLocaleString()).join(" / ")}（合計 {(sp * 4).toLocaleString()}点）だった場合
+              終局時の素点が {demo.map(x => x.toLocaleString()).join(" / ")}（合計 {(sp * pcU).toLocaleString()}点）だった場合
             </div>
             {demo.map((s, i) => (
               <div key={i} style={{
@@ -1196,20 +1196,20 @@ export default function MahjongScorer() {
                 const v = parseInt(e.target.value, 10);
                 onChange({ startPoints: v, returnPoints: Math.max(v, rp) });
               }}>
-              {Array.from({length:16},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+              {Array.from({length:26},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>返し点</div>
             <select value={rp} style={selectStyle}
               onChange={e => onChange({ returnPoints: parseInt(e.target.value, 10) })}>
-              {Array.from({length:16},(_,i)=>20000+i*1000).filter(v => v >= sp).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+              {Array.from({length:26},(_,i)=>20000+i*1000).filter(v => v >= sp).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
             </select>
           </div>
         </div>
 
         <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8 }}>
-          オカ = (返し点 − 持ち点) × 4 = <span style={{ color: oka === 0 ? t.dm : t.gd, fontWeight: 700 }}>{oka}pt</span>
+          オカ = (返し点 − 持ち点) × {pcU} = <span style={{ color: oka === 0 ? t.dm : t.gd, fontWeight: 700 }}>{oka}pt</span>
           {oka === 0 ? " — 発生しません" : " がトップへ"}
         </div>
 
@@ -2852,7 +2852,7 @@ input, select { padding: 10px 14px; }
         <div style={body}>
           <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>🎯</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 8px" }}>飜数・役名テスト</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 8px" }}>翻数・役名テスト</h2>
             <p style={{ fontSize: 13, color: t.dm }}>間違えた役から優先的に出題されます</p>
           </div>
 
@@ -4943,7 +4943,7 @@ input, select { padding: 10px 14px; }
         // 受け取る供託。古い記録には pool が無いのでその場合だけ本数から求める
         const pool = (typeof r.pool === "number") ? r.pool : rc * 1000;
         const hb = r.honba * ((cfg.rules && cfg.rules.honbaUnit) || 300);
-        const handLabel = r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}飜${r.fu}符` : `${r.han}飜`;
+        const handLabel = r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`;
         if (paidRiichi) { delta -= 1000; }
 
         if (r.winner === pi) {
@@ -5915,7 +5915,7 @@ input, select { padding: 10px 14px; }
             {menuItem("📖", "役一覧", "全ての役の解説と翻数", () => {
               setView("dict"); setDictCat("1翻"); setDictExpanded(null);
             })}
-            {menuItem("🎯", "飜数・役名テスト", "役の飜数クイズ・役名テスト", () => {
+            {menuItem("🎯", "翻数・役名テスト", "役の翻数クイズ・役名テスト", () => {
               setView("quiz"); setQuizMode(null);
             })}
             {menuItem("📐", "符計算講座", "レベル別に符を学ぶ", () => {
@@ -6566,20 +6566,20 @@ input, select { padding: 10px 14px; }
                   const v = parseInt(e.target.value, 10);
                   set({ rules: { ...d.rules, startPoints: v, returnPoints: Math.max(v, d.rules.returnPoints || v) } });
                 }}>
-                {Array.from({length:16},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+                {Array.from({length:26},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>返し点</div>
               <select value={d.rules.returnPoints} style={selectStyle}
                 onChange={e => set({ rules: { ...d.rules, returnPoints: parseInt(e.target.value, 10) } })}>
-                {Array.from({length:16},(_,i)=>20000+i*1000).filter(v => v >= (d.rules.startPoints || 0)).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+                {Array.from({length:26},(_,i)=>20000+i*1000).filter(v => v >= (d.rules.startPoints || 0)).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
               </select>
             </div>
           </div>
           <div style={{ fontSize: 11, color: t.dm, marginTop: 8, lineHeight: 1.8 }}>
-            オカ = (返し点 − 持ち点) × 4 = <span style={{ color: t.gd, fontWeight: 700 }}>
-              {(((d.rules.returnPoints || 0) - (d.rules.startPoints || 0)) * 4 / 1000)}pt
+            オカ = (返し点 − 持ち点) × {lgPC} = <span style={{ color: t.gd, fontWeight: 700 }}>
+              {(((d.rules.returnPoints || 0) - (d.rules.startPoints || 0)) * lgPC / 1000)}pt
             </span> がトップへ
           </div>
 
@@ -6592,20 +6592,20 @@ input, select { padding: 10px 14px; }
           {showUmaHelp && (() => {
             const sp = d.rules.startPoints || 25000;
             const rp = d.rules.returnPoints || 30000;
-            const oka = (rp - sp) * 4 / 1000;
-            // 持ち点に合わせた例（合計が 持ち点×4 になるようにする）
-            const demo = [15000, 7000, -7000, -15000].map(o => sp + o);
-            const res = calcGamePts(demo.slice(0, lgPC), demo.slice(0, lgPC).map((_, i) => i), { rules: d.rules, uma: d.uma });
+            const oka = (rp - sp) * lgPC / 1000;
+            // 持ち点に合わせた例（合計が 持ち点×人数 になるようにする）
+            const demo = (lgPC === 3 ? [15000, 0, -15000] : [15000, 7000, -7000, -15000]).map(o => sp + o);
+            const res = calcGamePts(demo, demo.map((_, i) => i), { rules: d.rules, uma: d.uma });
             return (
               <div style={{ marginTop: 10, padding: 14, borderRadius: 11, background: t.sf, border: `1px solid ${t.bd}` }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: t.tx, marginBottom: 6 }}>ウマとは</div>
                 <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
                   順位によってやりとりするポイントです。今の設定「
                   <span style={{ color: t.ac, fontWeight: 700 }}>
-                    {UMA_PRESETS.find(u => u.key === d.umaKey)?.label}
+                    {(lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === d.umaKey)?.label || d.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}
                   </span>
                   」だと、1位が{d.uma[0] >= 0 ? "+" : ""}{d.uma[0]}、2位が{d.uma[1] >= 0 ? "+" : ""}{d.uma[1]}、
-                  3位が{d.uma[2]}、4位が{d.uma[3]}です。合計はゼロなので、場全体のポイントは増減しません。
+                  3位が{d.uma[2]}{lgPC === 4 ? `、4位が${d.uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
                   数字が大きいほど素点より順位の価値が高くなります。
                 </div>
 
@@ -6616,7 +6616,7 @@ input, select { padding: 10px 14px; }
                     <> 今は持ち点と返し点が同じ{sp.toLocaleString()}点なので、
                     <span style={{ color: t.gd, fontWeight: 700 }}>オカは発生しません</span>。
                     トップの取り分を増やしたい場合は、持ち点を返し点より低くしてください
-                    （例: 持ち点25,000 / 返し点30,000 なら20ptがトップへ）。</>
+                    （例: 持ち点25,000 / 返し点30,000 なら{5 * lgPC}ptがトップへ）。</>
                   ) : (
                     <> 今は1人あたり{((rp - sp) / 1000)}ptぶんを供出し、
                     合計<span style={{ color: t.gd, fontWeight: 700 }}>{oka}pt</span>がトップに乗ります。
@@ -6637,7 +6637,7 @@ input, select { padding: 10px 14px; }
                 </div>
                 <div style={{ fontSize: 10, color: t.dm, marginBottom: 7 }}>
                   終局時の素点が {demo.map(x => x.toLocaleString()).join(" / ")} だった場合
-                  （合計 {(sp * 4).toLocaleString()}点）
+                  （合計 {(sp * lgPC).toLocaleString()}点）
                 </div>
                 {demo.map((s, i) => (
                   <div key={i} style={{
