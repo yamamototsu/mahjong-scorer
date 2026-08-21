@@ -1238,18 +1238,23 @@ export default function MahjongScorer() {
   };
   const inputStyle = { background: t.sf, border: `1px solid ${t.bd}`, borderRadius: 10, padding: "10px 14px", color: t.tx, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none" };
   const selectStyle = { ...inputStyle, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: 32 };
-  const toggleRow = (label, on, onToggle) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
-      <span style={{ fontSize: 14 }}>{label}</span>
-      <button onClick={onToggle} style={{
-        width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-        background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
-      }}>
-        <div style={{
-          width: 20, height: 20, borderRadius: "50%", background: "#fff",
-          position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
-        }} />
-      </button>
+  // desc を渡すと、説明文も同じ枠の中（区切り線の内側）に入る。
+  // 枠の外に置くと、区切り線が説明文の上を通ってしまう。
+  const toggleRow = (label, on, onToggle, desc) => (
+    <div style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 14 }}>{label}</span>
+        <button onClick={onToggle} style={{
+          width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer", flexShrink: 0,
+          background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
+        }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: "50%", background: "#fff",
+            position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
+          }} />
+        </button>
+      </div>
+      {desc && <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 4 }}>{desc}</div>}
     </div>
   );
 
@@ -8183,26 +8188,16 @@ input, select { padding: 10px 14px; }
 
           <div style={{ marginBottom: 8, marginTop: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8, letterSpacing: "0.05em" }}>その他</div>
-            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6, lineHeight: 1.7 }}>
-              鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます
-            </div>
-            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6, lineHeight: 1.7 }}>
-              役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け
-            </div>
-            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              ONにすると4翻30符・3翻60符を満貫扱い
-            </div>
-            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます
-            </div>
-            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）
-            </div>
+            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })),
+              "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます")}
+            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })),
+              "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け")}
+            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })),
+              "ONにすると4翻30符・3翻60符を満貫扱い")}
+            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })),
+              "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます")}
+            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })),
+              "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")}
           </div>
 
           <div style={{ marginTop: 18, marginBottom: 8 }}>
