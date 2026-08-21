@@ -5483,11 +5483,19 @@ input, select { padding: 10px 14px; }
                 width: "30%", height: "22%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               }}>
+                {/* 名前と「親」を並べても枠の幅を超えないようにする。
+                    「親」が付く席はそのぶん名前を小さくし、それでも入らない長い名前は末尾を省略する */}
                 <div style={{
-                  fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length))))),
-                  fontWeight: 800, color: "#fff", lineHeight: 1.15,
-                  whiteSpace: "nowrap", maxWidth: "100%",
-                }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: fs(10), color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
+                  display: "flex", alignItems: "baseline", justifyContent: "center",
+                  gap: 3, width: "100%", maxWidth: "100%",
+                }}>
+                  <span style={{
+                    fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.6 : 0)))))),
+                    fontWeight: 800, color: "#fff", lineHeight: 1.15,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
+                  }}>{players[i]}</span>
+                  {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.15, flexShrink: 0 }}>親</span>}
+                </div>
                 <div style={{
                   fontSize: fs(19), fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1.1,
                   color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
