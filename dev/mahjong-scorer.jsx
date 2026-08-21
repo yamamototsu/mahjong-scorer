@@ -1164,7 +1164,7 @@ export default function MahjongScorer() {
                 <span style={{ fontSize: 10, color: t.dm }}>
                   {(s - rp) / 1000 >= 0 ? "+" : ""}{(s - rp) / 1000}
                   {pts[i].rank === 1 && oka !== 0 ? ` +${oka}` : ""}
-                  {" "}{uma[pts[i].rank - 1] >= 0 ? "+" : ""}{uma[pts[i].rank - 1]}
+                  {" "}{uma[pts[i].rank - 1] > 0 ? "+" : ""}{uma[pts[i].rank - 1]}
                 </span>
                 <span style={{
                   width: 46, textAlign: "right", fontSize: 14, fontWeight: 900, fontVariantNumeric: "tabular-nums",
@@ -6659,7 +6659,7 @@ input, select { padding: 10px 14px; }
                     <span style={{ fontSize: 10, color: t.dm }}>
                       {(s - rp) / 1000 >= 0 ? "+" : ""}{(s - rp) / 1000}
                       {res[i].rank === 1 && oka !== 0 ? ` +${oka}` : ""}
-                      {" "}{d.uma[res[i].rank - 1] >= 0 ? "+" : ""}{d.uma[res[i].rank - 1]}
+                      {" "}{d.uma[res[i].rank - 1] > 0 ? "+" : ""}{d.uma[res[i].rank - 1]}
                     </span>
                     <span style={{
                       width: 48, textAlign: "right", fontSize: 14, fontWeight: 900, fontVariantNumeric: "tabular-nums",
@@ -9138,7 +9138,7 @@ input, select { padding: 10px 14px; }
                       color: honba > 0 ? t.gd : "rgba(255,255,255,0.45)",
                     }}>{honba}本場</span>
                     {riichiBets > 0 && (
-                      <span style={{ fontSize: 12, fontWeight: 800, color: t.ac }}>
+                      <span style={{ fontSize: "3.2cqmin", fontWeight: 800, color: t.ac }}>
                         供託{riichiBets}本
                       </span>
                     )}
