@@ -332,7 +332,9 @@ export default function MahjongScorer() {
   };
   const drawSeatTile = (pos) => {
     if (seatDone || seatTiles[pos]?.by !== null) return;
-    const next = seatTiles.map((s, i) => i === pos ? { ...s, by: seatTurn } : s);
+    // 引いた人の名前も控える（全員引き終わると players が席順に並べ替わり、
+    // 元の添字 by では別人を指してしまうため）
+    const next = seatTiles.map((s, i) => i === pos ? { ...s, by: seatTurn, byName: players[seatTurn] } : s);
     setSeatTiles(next);
     try { if (navigator.vibrate) navigator.vibrate(10); } catch {}
     if (seatTurn + 1 >= PC) {
@@ -7777,7 +7779,7 @@ input, select { padding: 10px 14px; }
                       <span style={{
                         fontSize: 9, color: "#5a5a5a", maxWidth: 56,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>{players[s.by]}</span>
+                      }}>{s.byName ?? players[s.by]}</span>
                     </>
                   ) : (
                     <span style={{
