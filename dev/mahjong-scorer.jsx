@@ -8858,6 +8858,11 @@ input, select { padding: 10px 14px; }
             <button style={{ ...smallBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
             <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
               onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
+            <button aria-label="対局を保留" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+              onClick={() => {
+                setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
+                setGameStarted(false); setView("home"); setHomeCat(null);
+              }}>⏸</button>
             <button aria-label="席順を回す" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
               onClick={() => setSeatRot(r => (r + PC - 1) % PC)}>🔄</button>
           </div>
@@ -8885,11 +8890,6 @@ input, select { padding: 10px 14px; }
             <button style={{ background: "none", border: "none", color: t.dm, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
               onClick={() => setShowRoundEdit(true)}>📋 局の修正</button>
           )}
-          <button style={{ background: "none", border: "none", color: t.dm, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
-            onClick={() => {
-              setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
-              setGameStarted(false); setView("home"); setHomeCat(null);
-            }}>⏸ 保留</button>
         </div>
 
         <RuleCheckModal />

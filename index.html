@@ -17498,6 +17498,29 @@ input, select { padding: 10px 14px; }
       },
       onClick: () => setShowRuleCheck(flip ? "flip" : true)
     }, "📋"), React.createElement("button", {
+      "aria-label": "対局を保留",
+      style: {
+        ...smallBtn(),
+        flex: "0 0 46px",
+        fontSize: 19,
+        padding: "10px 0"
+      },
+      onClick: () => {
+        setSuspendedGame({
+          config: gameConfig,
+          players: [...players],
+          scores: [...scores],
+          rounds: [...rounds],
+          dealerIdx,
+          roundWind,
+          honba,
+          riichiBets
+        });
+        setGameStarted(false);
+        setView("home");
+        setHomeCat(null);
+      }
+    }, "⏸"), React.createElement("button", {
       "aria-label": "席順を回す",
       style: {
         ...smallBtn(),
@@ -17553,31 +17576,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 600
       },
       onClick: () => setShowRoundEdit(true)
-    }, "📋 局の修正"), React.createElement("button", {
-      style: {
-        background: "none",
-        border: "none",
-        color: t.dm,
-        fontSize: 11,
-        cursor: "pointer",
-        fontWeight: 600
-      },
-      onClick: () => {
-        setSuspendedGame({
-          config: gameConfig,
-          players: [...players],
-          scores: [...scores],
-          rounds: [...rounds],
-          dealerIdx,
-          roundWind,
-          honba,
-          riichiBets
-        });
-        setGameStarted(false);
-        setView("home");
-        setHomeCat(null);
-      }
-    }, "⏸ 保留")), React.createElement(RuleCheckModal, null), React.createElement(RonRuleWarnModal, null), actionRow(true), React.createElement("div", {
+    }, "📋 局の修正")), React.createElement(RuleCheckModal, null), React.createElement(RonRuleWarnModal, null), actionRow(true), React.createElement("div", {
       style: {
         flex: "1 1 auto",
         minHeight: 0,
