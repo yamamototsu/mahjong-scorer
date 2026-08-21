@@ -1,6 +1,9 @@
 # Claude Code local config
 .claude/
 
+# ローカル検証用の生成物（build.jsが生成、コミットしない）
+local.html
+
 # OS files
 .DS_Store
 Thumbs.db
