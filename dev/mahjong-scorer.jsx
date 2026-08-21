@@ -5715,8 +5715,8 @@ input, select { padding: 10px 14px; }
         display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
       }}>
         <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ fontSize: 9, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
     return (
