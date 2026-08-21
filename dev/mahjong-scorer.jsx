@@ -1118,8 +1118,8 @@ export default function MahjongScorer() {
             <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
               順位に応じてやりとりするポイントです。今の設定「
               <span style={{ color: t.ac, fontWeight: 700 }}>{UMA_PRESETS.find(u => u.key === (r.umaKey || "none"))?.label}</span>
-              」だと、1位が{uma[0] >= 0 ? "+" : ""}{uma[0]}、2位が{uma[1] >= 0 ? "+" : ""}{uma[1]}、
-              3位が{uma[2]}、4位が{uma[3]}です。合計はゼロなので、場全体のポイントは増減しません。
+              」だと、1位が{uma[0] > 0 ? "+" : ""}{uma[0]}、2位が{uma[1] > 0 ? "+" : ""}{uma[1]}、
+              3位が{uma[2] > 0 ? "+" : ""}{uma[2]}、4位が{uma[3] > 0 ? "+" : ""}{uma[3]}です。合計はゼロなので、場全体のポイントは増減しません。
               数字が大きいほど、素点より順位の価値が高くなります。
             </div>
 
