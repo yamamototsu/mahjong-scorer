@@ -5437,8 +5437,7 @@ input, select { padding: 10px 14px; }
               {/* markerUnits=userSpaceOnUse: 線の太さで矢じりの大きさが変わらないようにする */}
               <marker id="payArrow" markerUnits="userSpaceOnUse"
                 markerWidth="7.2" markerHeight="7.2" refX="6.8" refY="3.6" orient="auto">
-                <path d="M0.5,0.7 L6.8,3.6 L0.5,6.5 z" fill={t.gd}
-                  stroke="rgba(0,0,0,0.8)" strokeWidth="0.9" strokeLinejoin="round" />
+                <path d="M0.5,0.7 L6.8,3.6 L0.5,6.5 z" fill={t.gd} />
               </marker>
             </defs>
             {flows.map((f, k) => {
@@ -5451,9 +5450,6 @@ input, select { padding: 10px 14px; }
               const b = edgeOf(win, -ux, -uy, extOf(gWinner), 2.5);
               return (
                 <g key={k}>
-                  {/* 卓の緑に埋もれないよう、黒い縁取りを下に敷く */}
-                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(0,0,0,0.8)" strokeWidth="2.8"
-                    strokeLinecap="round" />
                   <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={t.gd} strokeWidth="1.4"
                     strokeLinecap="round" markerEnd="url(#payArrow)" />
                 </g>
@@ -5489,7 +5485,9 @@ input, select { padding: 10px 14px; }
                 }}>
                   {amt > 0 ? "+" : ""}{amt.toLocaleString()}
                 </div>
-                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.1, height: "3.2%" }}>{isWin ? "アガリ" : ""}</div>
+                {/* あがった人だけ「アガリ」。空でも1行ぶん確保して、他の席と行の位置を揃える
+                    （高さを%で固定すると文字がはみ出して点数と重なる） */}
+                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.3 }}>{isWin ? "アガリ" : " "}</div>
               </div>
             );
           })}

@@ -10920,10 +10920,7 @@ input, select { padding: 10px 14px; }
       orient: "auto"
     }, React.createElement("path", {
       d: "M0.5,0.7 L6.8,3.6 L0.5,6.5 z",
-      fill: t.gd,
-      stroke: "rgba(0,0,0,0.8)",
-      strokeWidth: "0.9",
-      strokeLinejoin: "round"
+      fill: t.gd
     }))), flows.map((f, k) => {
       const p0 = posOf(f.from);
       const dx = win.x - p0.x,
@@ -10936,14 +10933,6 @@ input, select { padding: 10px 14px; }
       return React.createElement("g", {
         key: k
       }, React.createElement("line", {
-        x1: a.x,
-        y1: a.y,
-        x2: b.x,
-        y2: b.y,
-        stroke: "rgba(0,0,0,0.8)",
-        strokeWidth: "2.8",
-        strokeLinecap: "round"
-      }), React.createElement("line", {
         x1: a.x,
         y1: a.y,
         x2: b.x,
@@ -11008,10 +10997,9 @@ input, select { padding: 10px 14px; }
           fontSize: fs(10),
           color: t.gd,
           fontWeight: 700,
-          lineHeight: 1.1,
-          height: "3.2%"
+          lineHeight: 1.3
         }
-      }, isWin ? "アガリ" : ""));
+      }, isWin ? "アガリ" : " "));
     })), React.createElement("button", {
       onClick: () => setShowPayView(false),
       style: {
