@@ -587,7 +587,7 @@ function MahjongScorer() {
       const raw = r.s - returnPt + (rank === 0 ? okaPool : 0);
       out[r.i] = {
         rank: rank + 1,
-        pt: goshaRokunyu(raw / 1000) + uma[rank]
+        pt: goshaRokunyu(raw / 1000) + (uma[rank] || 0)
       };
     });
     return out;
@@ -1633,7 +1633,7 @@ function MahjongScorer() {
         color: t.ac,
         fontWeight: 700
       }
-    }, (pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")), "」だと、1位が", uma[0] > 0 ? "+" : "", uma[0], "、2位が", uma[1] > 0 ? "+" : "", uma[1], "、 3位が", uma[2] > 0 ? "+" : "", uma[2], pcU === 4 ? `、4位が${uma[3] > 0 ? "+" : ""}${uma[3]}` : "", "です。合計はゼロなので、場全体のポイントは増減しません。 数字が大きいほど、素点より順位の価値が高くなります。"), React.createElement("div", {
+    }, (pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.slice(0, pcU).map(u => (u > 0 ? "+" : "") + u).join(" / ")), "」だと、1位が", uma[0] > 0 ? "+" : "", uma[0], "、2位が", uma[1] > 0 ? "+" : "", uma[1], "、 3位が", uma[2] > 0 ? "+" : "", uma[2], pcU === 4 ? `、4位が${uma[3] > 0 ? "+" : ""}${uma[3]}` : "", "です。合計はゼロなので、場全体のポイントは増減しません。 数字が大きいほど、素点より順位の価値が高くなります。"), React.createElement("div", {
       style: {
         fontSize: 12,
         fontWeight: 800,
@@ -1712,7 +1712,7 @@ function MahjongScorer() {
         fontSize: 10,
         color: t.dm
       }
-    }, (s - rp) / 1000 >= 0 ? "+" : "", (s - rp) / 1000, pts[i].rank === 1 && oka !== 0 ? ` +${oka}` : "", " ", uma[pts[i].rank - 1] >= 0 ? "+" : "", uma[pts[i].rank - 1]), React.createElement("span", {
+    }, (s - rp) / 1000 >= 0 ? "+" : "", (s - rp) / 1000, pts[i].rank === 1 && oka !== 0 ? ` +${oka}` : "", " ", uma[pts[i].rank - 1] > 0 ? "+" : "", uma[pts[i].rank - 1]), React.createElement("span", {
       style: {
         width: 46,
         textAlign: "right",
@@ -13261,7 +13261,7 @@ input, select { padding: 10px 14px; }
           color: t.ac,
           fontWeight: 700
         }
-      }, (lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === d.umaKey)?.label || d.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")), "」だと、1位が", d.uma[0] > 0 ? "+" : "", d.uma[0], "、2位が", d.uma[1] > 0 ? "+" : "", d.uma[1], "、 3位が", d.uma[2] > 0 ? "+" : "", d.uma[2], lgPC === 4 ? `、4位が${d.uma[3] > 0 ? "+" : ""}${d.uma[3]}` : "", "です。合計はゼロなので、場全体のポイントは増減しません。 数字が大きいほど素点より順位の価値が高くなります。"), React.createElement("div", {
+      }, (lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === d.umaKey)?.label || d.uma.slice(0, lgPC).map(u => (u > 0 ? "+" : "") + u).join(" / ")), "」だと、1位が", d.uma[0] > 0 ? "+" : "", d.uma[0], "、2位が", d.uma[1] > 0 ? "+" : "", d.uma[1], "、 3位が", d.uma[2] > 0 ? "+" : "", d.uma[2], lgPC === 4 ? `、4位が${d.uma[3] > 0 ? "+" : ""}${d.uma[3]}` : "", "です。合計はゼロなので、場全体のポイントは増減しません。 数字が大きいほど素点より順位の価値が高くなります。"), React.createElement("div", {
         style: {
           fontSize: 12,
           fontWeight: 800,
@@ -13340,7 +13340,7 @@ input, select { padding: 10px 14px; }
           fontSize: 10,
           color: t.dm
         }
-      }, (s - rp) / 1000 >= 0 ? "+" : "", (s - rp) / 1000, res[i].rank === 1 && oka !== 0 ? ` +${oka}` : "", " ", d.uma[res[i].rank - 1] >= 0 ? "+" : "", d.uma[res[i].rank - 1]), React.createElement("span", {
+      }, (s - rp) / 1000 >= 0 ? "+" : "", (s - rp) / 1000, res[i].rank === 1 && oka !== 0 ? ` +${oka}` : "", " ", d.uma[res[i].rank - 1] > 0 ? "+" : "", d.uma[res[i].rank - 1]), React.createElement("span", {
         style: {
           width: 48,
           textAlign: "right",
@@ -17942,7 +17942,7 @@ input, select { padding: 10px 14px; }
         }
       }, honba, "本場"), riichiBets > 0 && React.createElement("span", {
         style: {
-          fontSize: 12,
+          fontSize: "3.2cqmin",
           fontWeight: 800,
           color: t.ac
         }
@@ -19523,7 +19523,7 @@ input, select { padding: 10px 14px; }
       rk.forEach((x, rank) => {
         res[x.i] = {
           rank: rank + 1,
-          pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + uma[rank]
+          pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0)
         };
       });
       const order = [...res.map((r, i) => ({
