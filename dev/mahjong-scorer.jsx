@@ -5365,23 +5365,61 @@ input, select { padding: 10px 14px; }
     // 席の配置（卓上モードと同じ: 手前/右/(向かい)/左）
     const slotOf = (i) => (i - seatRot + PC) % PC;
     const POS4 = [
-      { x: 50, y: 82, rot: 0 }, { x: 83, y: 50, rot: -90 },
-      { x: 50, y: 18, rot: 180 }, { x: 17, y: 50, rot: 90 },
+      { x: 50, y: 84, rot: 0 }, { x: 86, y: 50, rot: -90 },
+      { x: 50, y: 16, rot: 180 }, { x: 14, y: 50, rot: 90 },
     ];
     const POS3 = [
-      { x: 50, y: 82, rot: 0 }, { x: 81, y: 33, rot: -90 }, { x: 19, y: 33, rot: 90 },
+      { x: 50, y: 84, rot: 0 }, { x: 84, y: 31, rot: -90 }, { x: 16, y: 31, rot: 90 },
     ];
     const posOf = (i) => (PC === 3 ? POS3 : POS4)[slotOf(i)];
     const win = posOf(gWinner);
+
+    // 上段（局・アガリ内容）と「← 戻る」のぶんを引いて卓の大きさを決める
+    const boxW = "min(94vw, 58vh, 560px)";
+    // パネルの文字は卓の大きさに追従させる（横向きでも枠からはみ出さないように）
+    const fs = (px) => `calc(${boxW} * ${(px / 366).toFixed(5)})`;
+    // パネルの見た目の半径（幅30% × 高さ22%。左右の席は90度回転しているので入れ替わる）
+    const extOf = (i) => (Math.abs(posOf(i).rot) % 180 === 90 ? { hw: 11, hh: 15 } : { hw: 15, hh: 11 });
+    // 中心から (ux,uy) 方向へ進んで、パネルの枠を抜ける点
+    const edgeOf = (c, ux, uy, e, margin) => {
+      const tx = Math.abs(ux) < 1e-6 ? Infinity : e.hw / Math.abs(ux);
+      const ty = Math.abs(uy) < 1e-6 ? Infinity : e.hh / Math.abs(uy);
+      const t = Math.min(tx, ty) + margin;
+      return { x: c.x + ux * t, y: c.y + uy * t };
+    };
 
     return (
       <div onClick={() => setShowPayView(false)} style={{
         position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
         background: "rgba(0,0,0,0.93)", zIndex: 200,
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 12,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        padding: 12, overflowY: "auto",
       }}>
+        {/* 上段: 局とアガリ内容（卓の中央は矢印のために空けておく） */}
         <div onClick={(e) => e.stopPropagation()} style={{
-          position: "relative", width: "min(94vw, 94vh, 560px)", aspectRatio: "1 / 1",
+          width: boxW, marginBottom: 10, padding: "10px 14px", borderRadius: 14,
+          background: "rgba(0,0,0,0.55)", border: `1px solid ${t.bd}`, boxSizing: "border-box",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 12, flexWrap: "wrap", textAlign: "center",
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
+            {roundWind}{dealerIdx + 1}局{honba > 0 ? ` ${honba}本場` : ""}
+          </span>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
+            {gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`} / {gTsumo ? "ツモ" : "ロン"}
+          </span>
+          <span style={{ fontSize: 26, fontWeight: 900, color: t.gd, fontVariantNumeric: "tabular-nums" }}>
+            +{total.toLocaleString()}
+          </span>
+          {pool > 0 && (
+            <span style={{ fontSize: 12, color: t.ac, fontWeight: 700 }}>
+              リーチ棒{pool / 1000}本 +{pool.toLocaleString()}含む
+            </span>
+          )}
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()} style={{
+          position: "relative", width: boxW, aspectRatio: "1 / 1",
           borderRadius: 18, backgroundImage: `url(${TABLE_IMG})`,
           backgroundSize: "100% 100%", backgroundColor: "#14402b",
           overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
@@ -5389,43 +5427,33 @@ input, select { padding: 10px 14px; }
           {/* 矢印 */}
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
             <defs>
-              <marker id="payArrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
-                <path d="M0,0 L5,2.5 L0,5 z" fill={t.gd} />
+              {/* markerUnits=userSpaceOnUse: 線の太さで矢じりの大きさが変わらないようにする */}
+              <marker id="payArrow" markerUnits="userSpaceOnUse"
+                markerWidth="7.2" markerHeight="7.2" refX="6.8" refY="3.6" orient="auto">
+                <path d="M0.5,0.7 L6.8,3.6 L0.5,6.5 z" fill={t.gd}
+                  stroke="rgba(0,0,0,0.8)" strokeWidth="0.9" strokeLinejoin="round" />
               </marker>
             </defs>
             {flows.map((f, k) => {
               const p0 = posOf(f.from);
               const dx = win.x - p0.x, dy = win.y - p0.y;
               const len = Math.sqrt(dx * dx + dy * dy) || 1;
-              // 端を少し縮めてパネルに重ならないように
-              const x1 = p0.x + (dx / len) * 18, y1 = p0.y + (dy / len) * 18;
-              const x2 = win.x - (dx / len) * 20, y2 = win.y - (dy / len) * 20;
-              return <line key={k} x1={x1} y1={y1} x2={x2} y2={y2} stroke={t.gd} strokeWidth="0.7" markerEnd="url(#payArrow)" opacity="0.9" />;
+              const ux = dx / len, uy = dy / len;
+              // パネルの枠ぎりぎりから枠ぎりぎりまで引いて、矢印を長く見せる
+              const a = edgeOf(p0, ux, uy, extOf(f.from), 1.5);
+              const b = edgeOf(win, -ux, -uy, extOf(gWinner), 2.5);
+              return (
+                <g key={k}>
+                  {/* 卓の緑に埋もれないよう、黒い縁取りを下に敷く */}
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(0,0,0,0.8)" strokeWidth="2.8"
+                    strokeLinecap="round" />
+                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={t.gd} strokeWidth="1.4"
+                    strokeLinecap="round" markerEnd="url(#payArrow)" />
+                </g>
+              );
             })}
           </svg>
 
-          {/* 中央: 局とアガリ内容 */}
-          <div style={{
-            position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-            textAlign: "center", padding: "8px 10px", borderRadius: 14,
-            background: "rgba(0,0,0,0.55)", border: `1px solid ${t.bd}`,
-            width: "38%", boxSizing: "border-box",
-          }}>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
-              {roundWind}{dealerIdx + 1}局{honba > 0 ? ` ${honba}本場` : ""}
-            </div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
-              {gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`} / {gTsumo ? "ツモ" : "ロン"}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: t.gd, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
-              +{total.toLocaleString()}
-            </div>
-            {pool > 0 && (
-              <div style={{ fontSize: 10, color: t.ac, fontWeight: 700, lineHeight: 1.5 }}>
-                リーチ棒{pool / 1000}本<br />+{pool.toLocaleString()}含む
-              </div>
-            )}
-          </div>
 
           {/* 各席のパネル */}
           {Array.from({ length: PC }, (_, i) => i).map(i => {
@@ -5437,31 +5465,31 @@ input, select { padding: 10px 14px; }
               <div key={i} style={{
                 position: "absolute", top: `${pos.y}%`, left: `${pos.x}%`,
                 transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
-                textAlign: "center", padding: "8px 10px", borderRadius: 12,
+                textAlign: "center", padding: "2% 2.7%", borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
-                width: "32%", height: "22%", boxSizing: "border-box",
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
+                width: "30%", height: "22%", boxSizing: "border-box",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               }}>
                 <div style={{
-                  fontSize: Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length)))),
-                  fontWeight: 800, color: "#fff", lineHeight: 1.2,
+                  fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length))))),
+                  fontWeight: 800, color: "#fff", lineHeight: 1.15,
                   whiteSpace: "nowrap", maxWidth: "100%",
-                }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: 10, color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
+                }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: fs(10), color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
                 <div style={{
-                  fontSize: 19, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                  fontSize: fs(19), fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1.1,
                   color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
                 }}>
                   {amt > 0 ? "+" : ""}{amt.toLocaleString()}
                 </div>
-                <div style={{ fontSize: 10, color: t.gd, fontWeight: 700, height: 13 }}>{isWin ? "アガリ" : ""}</div>
+                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.1, height: "3.2%" }}>{isWin ? "アガリ" : ""}</div>
               </div>
             );
           })}
         </div>
 
         <button onClick={() => setShowPayView(false)} style={{
-          width: "min(94vw, 560px)", marginTop: 12, padding: "15px 8px", borderRadius: 12,
+          width: boxW, marginTop: 12, padding: "15px 8px", borderRadius: 12, flexShrink: 0,
           border: `1px solid ${t.bd}`, background: t.card, color: t.tx, fontSize: 15, fontWeight: 700, cursor: "pointer",
         }}>← 戻る</button>
       </div>
