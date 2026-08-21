@@ -9135,7 +9135,7 @@ input, select { padding: 10px 14px; }
                     }}>{honba}本場</span>
                     {riichiBets > 0 && (
                       <span style={{ fontSize: 12, fontWeight: 800, color: t.ac }}>
-                        供託 {riichiBets.toLocaleString()}
+                        供託{riichiBets}本
                       </span>
                     )}
                   </div>
