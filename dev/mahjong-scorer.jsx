@@ -2318,7 +2318,7 @@ export default function MahjongScorer() {
                           ) : (h >= 13 ? "役満" : `${h}翻`)}
                         </div>
                         {pickerNaki && y.naki !== null && y.naki < y.han && (
-                          <div style={{ fontSize: 8, color: t.gn, opacity: 0.85, marginTop: 1 }}>食い下がり</div>
+                          <div style={{ fontSize: 10, color: t.gn, opacity: 0.85, marginTop: 1 }}>食い下がり</div>
                         )}
                       </button>
                     );
