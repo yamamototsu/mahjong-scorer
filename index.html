@@ -10322,6 +10322,9 @@ input, select { padding: 10px 14px; }
     const renchan = rs.agariRenchan ? "あがり連荘" : rs.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘";
     const renchanHint = rs.agariRenchan ? "流局したら親は必ず流れる" : rs.tenpaiRenchan ? "親がテンパイなら続行、ノーテンなら流れる" : "流局しても親は続行";
     const mr = rs.multiRon === "triple" ? "トリプルロンあり" : rs.multiRon === "double" ? "ダブロンあり" : "頭ハネ";
+    const umaArr = lg && lg.uma && lg.uma.length === PC ? lg.uma : rs.uma && rs.uma.length === PC ? rs.uma : null;
+    const umaLabel = !umaArr || umaArr.every(u => !u) ? "なし" : umaArr.map(u => (u > 0 ? "+" : "") + u).join(" / ");
+    const rateUnit = rs.rateUnit || "G";
     return React.createElement("div", {
       style: {
         position: "fixed",
@@ -10329,7 +10332,7 @@ input, select { padding: 10px 14px; }
         background: "rgba(0,0,0,0.75)",
         zIndex: 100,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
         padding: "20px 16px",
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
@@ -10381,7 +10384,7 @@ input, select { padding: 10px 14px; }
         setShowRuleCheck(false);
         setRuleEditMode(false);
       }
-    }, "✕")), !ruleEditMode ? React.createElement(React.Fragment, null, row("形式", MATCH_LABEL(gameConfig?.matchType)), row("持ち点 / 返し点", `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`, `オカ ${((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * 4 / 1000}pt がトップへ`), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), lg && row("ウマ", lg.uma.map(u => (u > 0 ? "+" : "") + u).join(" / "))) : (() => {
+    }, "✕")), !ruleEditMode ? React.createElement(React.Fragment, null, row("人数", PC === 3 ? "三人麻雀" : "四人麻雀"), row("形式", MATCH_LABEL(gameConfig?.matchType)), row("持ち点 / 返し点", `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`, `オカ ${((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * PC / 1000}pt がトップへ`), row("ウマ（順位点）", umaLabel), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし", rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり"), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), row("本場", `1本 = ${HU().toLocaleString()}点`, `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`), row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います"), row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし", rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)) : (() => {
       const seg = (opts, cur, onPick) => React.createElement("div", {
         style: {
           display: "flex",
@@ -10519,17 +10522,10 @@ input, select { padding: 10px 14px; }
         border: `1px solid ${ruleEditMode ? t.gn : t.ac}55`
       },
       onClick: () => setRuleEditMode(v => !v)
-    }, ruleEditMode ? "✓ 変更を終える" : "✏️ ルールを変更する"), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: "#b9c6d8",
-        marginTop: 12,
-        lineHeight: 1.7
-      }
-    }, "ノーテン罰符は場で3,000点、本場は1本につき300点です"), React.createElement("button", {
+    }, ruleEditMode ? "✓ 変更を終える" : "✏️ ルールを変更する"), React.createElement("button", {
       style: {
         ...actionBtn("p"),
-        marginTop: 10
+        marginTop: 14
       },
       onClick: () => {
         setShowRuleCheck(false);
