@@ -5285,10 +5285,6 @@ input, select { padding: 10px 14px; }
               </div>
             </>
           )}
-
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 24 }}>
-            タップしてスキップ
-          </div>
         </div>
       </div>
     );
