@@ -8476,8 +8476,8 @@ input, select { padding: 10px 14px; }
                 <span style={{ color: t.gd }}>{MATCH_LABEL(matchType)}</span>
                 <span style={{ color: t.dm }}>|</span>
                 <span>{PC === 3 ? "三人麻雀" : "四人麻雀"}</span>
-                <span style={{ color: t.dm }}>|</span>
-                <span>{(rules.startPoints ?? 25000).toLocaleString()} / {(rules.returnPoints ?? 30000).toLocaleString()}</span>
+                {/* 持ち点/返し点は常に2行目へ（折り返しで区切りの「|」だけが行末に残るのを防ぐ） */}
+                <span style={{ width: "100%", textAlign: "center" }}>{(rules.startPoints ?? 25000).toLocaleString()} / {(rules.returnPoints ?? 30000).toLocaleString()}</span>
               </div>
               <div style={{ borderBottom: `1px solid ${t.bd}33`, padding: "2px 0 8px" }}>
                 {/* 卓の並びで表示（手前が起家。実際に座る位置と同じ配置） */}
