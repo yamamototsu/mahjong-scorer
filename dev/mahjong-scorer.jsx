@@ -290,9 +290,10 @@ export default function MahjongScorer() {
   const tileScale = isLandscape ? Math.min(2.2, Math.max(1.3, vp.w / 440)) : 1;
 
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
+  // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
   const [booting, setBooting] = useState(true);
   React.useEffect(() => {
-    const tm = setTimeout(() => setBooting(false), 2600);
+    const tm = setTimeout(() => setBooting(false), 2900);
     return () => clearTimeout(tm);
   }, []);
 
@@ -2428,6 +2429,15 @@ input, select { padding: 10px 14px; }
 @keyframes bootFade {
   0%, 72% { opacity: 1; }
   100%    { opacity: 0; visibility: hidden; }
+}
+@keyframes bootShine {
+  0%   { opacity: 0; transform: translateX(-115%); }
+  35%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(115%); }
+}
+@keyframes menuIn {
+  0%   { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
@@ -5307,47 +5317,6 @@ input, select { padding: 10px 14px; }
     );
   };
 
-  // 起動時のオープニング（タップでスキップ）
-  const BootSplash = () => {
-    if (!booting) return null;
-    const chars = ["卓", "上", "ポ", "ン", "づ", "け"];
-    return (
-      <div onClick={() => setBooting(false)} style={{
-        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 400,
-        background: "radial-gradient(circle at 50% 42%, #164a32 0%, #0a0f14 60%, #05080b 100%)",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        animation: "bootFade 2.6s ease-in forwards",
-      }}>
-        <div style={{ fontSize: 46, animation: "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both", lineHeight: 1 }}>🀄</div>
-
-        <div style={{
-          marginTop: 14, fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em",
-          animation: "bootSub 0.7s 0.3s ease-out both",
-        }}>麻雀スコアラー</div>
-
-        <div style={{ display: "flex", gap: 2, marginTop: 8 }}>
-          {chars.map((c, i) => (
-            <span key={i} style={{
-              fontSize: 40, fontWeight: 900, color: "#fff", letterSpacing: "0.02em",
-              animation: `bootChar 0.5s ${0.45 + i * 0.11}s cubic-bezier(.2,1.1,.35,1) both, bootGlow 2.2s ${1.2 + i * 0.05}s ease-in-out infinite`,
-            }}>{c}</span>
-          ))}
-        </div>
-
-        <div style={{
-          height: 2, width: 210, marginTop: 14,
-          background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-          animation: "bootLine 0.7s 1.05s ease-out both",
-        }} />
-
-        <div style={{
-          marginTop: 22, fontSize: 10, color: "rgba(255,255,255,0.4)",
-          animation: "bootSub 0.8s 1.6s ease-out both",
-        }}>卓の真ん中に置いて使えます</div>
-      </div>
-    );
-  };
-
   // 卓上表示: 誰から誰へいくら動くかを、卓の配置＋矢印で見せる
   const PayTableView = () => {
     if (!showPayView || gWinner === null || !gResult) return null;
@@ -5748,30 +5717,58 @@ input, select { padding: 10px 14px; }
         <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
+    // 起動直後はタイトルだけを見せる。演出が終わったらメニューを順に出す。
+    // 中身は常に置いたまま透明にするので、メニューが出るときに位置が飛ばない。
+    const intro = booting;
+    const reveal = (i) => intro
+      ? { opacity: 0, transform: "translateY(14px)", pointerEvents: "none" }
+      : { animation: `menuIn 0.5s ${(i * 0.07).toFixed(2)}s cubic-bezier(.2,.9,.3,1) both` };
+
     return (
-      <div style={{ ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8 }}>
-        {/* ロゴ */}
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <div style={{ fontSize: 40, lineHeight: 1, animation: "bootTile 0.7s cubic-bezier(.2,1.4,.4,1) both" }}>🀄</div>
+      <div style={{
+        ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8,
+        background: intro
+          ? "radial-gradient(circle at 50% 44%, rgba(22,74,50,0.55) 0%, rgba(10,15,20,0) 62%)"
+          : "radial-gradient(circle at 50% 44%, rgba(22,74,50,0) 0%, rgba(10,15,20,0) 62%)",
+        transition: "background 1.1s ease-out",
+      }}>
+        {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
+        <div style={{
+          textAlign: "center", marginBottom: 22,
+          transform: intro ? "translateY(76px) scale(1.06)" : "translateY(0) scale(1)",
+          transition: "transform 0.85s cubic-bezier(.2,.9,.3,1)",
+        }}>
+          {/* lineHeight は 1 にしない（絵文字の字面が行の高さを超えてはみ出す） */}
+          <div style={{ fontSize: 40, lineHeight: 1.1, animation: "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both" }}>🀄</div>
           <div style={{
-            fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 12,
-            animation: "bootSub 0.6s 0.15s ease-out both",
+            fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 9,
+            animation: "bootSub 0.7s 0.3s ease-out both",
           }}>麻雀スコアラー</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 6 }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 6, position: "relative" }}>
             {["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => (
               <span key={i} style={{
                 fontSize: 34, fontWeight: 900, color: "#fff", lineHeight: 1.2,
-                animation: `bootChar 0.45s ${0.2 + i * 0.08}s cubic-bezier(.2,1.1,.35,1) both`,
+                animation: `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both`
+                  + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`,
                 textShadow: "0 0 22px rgba(234,179,8,0.28), 0 3px 12px rgba(0,0,0,0.6)",
               }}>{c}</span>
             ))}
+            {/* 文字の上を一度だけ光が走る */}
+            <span style={{
+              position: "absolute", inset: "-6% -12%", pointerEvents: "none", borderRadius: 8,
+              background: "linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.5) 50%, transparent 62%)",
+              animation: "bootShine 1.1s 1.35s ease-out both",
+            }} />
           </div>
           <div style={{
             height: 2, width: 200, margin: "12px auto 9px",
             background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-            animation: "bootLine 0.6s 0.6s ease-out both",
+            animation: "bootLine 0.7s 1.15s ease-out both",
           }} />
-          <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>卓の真ん中に置いて使えます</div>
+          <div style={{
+            fontSize: 10, color: t.dm, marginTop: 2,
+            animation: "bootSub 0.8s 1.7s ease-out both",
+          }}>卓の真ん中に置いて使えます</div>
         </div>
 
         {/* 保留中があれば最優先で出す */}
@@ -5779,7 +5776,7 @@ input, select { padding: 10px 14px; }
           <button onClick={resumeGame} style={{
             width: "100%", padding: "14px 12px", borderRadius: 14, cursor: "pointer", marginBottom: 10,
             border: `2px solid ${t.gd}`, background: t.gdS, color: t.tx, textAlign: "left",
-            display: "flex", alignItems: "center", gap: 10,
+            display: "flex", alignItems: "center", gap: 10, ...reveal(0),
           }}>
             <span style={{ fontSize: 20 }}>⏸</span>
             <span style={{ flex: 1, minWidth: 0 }}>
@@ -5796,19 +5793,19 @@ input, select { padding: 10px 14px; }
         <button onClick={startPlay} style={{
           width: "100%", padding: "20px 12px", borderRadius: 16, cursor: "pointer", marginBottom: 12,
           border: "none", background: t.ac, color: "#fff",
-          boxShadow: "0 8px 24px rgba(91,155,255,0.28)",
+          boxShadow: "0 8px 24px rgba(91,155,255,0.28)", ...reveal(1),
         }}>
           <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: "0.05em" }}>対局をはじめる</div>
           <div style={{ fontSize: 11, opacity: 0.9, marginTop: 3 }}>東風戦・半荘戦・全荘戦 / 四人・三人麻雀</div>
         </button>
 
         {/* サブメニュー */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, ...reveal(2) }}>
           {subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league"))}
           {subBtn("🔢", "1局戦", "点数計算", () => { resetCalc(); setView("calc"); })}
           {subBtn("📋", "履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, ...reveal(3) }}>
           {subBtn("🎓", "練習問題", "点数・役・符", () => { setView("home"); setHomeCat("practice"); })}
           {subBtn("🎴", "始め方", "図解で解説", () => { setView("startguide"); setGuideStep(0); })}
           {subBtn("⚙️", "設定", "ルール初期値", () => {
@@ -5819,6 +5816,7 @@ input, select { padding: 10px 14px; }
         <button onClick={() => { setHomeCat(null); setView("home"); }} style={{
           width: "100%", marginTop: 14, padding: "11px 8px", borderRadius: 11, cursor: "pointer",
           border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 12, fontWeight: 700,
+          ...reveal(4),
         }}>すべてのメニュー</button>
       </div>
     );
@@ -9183,7 +9181,6 @@ input, select { padding: 10px 14px; }
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
         </div>
-        <BootSplash />
         <StartSplash />
         <PayTableView />
         <RankPeekOverlay />
@@ -9287,7 +9284,6 @@ input, select { padding: 10px 14px; }
       <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 10, marginTop: -8 }}>
         点数を長押しすると順位と点差が見られます
       </div>
-      <BootSplash />
       <StartSplash />
       <PayTableView />
       <RankPeekOverlay />
