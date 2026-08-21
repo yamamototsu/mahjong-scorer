@@ -1115,9 +1115,9 @@ export default function MahjongScorer() {
             <div style={{ fontSize: 12, fontWeight: 800, color: t.tx, marginBottom: 6 }}>ウマとは</div>
             <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
               順位に応じてやりとりするポイントです。今の設定「
-              <span style={{ color: t.ac, fontWeight: 700 }}>{UMA_PRESETS.find(u => u.key === (r.umaKey || "none"))?.label}</span>
+              <span style={{ color: t.ac, fontWeight: 700 }}>{(pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}</span>
               」だと、1位が{uma[0] >= 0 ? "+" : ""}{uma[0]}、2位が{uma[1] >= 0 ? "+" : ""}{uma[1]}、
-              3位が{uma[2]}、4位が{uma[3]}です。合計はゼロなので、場全体のポイントは増減しません。
+              3位が{uma[2]}{pcU === 4 ? `、4位が${uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
               数字が大きいほど、素点より順位の価値が高くなります。
             </div>
 
@@ -1128,7 +1128,7 @@ export default function MahjongScorer() {
                 <> 今は持ち点と返し点が同じ{sp.toLocaleString()}点なので
                 <span style={{ color: t.gd, fontWeight: 700 }}>オカは発生しません</span>。
                 トップの取り分を増やすなら、持ち点を返し点より低くしてください
-                （例: 持ち点25,000 / 返し点30,000 で20pt）。</>
+                （例: 持ち点25,000 / 返し点30,000 で{5 * pcU}pt）。</>
               ) : (
                 <> 1人あたり{((rp - sp) / 1000)}ptを供出し、合計
                 <span style={{ color: t.gd, fontWeight: 700 }}>{oka}pt</span>がトップに乗ります。
@@ -1146,7 +1146,7 @@ export default function MahjongScorer() {
 
             <div style={{ fontSize: 12, fontWeight: 800, color: t.tx, marginBottom: 7 }}>今の設定での例</div>
             <div style={{ fontSize: 10, color: t.dm, marginBottom: 7 }}>
-              終局時の素点が {demo.map(x => x.toLocaleString()).join(" / ")}（合計 {(sp * 4).toLocaleString()}点）だった場合
+              終局時の素点が {demo.map(x => x.toLocaleString()).join(" / ")}（合計 {(sp * pcU).toLocaleString()}点）だった場合
             </div>
             {demo.map((s, i) => (
               <div key={i} style={{
@@ -1209,7 +1209,7 @@ export default function MahjongScorer() {
         </div>
 
         <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8 }}>
-          オカ = (返し点 − 持ち点) × 4 = <span style={{ color: oka === 0 ? t.dm : t.gd, fontWeight: 700 }}>{oka}pt</span>
+          オカ = (返し点 − 持ち点) × {pcU} = <span style={{ color: oka === 0 ? t.dm : t.gd, fontWeight: 700 }}>{oka}pt</span>
           {oka === 0 ? " — 発生しません" : " がトップへ"}
         </div>
 
