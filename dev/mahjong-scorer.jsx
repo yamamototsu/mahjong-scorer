@@ -2852,7 +2852,7 @@ input, select { padding: 10px 14px; }
         <div style={body}>
           <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>🎯</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 8px" }}>飜数・役名テスト</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 8px" }}>翻数・役名テスト</h2>
             <p style={{ fontSize: 13, color: t.dm }}>間違えた役から優先的に出題されます</p>
           </div>
 
@@ -4943,7 +4943,7 @@ input, select { padding: 10px 14px; }
         // 受け取る供託。古い記録には pool が無いのでその場合だけ本数から求める
         const pool = (typeof r.pool === "number") ? r.pool : rc * 1000;
         const hb = r.honba * ((cfg.rules && cfg.rules.honbaUnit) || 300);
-        const handLabel = r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}飜${r.fu}符` : `${r.han}飜`;
+        const handLabel = r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`;
         if (paidRiichi) { delta -= 1000; }
 
         if (r.winner === pi) {
@@ -5915,7 +5915,7 @@ input, select { padding: 10px 14px; }
             {menuItem("📖", "役一覧", "全ての役の解説と翻数", () => {
               setView("dict"); setDictCat("1翻"); setDictExpanded(null);
             })}
-            {menuItem("🎯", "飜数・役名テスト", "役の飜数クイズ・役名テスト", () => {
+            {menuItem("🎯", "翻数・役名テスト", "役の翻数クイズ・役名テスト", () => {
               setView("quiz"); setQuizMode(null);
             })}
             {menuItem("📐", "符計算講座", "レベル別に符を学ぶ", () => {
