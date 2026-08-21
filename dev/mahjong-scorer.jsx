@@ -1196,14 +1196,14 @@ export default function MahjongScorer() {
                 const v = parseInt(e.target.value, 10);
                 onChange({ startPoints: v, returnPoints: Math.max(v, rp) });
               }}>
-              {Array.from({length:16},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+              {Array.from({length:26},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>返し点</div>
             <select value={rp} style={selectStyle}
               onChange={e => onChange({ returnPoints: parseInt(e.target.value, 10) })}>
-              {Array.from({length:16},(_,i)=>20000+i*1000).filter(v => v >= sp).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+              {Array.from({length:26},(_,i)=>20000+i*1000).filter(v => v >= sp).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
             </select>
           </div>
         </div>
@@ -6566,14 +6566,14 @@ input, select { padding: 10px 14px; }
                   const v = parseInt(e.target.value, 10);
                   set({ rules: { ...d.rules, startPoints: v, returnPoints: Math.max(v, d.rules.returnPoints || v) } });
                 }}>
-                {Array.from({length:16},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+                {Array.from({length:26},(_,i)=>20000+i*1000).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>返し点</div>
               <select value={d.rules.returnPoints} style={selectStyle}
                 onChange={e => set({ rules: { ...d.rules, returnPoints: parseInt(e.target.value, 10) } })}>
-                {Array.from({length:16},(_,i)=>20000+i*1000).filter(v => v >= (d.rules.startPoints || 0)).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
+                {Array.from({length:26},(_,i)=>20000+i*1000).filter(v => v >= (d.rules.startPoints || 0)).map(v => <option key={v} value={v}>{v.toLocaleString()}</option>)}
               </select>
             </div>
           </div>
