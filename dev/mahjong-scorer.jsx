@@ -406,7 +406,8 @@ export default function MahjongScorer() {
     const out = new Array(pcN);
     ranked.forEach((r, rank) => {
       const raw = r.s - returnPt + (rank === 0 ? okaPool : 0);
-      out[r.i] = { rank: rank + 1, pt: goshaRokunyu(raw / 1000) + uma[rank] };
+      // ウマの要素数が人数に足りない場合でも NaN にしない（三人用のウマのまま四人で打った等）
+      out[r.i] = { rank: rank + 1, pt: goshaRokunyu(raw / 1000) + (uma[rank] || 0) };
     });
     return out;
   };
@@ -1121,7 +1122,7 @@ export default function MahjongScorer() {
             <div style={{ fontSize: 12, fontWeight: 800, color: t.tx, marginBottom: 6 }}>ウマとは</div>
             <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
               順位に応じてやりとりするポイントです。今の設定「
-              <span style={{ color: t.ac, fontWeight: 700 }}>{(pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}</span>
+              <span style={{ color: t.ac, fontWeight: 700 }}>{(pcU === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === (r.umaKey || "none"))?.label || uma.slice(0, pcU).map(u => (u > 0 ? "+" : "") + u).join(" / ")}</span>
               」だと、1位が{uma[0] > 0 ? "+" : ""}{uma[0]}、2位が{uma[1] > 0 ? "+" : ""}{uma[1]}、
               3位が{uma[2] > 0 ? "+" : ""}{uma[2]}{pcU === 4 ? `、4位が${uma[3] > 0 ? "+" : ""}${uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
               数字が大きいほど、素点より順位の価値が高くなります。
@@ -6608,7 +6609,7 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.95, marginBottom: 12 }}>
                   順位によってやりとりするポイントです。今の設定「
                   <span style={{ color: t.ac, fontWeight: 700 }}>
-                    {(lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === d.umaKey)?.label || d.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}
+                    {(lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === d.umaKey)?.label || d.uma.slice(0, lgPC).map(u => (u > 0 ? "+" : "") + u).join(" / ")}
                   </span>
                   」だと、1位が{d.uma[0] > 0 ? "+" : ""}{d.uma[0]}、2位が{d.uma[1] > 0 ? "+" : ""}{d.uma[1]}、
                   3位が{d.uma[2] > 0 ? "+" : ""}{d.uma[2]}{lgPC === 4 ? `、4位が${d.uma[3] > 0 ? "+" : ""}${d.uma[3]}` : ""}です。合計はゼロなので、場全体のポイントは増減しません。
@@ -9890,7 +9891,7 @@ input, select { padding: 10px 14px; }
           const rk = scores.map((s, i) => ({ i, s })).sort((a3, b3) => (b3.s - a3.s) || (a3.i - b3.i));
           const res = new Array(PC);
           rk.forEach((x, rank) => {
-            res[x.i] = { rank: rank + 1, pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + uma[rank] };
+            res[x.i] = { rank: rank + 1, pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0) };
           });
           const order = [...res.map((r, i) => ({ ...r, i }))].sort((a3, b3) => a3.rank - b3.rank);
           return (
