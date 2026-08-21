@@ -374,7 +374,11 @@ export default function MahjongScorer() {
   const [lgDraft, setLgDraft] = useState(null);        // 作成・編集中のリーグ
   const [lgPick, setLgPick] = useState([]);            // その対局に出る4人
   const [lgMatchType, setLgMatchType] = useState("hanchan"); // 形式は対局ごとに決める
-  const [showUmaHelp, setShowUmaHelp] = useState(false); // ウマ・オカの説明を開く
+  const [showUmaHelp, setShowUmaHelp] = useState(false); // ウマ・オカの説明を開く（リーグ作成）
+  // 説明パネルの開閉は親のstateに置く（子コンポーネント内のstateだと
+  // 親の再レンダーで再マウントされ、開いてもすぐ閉じてしまうため）
+  const [ruleHelpOpen, setRuleHelpOpen] = useState(false);   // ルールの説明（設定・セットアップ共用）
+  const [umaOkaHelpOpen, setUmaOkaHelpOpen] = useState(false); // ウマ・オカとは（設定・セットアップ共用）
 
   const curLeague = leagues.find(l => l.id === leagueId) || null;
 
@@ -1026,7 +1030,7 @@ export default function MahjongScorer() {
   const pSelBtn = (on) => ({ padding: "14px 8px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center", flex: 1, transition: "all 0.1s" });
   // 対局ルールの説明（設定・セットアップ・リーグで共用）
   const RuleHelp = () => {
-    const [open, setOpen] = React.useState(false);
+    const open = ruleHelpOpen, setOpen = setRuleHelpOpen;
     const item = (title, body) => (
       <div style={{ padding: "11px 0", borderBottom: `1px solid ${t.bd}44` }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: t.tx, marginBottom: 4 }}>{title}</div>
@@ -1085,7 +1089,7 @@ export default function MahjongScorer() {
     const pcU = (r.uma && r.uma.length === 3) || isSanma ? 3 : 4;
     const uma = r.uma || (pcU === 3 ? [0, 0, 0] : [0, 0, 0, 0]);
     const oka = (rp - sp) * pcU / 1000;
-    const [open, setOpen] = React.useState(false);
+    const open = umaOkaHelpOpen, setOpen = setUmaOkaHelpOpen;
 
     // 説明用の例（持ち点に合わせて合計が合うようにする）
     const demo = (pcU === 3 ? [15000, 0, -15000] : [15000, 7000, -7000, -15000]).map(o => sp + o);
