@@ -11159,19 +11159,19 @@ input, select { padding: 10px 14px; }
       style: {
         width: "100%",
         marginTop: 8,
-        padding: "11px 8px",
+        padding: "13px 8px",
         borderRadius: 9,
         cursor: "pointer",
         border: `1px solid ${rankPeekGold ? t.gd : t.gd + "55"}`,
         background: rankPeekGold ? t.gdS : "transparent",
         color: t.gd,
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: 800
       },
       onClick: () => setRankPeekGold(v => !v)
     }, rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`), rankPeekGold && ptOf && React.createElement("div", {
       style: {
-        fontSize: 10,
+        fontSize: 13,
         color: t.dm,
         textAlign: "center",
         marginTop: 6,
@@ -11181,13 +11181,13 @@ input, select { padding: 10px 14px; }
       style: {
         width: "100%",
         marginTop: 8,
-        padding: "10px 8px",
+        padding: "13px 8px",
         borderRadius: 9,
         cursor: "pointer",
         border: `1px solid ${t.bd}`,
         background: "transparent",
         color: t.ac,
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: 700
       },
       onClick: () => {

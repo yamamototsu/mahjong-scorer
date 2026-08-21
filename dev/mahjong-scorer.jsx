@@ -5553,22 +5553,22 @@ input, select { padding: 10px 14px; }
 
           {rate > 0 && (
             <button style={{
-              width: "100%", marginTop: 8, padding: "11px 8px", borderRadius: 9, cursor: "pointer",
+              width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
               border: `1px solid ${rankPeekGold ? t.gd : t.gd + "55"}`,
               background: rankPeekGold ? t.gdS : "transparent",
-              color: t.gd, fontSize: 12, fontWeight: 800,
+              color: t.gd, fontSize: 15, fontWeight: 800,
             }} onClick={() => setRankPeekGold(v => !v)}>
               {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`}
             </button>
           )}
           {rankPeekGold && ptOf && (
-            <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 13, color: t.dm, textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
               いま終局した場合のポイント（ウマ・オカ込み）を{gameConfig?.rules?.rateUnit || "G"}に換算した値です
             </div>
           )}
           <button style={{
-            width: "100%", marginTop: 8, padding: "10px 8px", borderRadius: 9, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700,
+            width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 15, fontWeight: 700,
           }} onClick={() => { setPlayerDetail(pi); setRankPeek(null); }}>点数の変動履歴を見る</button>
 
           <button style={{
