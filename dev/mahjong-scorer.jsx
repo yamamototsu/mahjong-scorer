@@ -3305,7 +3305,7 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", gap: 4, marginBottom: 14, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {YAKU_CATEGORIES.map(cat => (
           <button key={cat} style={{
-            padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
             border: `1px solid ${dictCat === cat ? t.ac : t.bd}`,
             background: dictCat === cat ? t.acS : "transparent",
             color: dictCat === cat ? t.ac : t.dm,
@@ -6542,7 +6542,7 @@ input, select { padding: 10px 14px; }
           </div>
           <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
             background: "none", border: "none", color: t.ac, fontSize: 11,
-            cursor: "pointer", textDecoration: "underline", marginTop: 10,
+            cursor: "pointer", textDecoration: "underline", marginTop: 6, padding: "9px 10px",
           }}>👤 名前を追加・編集する</button>
         </div>
 
@@ -8244,7 +8244,7 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 6 }}>名前の欄をタップして選択</div>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
-              background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline",
+              background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: "9px 10px",
             }}>👤 リストの名前を編集</button>
           </div>
 
