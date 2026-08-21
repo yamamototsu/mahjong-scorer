@@ -1029,7 +1029,9 @@ export default function MahjongScorer() {
   const card = { background: t.card, borderRadius: 14, padding: 22, marginBottom: 18, border: `1px solid ${t.bd}`, boxSizing: "border-box", maxWidth: "100%", overflow: "hidden", lineHeight: 1.7 };
   const question = { fontSize: 16, fontWeight: 700, margin: "4px 0 20px", textAlign: "center", lineHeight: 1.6, letterSpacing: "0.02em" };
   const bigBtn = (c, s) => ({ flex: "1 1 140px", maxWidth: 200, padding: "20px 8px", border: `2px solid ${c}`, borderRadius: 14, background: s, color: c, fontSize: 20, fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.12s" });
-  const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 19, fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
+  // 文字を画面幅に追従させる。19pxのままだと狭い端末（280〜320px）で
+  // 4列のマス目が枠や画面の外へはみ出る。365px以上では19pxのまま変わらない。
+  const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: "clamp(14px, 5.2vw, 19px)", fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
   const actionBtn = (v) => ({ width: "100%", padding: "15px 12px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 10, boxSizing: "border-box", lineHeight: 1.5, ...(v === "p" ? { background: t.ac, color: "#fff" } : v === "d" ? { background: t.rd, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }) });
   const pSelBtn = (on) => ({ padding: "14px 8px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center", flex: 1, transition: "all 0.1s" });
   // 対局ルールの説明（設定・セットアップ・リーグで共用）
@@ -1239,18 +1241,23 @@ export default function MahjongScorer() {
   };
   const inputStyle = { background: t.sf, border: `1px solid ${t.bd}`, borderRadius: 10, padding: "10px 14px", color: t.tx, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none" };
   const selectStyle = { ...inputStyle, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: 32 };
-  const toggleRow = (label, on, onToggle) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
-      <span style={{ fontSize: 14 }}>{label}</span>
-      <button onClick={onToggle} style={{
-        width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-        background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
-      }}>
-        <div style={{
-          width: 20, height: 20, borderRadius: "50%", background: "#fff",
-          position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
-        }} />
-      </button>
+  // desc を渡すと、説明文も同じ枠の中（区切り線の内側）に入る。
+  // 枠の外に置くと、区切り線が説明文の上を通ってしまう。
+  const toggleRow = (label, on, onToggle, desc) => (
+    <div style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 14 }}>{label}</span>
+        <button onClick={onToggle} style={{
+          width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer", flexShrink: 0,
+          background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
+        }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: "50%", background: "#fff",
+            position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
+          }} />
+        </button>
+      </div>
+      {desc && <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 4 }}>{desc}</div>}
     </div>
   );
 
@@ -3308,7 +3315,7 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", gap: 4, marginBottom: 14, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {YAKU_CATEGORIES.map(cat => (
           <button key={cat} style={{
-            padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
             border: `1px solid ${dictCat === cat ? t.ac : t.bd}`,
             background: dictCat === cat ? t.acS : "transparent",
             color: dictCat === cat ? t.ac : t.dm,
@@ -5443,20 +5450,28 @@ input, select { padding: 10px 14px; }
                 width: "30%", height: "22%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               }}>
+                {/* 名前と「親」を並べても枠の幅を超えないようにする。
+                    「親」が付く席はそのぶん名前を小さくし、それでも入らない長い名前は末尾を省略する */}
                 <div style={{
-                  fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length))))),
-                  fontWeight: 800, color: "#fff", lineHeight: 1.15,
-                  whiteSpace: "nowrap", maxWidth: "100%",
-                }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: fs(10), color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
+                  display: "flex", alignItems: "baseline", justifyContent: "center",
+                  gap: 3, width: "100%", maxWidth: "100%",
+                }}>
+                  <span style={{
+                    fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.6 : 0)))))),
+                    fontWeight: 800, color: "#fff", lineHeight: 1.15,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
+                  }}>{players[i]}</span>
+                  {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.15, flexShrink: 0 }}>親</span>}
+                </div>
                 <div style={{
                   fontSize: fs(19), fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1.1,
                   color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
                 }}>
                   {amt > 0 ? "+" : ""}{amt.toLocaleString()}
                 </div>
-                {/* あがった人だけ「アガリ」。空でも1行ぶん確保して、他の席と行の位置を揃える
-                    （高さを%で固定すると文字がはみ出して点数と重なる） */}
-                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.3 }}>{isWin ? "アガリ" : " "}</div>
+                {/* あがった人だけ「アガリ」。高さを固定すると文字があふれて点数と重なるので
+                    行の高さで確保し、他の席は空白1文字を置いて4枠の高さを揃える */}
+                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.25 }}>{isWin ? "アガリ" : " "}</div>
               </div>
             );
           })}
@@ -6521,7 +6536,7 @@ input, select { padding: 10px 14px; }
           </div>
           <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
             background: "none", border: "none", color: t.ac, fontSize: 11,
-            cursor: "pointer", textDecoration: "underline", marginTop: 10,
+            cursor: "pointer", textDecoration: "underline", marginTop: 6, padding: "9px 10px",
           }}>👤 名前を追加・編集する</button>
         </div>
 
@@ -7724,7 +7739,7 @@ input, select { padding: 10px 14px; }
               <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 10 }}>または直接選択</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                 {validFuOptions(cHan, cTsumo).map(f => (
-                  <button key={f} style={{ ...numBtn(cFu===f), fontSize: f >= 100 ? 16 : 19 }} onClick={() => { setCFu(f); setCalcStep(4); }}>{f}符</button>
+                  <button key={f} style={{ ...numBtn(cFu===f), fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)" }} onClick={() => { setCFu(f); setCalcStep(4); }}>{f}符</button>
                 ))}
               </div>
             </>
@@ -8179,26 +8194,16 @@ input, select { padding: 10px 14px; }
 
           <div style={{ marginBottom: 8, marginTop: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8, letterSpacing: "0.05em" }}>その他</div>
-            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6, lineHeight: 1.7 }}>
-              鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます
-            </div>
-            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6, lineHeight: 1.7 }}>
-              役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け
-            </div>
-            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              ONにすると4翻30符・3翻60符を満貫扱い
-            </div>
-            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます
-            </div>
-            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）
-            </div>
+            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })),
+              "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます")}
+            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })),
+              "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け")}
+            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })),
+              "ONにすると4翻30符・3翻60符を満貫扱い")}
+            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })),
+              "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます")}
+            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })),
+              "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")}
           </div>
 
           <div style={{ marginTop: 18, marginBottom: 8 }}>
@@ -8233,7 +8238,7 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 6 }}>名前の欄をタップして選択</div>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
-              background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline",
+              background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: "9px 10px",
             }}>👤 リストの名前を編集</button>
           </div>
 
@@ -9294,7 +9299,9 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button style={{ ...actionBtn("p"), flex: 1 }} onClick={() => { resetGW(); setShowGW(true); setGStep(1); }}>アガリ入力</button>
         <button style={{ ...actionBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setShowDrawWiz(true); }}>流局</button>
-        <button style={{ ...actionBtn(), flex: "0 0 92px" }} onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
+        {/* 左右の余白を詰めて「ルー/ル」と途中で折り返さないようにする */}
+        <button style={{ ...actionBtn(), flex: "0 0 92px", padding: "15px 4px", whiteSpace: "nowrap" }}
+          onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
       </div>
 
       <button style={{ ...actionBtn(), marginBottom: 14, fontSize: 13 }}
@@ -9482,7 +9489,7 @@ input, select { padding: 10px 14px; }
                     <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 10 }}>または直接選択</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                       {validFuOptions(gHan, gTsumo).map(f => (
-                        <button key={f} style={{ ...numBtn(gFu === f), fontSize: f >= 100 ? 16 : 19 }} onClick={() => { setGFu(f); setGStep(7); }}>{f}符</button>
+                        <button key={f} style={{ ...numBtn(gFu === f), fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)" }} onClick={() => { setGFu(f); setGStep(7); }}>{f}符</button>
                       ))}
                     </div>
                   </>
