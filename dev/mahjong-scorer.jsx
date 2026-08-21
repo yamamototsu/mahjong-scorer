@@ -9305,7 +9305,9 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button style={{ ...actionBtn("p"), flex: 1 }} onClick={() => { resetGW(); setShowGW(true); setGStep(1); }}>アガリ入力</button>
         <button style={{ ...actionBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setShowDrawWiz(true); }}>流局</button>
-        <button style={{ ...actionBtn(), flex: "0 0 92px" }} onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
+        {/* 左右の余白を詰めて「ルー/ル」と途中で折り返さないようにする */}
+        <button style={{ ...actionBtn(), flex: "0 0 92px", padding: "15px 4px", whiteSpace: "nowrap" }}
+          onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
       </div>
 
       <button style={{ ...actionBtn(), marginBottom: 14, fontSize: 13 }}
