@@ -1028,7 +1028,9 @@ export default function MahjongScorer() {
   const card = { background: t.card, borderRadius: 14, padding: 22, marginBottom: 18, border: `1px solid ${t.bd}`, boxSizing: "border-box", maxWidth: "100%", overflow: "hidden", lineHeight: 1.7 };
   const question = { fontSize: 16, fontWeight: 700, margin: "4px 0 20px", textAlign: "center", lineHeight: 1.6, letterSpacing: "0.02em" };
   const bigBtn = (c, s) => ({ flex: "1 1 140px", maxWidth: 200, padding: "20px 8px", border: `2px solid ${c}`, borderRadius: 14, background: s, color: c, fontSize: 20, fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.12s" });
-  const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 19, fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
+  // 文字を画面幅に追従させる。19pxのままだと狭い端末（280〜320px）で
+  // 4列のマス目が枠や画面の外へはみ出る。365px以上では19pxのまま変わらない。
+  const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: "clamp(14px, 5.2vw, 19px)", fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
   const actionBtn = (v) => ({ width: "100%", padding: "15px 12px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 10, boxSizing: "border-box", lineHeight: 1.5, ...(v === "p" ? { background: t.ac, color: "#fff" } : v === "d" ? { background: t.rd, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }) });
   const pSelBtn = (on) => ({ padding: "14px 8px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center", flex: 1, transition: "all 0.1s" });
   // 対局ルールの説明（設定・セットアップ・リーグで共用）
@@ -7743,7 +7745,7 @@ input, select { padding: 10px 14px; }
               <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 10 }}>または直接選択</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                 {validFuOptions(cHan, cTsumo).map(f => (
-                  <button key={f} style={{ ...numBtn(cFu===f), fontSize: f >= 100 ? 16 : 19 }} onClick={() => { setCFu(f); setCalcStep(4); }}>{f}符</button>
+                  <button key={f} style={{ ...numBtn(cFu===f), fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)" }} onClick={() => { setCFu(f); setCalcStep(4); }}>{f}符</button>
                 ))}
               </div>
             </>
@@ -9495,7 +9497,7 @@ input, select { padding: 10px 14px; }
                     <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 10 }}>または直接選択</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                       {validFuOptions(gHan, gTsumo).map(f => (
-                        <button key={f} style={{ ...numBtn(gFu === f), fontSize: f >= 100 ? 16 : 19 }} onClick={() => { setGFu(f); setGStep(7); }}>{f}符</button>
+                        <button key={f} style={{ ...numBtn(gFu === f), fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)" }} onClick={() => { setGFu(f); setGStep(7); }}>{f}符</button>
                       ))}
                     </div>
                   </>
