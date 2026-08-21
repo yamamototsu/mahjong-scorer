@@ -17464,27 +17464,6 @@ input, select { padding: 10px 14px; }
         gap: 8
       }
     }, React.createElement("button", {
-      style: {
-        ...smallBtn("p"),
-        flex: 1
-      },
-      onClick: () => {
-        resetGW();
-        setRonPick([]);
-        setMultiRon(null);
-        setRonLoserPick(null);
-        setTmWinStep("winner");
-      }
-    }, "アガリ入力"), React.createElement("button", {
-      style: {
-        ...smallBtn(),
-        flex: 1
-      },
-      onClick: () => {
-        setDrawTenpai([...declaredRiichi]);
-        setTmDrawMode(true);
-      }
-    }, "流局"), React.createElement("button", {
       "aria-label": "ルール確認",
       style: {
         ...smallBtn(),
@@ -17517,6 +17496,27 @@ input, select { padding: 10px 14px; }
         setHomeCat(null);
       }
     }, "⏸"), React.createElement("button", {
+      style: {
+        ...smallBtn("p"),
+        flex: 1
+      },
+      onClick: () => {
+        resetGW();
+        setRonPick([]);
+        setMultiRon(null);
+        setRonLoserPick(null);
+        setTmWinStep("winner");
+      }
+    }, "アガリ入力"), React.createElement("button", {
+      style: {
+        ...smallBtn(),
+        flex: 1
+      },
+      onClick: () => {
+        setDrawTenpai([...declaredRiichi]);
+        setTmDrawMode(true);
+      }
+    }, "流局"), React.createElement("button", {
       "aria-label": "席順を回す",
       style: {
         ...smallBtn(),
