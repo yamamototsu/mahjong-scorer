@@ -1040,9 +1040,9 @@ export default function MahjongScorer() {
     return (
       <div style={{ marginTop: 12 }}>
         <button onClick={() => setOpen(v => !v)} style={{
-          width: "100%", padding: "11px 8px", borderRadius: 9, cursor: "pointer",
+          width: "100%", padding: "13px 8px", borderRadius: 9, cursor: "pointer",
           border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
-          fontSize: 12, fontWeight: 700,
+          fontSize: 15, fontWeight: 700,
         }}>{open ? "ルールの説明を閉じる" : "それぞれのルールの説明を見る"}</button>
 
         {open && (
@@ -1110,8 +1110,8 @@ export default function MahjongScorer() {
         </div>
 
         <button onClick={() => setOpen(v => !v)} style={{
-          width: "100%", marginBottom: 10, padding: "10px 8px", borderRadius: 9, cursor: "pointer",
-          border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700,
+          width: "100%", marginBottom: 10, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
+          border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 15, fontWeight: 700,
         }}>{open ? "説明を閉じる" : "ウマ・オカとは"}</button>
 
         {open && (
@@ -6589,8 +6589,8 @@ input, select { padding: 10px 14px; }
 
           {/* 解説 */}
           <button onClick={() => setShowUmaHelp(v => !v)} style={{
-            width: "100%", marginTop: 10, padding: "10px 8px", borderRadius: 9, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700,
+            width: "100%", marginTop: 10, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 15, fontWeight: 700,
           }}>{showUmaHelp ? "説明を閉じる" : "ウマ・オカとは"}</button>
 
           {showUmaHelp && (() => {
