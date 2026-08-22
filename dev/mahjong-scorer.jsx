@@ -531,8 +531,7 @@ export default function MahjongScorer() {
   const [draftRules, setDraftRules] = useState(loadDefaultRules);
   const [rulesSaved, setRulesSaved] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);  // ルール詳細の展開
-  // 前回のルールが無い（初回）ときは最初から開いておく
-  React.useEffect(() => { if (!lastRules) setRulesOpen(true); }, [lastRules]);
+  // 初回も「初期設定ルールで始める」から進めるので、詳細は閉じたままにする
   const rulesDirty = JSON.stringify(draftRules) !== JSON.stringify(defaultRules);
   const editDraft = (patch) => { setDraftRules(d => ({ ...d, ...patch })); setRulesSaved(false); };
   const commitDraftRules = () => {
@@ -8188,32 +8187,35 @@ input, select { padding: 10px 14px; }
           </div>
 
 
-          {/* 前回と同じルールで始める */}
-          {lastRules && (() => {
-            const same = JSON.stringify(rules) === JSON.stringify(lastRules);
+          {/* 前回と同じルールで始める（初回は前回が無いので、設定の初期値で始める） */}
+          {(() => {
+            const hasLast = !!lastRules;
+            const base = lastRules || defaultRules;
+            const same = JSON.stringify(rules) === JSON.stringify(base);
+            const ok = hasLast && same;   // 前回と同じときだけ緑で「✓」を出す
             const sum = [
-              lastRules.agariRenchan ? "あがり連荘" : lastRules.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘",
-              lastRules.multiRon === "triple" ? "トリプルロン" : lastRules.multiRon === "double" ? "ダブロン" : "頭ハネ",
-              lastRules.kuitan ? "食いタンあり" : "食いタンなし",
-              lastRules.doubleYakuman ? "ダブル役満あり" : null,
-              `持ち点${(lastRules.startPoints || 0).toLocaleString()}`,
+              base.agariRenchan ? "あがり連荘" : base.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘",
+              base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ",
+              base.kuitan ? "食いタンあり" : "食いタンなし",
+              base.doubleYakuman ? "ダブル役満あり" : null,
+              `持ち点${(base.startPoints || 0).toLocaleString()}`,
             ].filter(Boolean).join(" ・ ");
             return (
               <div style={{
                 padding: 14, marginBottom: 18, borderRadius: 12,
-                background: same ? t.gnS : t.acS,
-                border: `1px solid ${same ? t.gn : t.ac}55`,
+                background: ok ? t.gnS : t.acS,
+                border: `1px solid ${ok ? t.gn : t.ac}55`,
               }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: same ? t.gn : t.ac, marginBottom: 5 }}>
-                  {same ? "✓ 前回と同じルールです" : "前回のルール"}
+                <div style={{ fontSize: 12, fontWeight: 800, color: ok ? t.gn : t.ac, marginBottom: 5 }}>
+                  {!hasLast ? "初期設定ルール" : same ? "✓ 前回と同じルールです" : "前回のルール"}
                 </div>
                 <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginBottom: 11 }}>{sum}</div>
                 <button disabled={!matchType}
-                  onClick={() => { setRules({ ...lastRules }); setSetupStep(0); }} style={{
+                  onClick={() => { setRules({ ...base }); setSetupStep(0); }} style={{
                   width: "100%", padding: "13px 10px", borderRadius: 10, cursor: matchType ? "pointer" : "default", border: "none",
-                  background: same ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
+                  background: ok ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
                   opacity: matchType ? 1 : 0.4,
-                }}>{same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"}</button>
+                }}>{!hasLast ? "初期設定ルールでメンバー決定へ" : same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"}</button>
                 <div style={{ fontSize: 10, color: matchType ? t.dm : t.gd, marginTop: 7, textAlign: "center", fontWeight: matchType ? 400 : 700 }}>
                   {matchType ? "変更したい場合は、下の「ルールを変更する」から" : "まず上の試合形式を選んでください"}
                 </div>
@@ -8346,8 +8348,9 @@ input, select { padding: 10px 14px; }
           </>)}
 
 
-          {/* 詳細を開いているときだけ、下の進むボタンを出す */}
-          {(rulesOpen || !lastRules) && (
+          {/* 詳細を開いているときだけ、下の進むボタンを出す
+              （閉じているときは上のカードのボタンで進む） */}
+          {rulesOpen && (
             <div style={{ marginTop: 16 }}>
               <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
                 onClick={() => { setRulesOpen(false); setSetupStep(0); }}>ルール確定・メンバー選択へ</button>
