@@ -759,11 +759,42 @@ function MahjongScorer() {
   const [honba, setHonba] = useState(0);
   const [riichiBets, setRiichiBets] = useState(0);
   const [declaredRiichi, setDeclaredRiichi] = useState([false, false, false, false]);
+  const [riichiVoiceOn, setRiichiVoiceOn] = useState(() => {
+    try {
+      return localStorage.getItem("mj_riichi_voice") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const saveRiichiVoice = on => {
+    setRiichiVoiceOn(on);
+    try {
+      localStorage.setItem("mj_riichi_voice", on ? "1" : "0");
+    } catch {}
+  };
+  const playRiichiVoice = () => {
+    if (!riichiVoiceOn) return;
+    try {
+      const syn = window.speechSynthesis;
+      if (!syn) return;
+      syn.cancel();
+      const u = new SpeechSynthesisUtterance("リーチ");
+      u.lang = "ja-JP";
+      u.rate = 1.05;
+      u.pitch = 1.0;
+      try {
+        const ja = (syn.getVoices() || []).find(v => v && /^ja/i.test(v.lang || ""));
+        if (ja) u.voice = ja;
+      } catch {}
+      syn.speak(u);
+    } catch {}
+  };
   const toggleDeclaredRiichi = i => {
     setDeclaredRiichi(prev => {
       const next = [...prev];
       const wasDeclared = next[i];
       next[i] = !wasDeclared;
+      if (!wasDeclared) playRiichiVoice();
       setScores(s => {
         const ns = [...s];
         ns[i] += wasDeclared ? 1000 : -1000;
@@ -12612,7 +12643,75 @@ input, select { padding: 10px 14px; }
         background: "#fff",
         transition: "left 0.15s"
       }
-    }))))), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }))))), secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "リーチの読み上げあり" : "リーチの読み上げなし"), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginTop: 4
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
+      }
+    }, React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        paddingRight: 10
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 700,
+        color: t.tx
+      }
+    }, "🗣 リーチの読み上げ"), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        marginTop: 2,
+        lineHeight: 1.7
+      }
+    }, "リーチを宣言したときに「リーチ」と読み上げます")), React.createElement("button", {
+      onClick: () => {
+        saveRiichiVoice(!riichiVoiceOn);
+        if (!riichiVoiceOn) playRiichiVoice();
+      },
+      style: {
+        width: 48,
+        height: 28,
+        borderRadius: 14,
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        background: riichiVoiceOn ? t.ac : t.bd,
+        position: "relative",
+        transition: "background 0.15s",
+        flexShrink: 0
+      }
+    }, React.createElement("span", {
+      style: {
+        position: "absolute",
+        top: 3,
+        left: riichiVoiceOn ? 23 : 3,
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        background: "#fff",
+        transition: "left 0.15s"
+      }
+    }))), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        marginTop: 12,
+        paddingTop: 12,
+        borderTop: `1px solid ${t.bd}33`,
+        lineHeight: 1.8
+      }
+    }, "端末に入っている音声を使います。声が出ないときは、本体の消音（マナーモード）が 入っていないか、音量が下がっていないかを確かめてください。"))), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,

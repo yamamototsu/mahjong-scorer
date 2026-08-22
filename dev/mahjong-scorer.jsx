@@ -551,11 +551,41 @@ export default function MahjongScorer() {
   // 実況リーチ: 宣言した時点で1000点減算・供託に加算（この局で宣言済みの人）
   const [declaredRiichi, setDeclaredRiichi] = useState([false, false, false, false]);
 
+  // リーチ宣言時の読み上げ（端末の音声合成を使う。音声ファイルは持たない）
+  const [riichiVoiceOn, setRiichiVoiceOn] = useState(() => {
+    try { return localStorage.getItem("mj_riichi_voice") !== "0"; } catch { return true; }
+  });
+  const saveRiichiVoice = (on) => {
+    setRiichiVoiceOn(on);
+    try { localStorage.setItem("mj_riichi_voice", on ? "1" : "0"); } catch {}
+  };
+  const playRiichiVoice = () => {
+    if (!riichiVoiceOn) return;
+    try {
+      const syn = window.speechSynthesis;
+      if (!syn) return;
+      syn.cancel();   // 続けて押されたときに重ならないようにする
+      const u = new SpeechSynthesisUtterance("リーチ");
+      u.lang = "ja-JP";
+      u.rate = 1.05;
+      u.pitch = 1.0;
+      // 日本語の声が入っていればそれを使う（無ければ端末の既定にまかせる）。
+      // ここで失敗しても読み上げ自体は続ける
+      try {
+        const ja = (syn.getVoices() || []).find(v => v && /^ja/i.test(v.lang || ""));
+        if (ja) u.voice = ja;
+      } catch {}
+      syn.speak(u);
+    } catch {}
+  };
+
   const toggleDeclaredRiichi = (i) => {
     setDeclaredRiichi(prev => {
       const next = [...prev];
       const wasDeclared = next[i];
       next[i] = !wasDeclared;
+      // 宣言したときだけ「リーチ」と読み上げる（取り消しでは鳴らさない）
+      if (!wasDeclared) playRiichiVoice();
       setScores(s => { const ns = [...s]; ns[i] += wasDeclared ? 1000 : -1000; return ns; });
       setRiichiBets(b => b + (wasDeclared ? -1 : 1));
       return next;
@@ -6336,6 +6366,30 @@ input, select { padding: 10px 14px; }
                 }}>
                   <span style={{ position: "absolute", top: 3, left: diceSoundOn ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
                 </button>
+              </div>
+            </div>
+            </>)}
+
+            {secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "リーチの読み上げあり" : "リーチの読み上げなし")}
+            {setOpen === "voice" && (<>
+            <div style={{ ...card, padding: 16, marginTop: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>🗣 リーチの読み上げ</div>
+                  <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
+                    リーチを宣言したときに「リーチ」と読み上げます
+                  </div>
+                </div>
+                <button onClick={() => { saveRiichiVoice(!riichiVoiceOn); if (!riichiVoiceOn) playRiichiVoice(); }} style={{
+                  width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
+                  background: riichiVoiceOn ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+                }}>
+                  <span style={{ position: "absolute", top: 3, left: riichiVoiceOn ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+                </button>
+              </div>
+              <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
+                端末に入っている音声を使います。声が出ないときは、本体の消音（マナーモード）が
+                入っていないか、音量が下がっていないかを確かめてください。
               </div>
             </div>
             </>)}
