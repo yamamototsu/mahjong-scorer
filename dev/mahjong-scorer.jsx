@@ -5492,9 +5492,10 @@ input, select { padding: 10px 14px; }
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
             <defs>
               {/* markerUnits=userSpaceOnUse: 線の太さで矢じりの大きさが変わらないようにする */}
+              {/* 細長い三角にして先を尖らせる */}
               <marker id="payArrow" markerUnits="userSpaceOnUse"
-                markerWidth="7.2" markerHeight="7.2" refX="6.8" refY="3.6" orient="auto">
-                <path d="M0.5,0.7 L6.8,3.6 L0.5,6.5 z" fill={t.gd} />
+                markerWidth="9.6" markerHeight="6" refX="9.3" refY="3" orient="auto">
+                <path d="M0.3,0.35 L9.3,3 L0.3,5.65 L2.1,3 z" fill={t.gd} />
               </marker>
             </defs>
             {flows.map((f, k) => {
@@ -5525,7 +5526,9 @@ input, select { padding: 10px 14px; }
               <div key={i} style={{
                 position: "absolute", top: `${pos.y}%`, left: `${pos.x}%`,
                 transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
-                textAlign: "center", padding: "2% 2.7%", borderRadius: 12,
+                // 余白を%にすると卓全体の幅が基準になり、枠に対して大きくなりすぎて
+                // 名前が入らなくなる。卓の大きさに比例する fs() で指定する
+                textAlign: "center", padding: `${fs(5)} ${fs(6)}`, borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
                 width: "30%", height: "22%", boxSizing: "border-box",
