@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preload" as="image" href="assets/intro.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -110,6 +111,7 @@ const RATE_LABEL = r => !r ? "なし" : String(parseFloat(Number(r).toFixed(3)))
 const GOLD = (pt, rate) => Math.round(pt * 1000 * rate * 1000) / 1000;
 const GOLD_LABEL = g => g % 1 === 0 ? g.toLocaleString() : parseFloat(g.toFixed(3)).toLocaleString();
 const TABLE_IMG = "assets/table.jpg";
+const INTRO_IMG = "assets/intro.jpg";
 const SEATS_OF = pc => pc === 3 ? ["東", "南", "西"] : WINDS;
 const SANMA_DEFAULT_RULES = {
   startPoints: 40000,
@@ -4601,6 +4603,18 @@ input, select { padding: 10px 14px; }
 @keyframes menuIn {
   0%   { opacity: 0; transform: translateY(14px); }
   100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes introPhoto {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes introPhotoOut {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes introZoom {
+  0%   { transform: scale(1.14); }
+  100% { transform: scale(1); }
 }
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
@@ -11481,13 +11495,45 @@ input, select { padding: 10px 14px; }
         flexDirection: "column",
         justifyContent: "center",
         paddingTop: 8,
+        position: "relative",
         background: intro ? "radial-gradient(circle at 50% 44%, rgba(22,74,50,0.55) 0%, rgba(10,15,20,0) 62%)" : "radial-gradient(circle at 50% 44%, rgba(22,74,50,0) 0%, rgba(10,15,20,0) 62%)",
         transition: "background 1.1s ease-out"
       }
+    }, !introDone && React.createElement("div", {
+      style: {
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: "54%",
+        zIndex: 0,
+        pointerEvents: "none",
+        overflow: "hidden",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 24%, #000 84%, transparent 100%)",
+        maskImage: "linear-gradient(to bottom, transparent 0%, #000 24%, #000 84%, transparent 100%)",
+        animation: intro ? "introPhoto 1.6s 0.55s ease-out both" : "introPhotoOut 0.9s ease-out both"
+      }
     }, React.createElement("div", {
+      style: {
+        position: "absolute",
+        inset: 0,
+        backgroundImage: `url(${INTRO_IMG})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center 42%",
+        animation: "introZoom 7s ease-out both"
+      }
+    }), React.createElement("div", {
+      style: {
+        position: "absolute",
+        inset: 0,
+        background: "linear-gradient(to bottom, rgba(5,8,11,0.62) 0%, rgba(5,8,11,0.22) 45%, rgba(5,8,11,0.72) 100%)"
+      }
+    })), React.createElement("div", {
       style: {
         textAlign: "center",
         marginBottom: 22,
+        position: "relative",
+        zIndex: 1,
         transform: intro ? "translateY(76px) scale(1.06)" : "translateY(0) scale(1)",
         transition: "transform 0.85s cubic-bezier(.2,.9,.3,1)"
       }

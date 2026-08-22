@@ -59,6 +59,7 @@ const RATE_LABEL = (r) => !r ? "なし" : String(parseFloat(Number(r).toFixed(3)
 const GOLD = (pt, rate) => Math.round(pt * 1000 * rate * 1000) / 1000;  // ptは1000点単位
 const GOLD_LABEL = (g) => (g % 1 === 0 ? g.toLocaleString() : parseFloat(g.toFixed(3)).toLocaleString());
 const TABLE_IMG = "assets/table.jpg";   // 麻雀卓の画像
+const INTRO_IMG = "assets/intro.jpg";   // 起動演出の写真（卓の真ん中に置いたところ）
 // 人数に応じた席風（三麻は北家なし）
 const SEATS_OF = (pc) => pc === 3 ? ["東", "南", "西"] : WINDS;
 // 三人麻雀（連盟ルール）の既定値
@@ -2445,6 +2446,18 @@ input, select { padding: 10px 14px; }
 @keyframes menuIn {
   0%   { opacity: 0; transform: translateY(14px); }
   100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes introPhoto {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes introPhotoOut {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes introZoom {
+  0%   { transform: scale(1.14); }
+  100% { transform: scale(1); }
 }
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
@@ -5746,14 +5759,37 @@ input, select { padding: 10px 14px; }
     return (
       <div onClick={intro ? () => setBooting(false) : undefined} style={{
         ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8,
+        position: "relative",
         background: intro
           ? "radial-gradient(circle at 50% 44%, rgba(22,74,50,0.55) 0%, rgba(10,15,20,0) 62%)"
           : "radial-gradient(circle at 50% 44%, rgba(22,74,50,0) 0%, rgba(10,15,20,0) 62%)",
         transition: "background 1.1s ease-out",
       }}>
+        {/* 起動演出の写真。ゆっくり寄りながら現れ、メニューが出るときに消える。
+            上下を暗く落として題字が読めるようにする */}
+        {!introDone && (
+          <div style={{
+            position: "fixed", left: 0, right: 0, bottom: 0, height: "54%", zIndex: 0,
+            pointerEvents: "none", overflow: "hidden",
+            WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 24%, #000 84%, transparent 100%)",
+            maskImage: "linear-gradient(to bottom, transparent 0%, #000 24%, #000 84%, transparent 100%)",
+            // 演出が終わったら、メニューが出るのに合わせて静かに消す
+            animation: intro ? "introPhoto 1.6s 0.55s ease-out both" : "introPhotoOut 0.9s ease-out both",
+          }}>
+            <div style={{
+              position: "absolute", inset: 0,
+              backgroundImage: `url(${INTRO_IMG})`, backgroundSize: "cover", backgroundPosition: "center 42%",
+              animation: "introZoom 7s ease-out both",
+            }} />
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(to bottom, rgba(5,8,11,0.62) 0%, rgba(5,8,11,0.22) 45%, rgba(5,8,11,0.72) 100%)",
+            }} />
+          </div>
+        )}
         {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
         <div style={{
-          textAlign: "center", marginBottom: 22,
+          textAlign: "center", marginBottom: 22, position: "relative", zIndex: 1,
           transform: intro ? "translateY(76px) scale(1.06)" : "translateY(0) scale(1)",
           transition: "transform 0.85s cubic-bezier(.2,.9,.3,1)",
         }}>
