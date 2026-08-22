@@ -292,9 +292,13 @@ export default function MahjongScorer() {
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
   // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
   const [booting, setBooting] = useState(true);
+  // メニューが出そろったあとの目印。タイトルへ戻るたびに出現アニメーションが
+  // 再生されないよう、これが立ったら演出は一切かけない
+  const [introDone, setIntroDone] = useState(false);
   React.useEffect(() => {
     const tm = setTimeout(() => setBooting(false), 2900);
-    return () => clearTimeout(tm);
+    const tm2 = setTimeout(() => setIntroDone(true), 3900);
+    return () => { clearTimeout(tm); clearTimeout(tm2); };
   }, []);
 
   const [gameConfig, setGameConfig] = useState(null); // saved config after setup
@@ -5735,7 +5739,9 @@ input, select { padding: 10px 14px; }
     const intro = booting;
     const reveal = (i) => intro
       ? { opacity: 0, transform: "translateY(14px)", pointerEvents: "none" }
-      : { animation: `menuIn 0.5s ${(i * 0.07).toFixed(2)}s cubic-bezier(.2,.9,.3,1) both` };
+      : introDone
+        ? undefined   // 起動後にタイトルへ戻ったときは、そのまま出す
+        : { animation: `menuIn 0.5s ${(i * 0.07).toFixed(2)}s cubic-bezier(.2,.9,.3,1) both` };
 
     return (
       <div onClick={intro ? () => setBooting(false) : undefined} style={{
