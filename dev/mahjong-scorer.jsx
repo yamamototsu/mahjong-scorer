@@ -551,7 +551,8 @@ export default function MahjongScorer() {
   // 実況リーチ: 宣言した時点で1000点減算・供託に加算（この局で宣言済みの人）
   const [declaredRiichi, setDeclaredRiichi] = useState([false, false, false, false]);
 
-  // リーチ宣言時の読み上げ（端末の音声合成を使う。音声ファイルは持たない）
+  // 発声の読み上げ（端末の音声合成を使う。音声ファイルは持たない）
+  // リーチ宣言・ツモ／ロンの確定で「リーチ」「ツモ」「ロン」と読み上げる
   const [riichiVoiceOn, setRiichiVoiceOn] = useState(() => {
     try { return localStorage.getItem("mj_riichi_voice") !== "0"; } catch { return true; }
   });
@@ -559,13 +560,13 @@ export default function MahjongScorer() {
     setRiichiVoiceOn(on);
     try { localStorage.setItem("mj_riichi_voice", on ? "1" : "0"); } catch {}
   };
-  const playRiichiVoice = () => {
+  const playVoice = (text) => {
     if (!riichiVoiceOn) return;
     try {
       const syn = window.speechSynthesis;
       if (!syn) return;
       syn.cancel();   // 続けて押されたときに重ならないようにする
-      const u = new SpeechSynthesisUtterance("リーチ");
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
       u.rate = 1.05;
       u.pitch = 1.0;
@@ -585,7 +586,7 @@ export default function MahjongScorer() {
       const wasDeclared = next[i];
       next[i] = !wasDeclared;
       // 宣言したときだけ「リーチ」と読み上げる（取り消しでは鳴らさない）
-      if (!wasDeclared) playRiichiVoice();
+      if (!wasDeclared) playVoice("リーチ");
       setScores(s => { const ns = [...s]; ns[i] += wasDeclared ? 1000 : -1000; return ns; });
       setRiichiBets(b => b + (wasDeclared ? -1 : 1));
       return next;
@@ -6365,17 +6366,17 @@ input, select { padding: 10px 14px; }
             </div>
             </>)}
 
-            {secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "リーチの読み上げあり" : "リーチの読み上げなし")}
+            {secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "発声の読み上げあり" : "発声の読み上げなし")}
             {setOpen === "voice" && (<>
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>🗣 リーチの読み上げ</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>🗣 発声の読み上げ</div>
                   <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
-                    リーチを宣言したときに「リーチ」と読み上げます
+                    リーチの宣言で「リーチ」、あがり方を決めたときに「ツモ」「ロン」と読み上げます
                   </div>
                 </div>
-                <button onClick={() => { saveRiichiVoice(!riichiVoiceOn); if (!riichiVoiceOn) playRiichiVoice(); }} style={{
+                <button onClick={() => { saveRiichiVoice(!riichiVoiceOn); if (!riichiVoiceOn) playVoice("リーチ"); }} style={{
                   width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
                   background: riichiVoiceOn ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
                 }}>
@@ -9142,6 +9143,7 @@ input, select { padding: 10px 14px; }
                 /* 放銃者を選んだら確定ボタン */
                 <button onClick={(e) => {
                   e.stopPropagation();
+                  playVoice("ロン");
                   const i = ronLoserPick;
                   setTmWinStep(null);
                   setGTsumo(false); setGLoser(i);
@@ -9168,6 +9170,7 @@ input, select { padding: 10px 14px; }
               ) : (
                 <button onClick={(e) => {
                   e.stopPropagation();
+                  playVoice("ツモ");
                   setGTsumo(true); setGLoser(null); setTmWinStep(null);
                   // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
                   if (ronPick.length === 1) setGWinner(ronPick[0]);
@@ -9445,8 +9448,8 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>STEP 2</div>
                 <div style={question}>あがり方は？</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                  <button style={bigBtn(t.gn, t.gnS)} onClick={() => { setGTsumo(true); setGStep(4); }}>ツモ</button>
-                  <button style={bigBtn(t.rd, t.rdS)} onClick={() => { setGTsumo(false); setGStep(3); }}>ロン</button>
+                  <button style={bigBtn(t.gn, t.gnS)} onClick={() => { playVoice("ツモ"); setGTsumo(true); setGStep(4); }}>ツモ</button>
+                  <button style={bigBtn(t.rd, t.rdS)} onClick={() => { playVoice("ロン"); setGTsumo(false); setGStep(3); }}>ロン</button>
                 </div>
               </div>
             )}

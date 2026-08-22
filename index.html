@@ -772,13 +772,13 @@ function MahjongScorer() {
       localStorage.setItem("mj_riichi_voice", on ? "1" : "0");
     } catch {}
   };
-  const playRiichiVoice = () => {
+  const playVoice = text => {
     if (!riichiVoiceOn) return;
     try {
       const syn = window.speechSynthesis;
       if (!syn) return;
       syn.cancel();
-      const u = new SpeechSynthesisUtterance("リーチ");
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
       u.rate = 1.05;
       u.pitch = 1.0;
@@ -794,7 +794,7 @@ function MahjongScorer() {
       const next = [...prev];
       const wasDeclared = next[i];
       next[i] = !wasDeclared;
-      if (!wasDeclared) playRiichiVoice();
+      if (!wasDeclared) playVoice("リーチ");
       setScores(s => {
         const ns = [...s];
         ns[i] += wasDeclared ? 1000 : -1000;
@@ -12640,7 +12640,7 @@ input, select { padding: 10px 14px; }
         background: "#fff",
         transition: "left 0.15s"
       }
-    }))))), secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "リーチの読み上げあり" : "リーチの読み上げなし"), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }))))), secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "発声の読み上げあり" : "発声の読み上げなし"), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -12664,17 +12664,17 @@ input, select { padding: 10px 14px; }
         fontWeight: 700,
         color: t.tx
       }
-    }, "🗣 リーチの読み上げ"), React.createElement("div", {
+    }, "🗣 発声の読み上げ"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
         marginTop: 2,
         lineHeight: 1.7
       }
-    }, "リーチを宣言したときに「リーチ」と読み上げます")), React.createElement("button", {
+    }, "リーチの宣言で「リーチ」、あがり方を決めたときに「ツモ」「ロン」と読み上げます")), React.createElement("button", {
       onClick: () => {
         saveRiichiVoice(!riichiVoiceOn);
-        if (!riichiVoiceOn) playRiichiVoice();
+        if (!riichiVoiceOn) playVoice("リーチ");
       },
       style: {
         width: 48,
@@ -17867,6 +17867,7 @@ input, select { padding: 10px 14px; }
     }, "ホウジュウ", React.createElement("br", null), "した人を選択")) : ronLoserPick !== null ? React.createElement("button", {
       onClick: e => {
         e.stopPropagation();
+        playVoice("ロン");
         const i = ronLoserPick;
         setTmWinStep(null);
         setGTsumo(false);
@@ -17917,6 +17918,7 @@ input, select { padding: 10px 14px; }
     }, "確定")) : React.createElement("button", {
       onClick: e => {
         e.stopPropagation();
+        playVoice("ツモ");
         setGTsumo(true);
         setGLoser(null);
         setTmWinStep(null);
@@ -18487,12 +18489,14 @@ input, select { padding: 10px 14px; }
   }, React.createElement("button", {
     style: bigBtn(t.gn, t.gnS),
     onClick: () => {
+      playVoice("ツモ");
       setGTsumo(true);
       setGStep(4);
     }
   }, "ツモ"), React.createElement("button", {
     style: bigBtn(t.rd, t.rdS),
     onClick: () => {
+      playVoice("ロン");
       setGTsumo(false);
       setGStep(3);
     }
