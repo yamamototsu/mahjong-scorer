@@ -8366,7 +8366,8 @@ input, select { padding: 10px 14px; }
       {/* Step 3: ルール設定 */}
       {setupStep === 3 && (
         <div style={card}>
-          <Back onClick={() => { setView("menu"); }} />
+          {/* メニューはタイトル画面に一本化されているのでタイトルへ戻す */}
+          <Back onClick={() => { setHomeCat(null); setView("title"); }} />
           <Dots total={5} cur={0} />
           <div style={question}>人数・試合形式・ルール</div>
           {/* 人数（四人麻雀 / 三人麻雀） */}
