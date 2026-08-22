@@ -5967,12 +5967,6 @@ input, select { padding: 10px 14px; }
             setDraftRules({ ...defaultRules }); setRulesSaved(false); setView("home"); setHomeCat("settings");
           })}
         </div>
-
-        <button onClick={() => { setHomeCat(null); setView("home"); }} style={{
-          width: "100%", marginTop: 14, padding: "11px 8px", borderRadius: 11, cursor: "pointer",
-          border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 12, fontWeight: 700,
-          ...reveal(4),
-        }}>すべてのメニュー</button>
       </div>
     );
   };
@@ -6002,64 +5996,10 @@ input, select { padding: 10px 14px; }
     );
 
     // ── トップ: 3カテゴリ ──
-    if (homeCat === null) {
-      return (
-        <div style={body}>
-          <div style={{ textAlign: "center", padding: "18px 0 20px" }}>
-            <p style={{ fontSize: 13, color: t.gd, margin: "0 0 3px", letterSpacing: "0.2em", fontWeight: 800 }}>麻雀スコアラー</p>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-              <span style={{ fontSize: 24, animation: "titlePop 0.45s cubic-bezier(.2,1.3,.4,1) both" }}>🀄</span>
-              {["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => (
-                <span key={i} style={{
-                  fontSize: 26, fontWeight: 900, lineHeight: 1.2, color: t.tx,
-                  animation: `titlePop 0.42s ${0.08 + i * 0.08}s cubic-bezier(.2,1.3,.4,1) both`,
-                }}>{c}</span>
-              ))}
-            </div>
-            <div style={{
-              height: 2, width: 170, margin: "10px auto 8px",
-              background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-              animation: "bootLine 0.6s 0.45s ease-out both",
-            }} />
-            <p style={{ fontSize: 11, color: t.dm, margin: "3px 0 0" }}>かんたん点数計算 &amp; 対局管理</p>
-          </div>
-
-          {suspendedGame && menuItem("⏸", "保留中の対局を再開",
-            `${suspendedGame.config.date} ${MATCH_LABEL_SHORT(suspendedGame.config.matchType)} — ${suspendedGame.players.join("・")}`,
-            () => {
-              setGameConfig(suspendedGame.config);
-              setPlayerCount(suspendedGame.config.playerCount || 4);
-              setPlayers(suspendedGame.players);
-              setScores(suspendedGame.scores);
-              setRounds(suspendedGame.rounds);
-              setDealerIdx(suspendedGame.dealerIdx);
-              setRoundWind(suspendedGame.roundWind);
-              setHonba(suspendedGame.honba);
-              setRiichiBets(suspendedGame.riichiBets);
-              setGameStarted(true); setGameFinished(false);
-              setTableMode(true);
-              setView("game");
-            }, true)}
-
-          {menuItem("▶", "対局", suspendedGame ? "※ 保留中の対局があります" : "対局の開始・一局計算・履歴", () => setHomeCat("play"))}
-          {menuItem("🎓", "練習問題", "点数計算・役・符を学ぶ", () => setHomeCat("practice"))}
-          {menuItem("🎴", "麻雀の始め方", "席決め・配牌を図解で解説", () => {
-            setView("startguide"); setGuideStep(0);
-          })}
-          {menuItem("⚙️", "設定", "プレイヤー名・ルールの初期値", () => {
-            setDraftRules({ ...defaultRules }); setRulesSaved(false); setHomeCat("settings");
-          })}
-
-          <button onClick={() => setView("title")} style={{
-            width: "100%", marginTop: 14, padding: "11px 8px", borderRadius: 11, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 12, fontWeight: 700,
-          }}>← タイトルへ</button>
-        </div>
-      );
-    }
+    // メニューはタイトル画面に一本化した。念のため、ここへ来ても同じ画面を出す
+    if (homeCat === null) return renderTitle();
 
     const CATS = {
-      play: { title: "対局", icon: "▶" },
       practice: { title: "練習問題", icon: "🎓" },
       settings: { title: "設定", icon: "⚙️" },
     };
@@ -6068,30 +6008,6 @@ input, select { padding: 10px 14px; }
     return (
       <div style={body}>
         <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 16 }}>{cat.icon} {cat.title}</div>
-
-        {homeCat === "play" && (
-          <>
-            {menuItem("▶", "東風戦・半荘戦・全荘戦", "1回きりの対局。成績は履歴に残ります", () => {
-              setView("game"); setGameStarted(false); setGameFinished(false); setSetupStep(3);
-              setActiveLeagueId(null); setReviewing(false); setShowScoreFix(false);
-              // 対局日は自動で今日にする
-              {
-                const d = new Date();
-                setGameDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
-              }
-              setPlayerMode([false, false, false, false]);
-              setPlayers(["Aプレーヤー", "Bプレーヤー", "Cプレーヤー", "Dプレーヤー"]);
-              setTableMode(true);
-            })}
-            {menuItem("🏆", "リーグ戦", "複数の対局を通して順位を争う", () => { setView("league"); })}
-            {menuItem("🔢", "一局計算", "翻・符から点数をすぐ計算", () => {
-              setView("calc"); setCalcStep(0); setCTsumo(null); setCParent(null); setCHan(null); setCFu(null); resetFuGuide();
-            })}
-            {menuItem("📋", "対局履歴", `${gameHistory.length}件の記録`, () => {
-              setView("history"); setHistoryDetail(null);
-            })}
-          </>
-        )}
 
         {homeCat === "practice" && (
           <>
@@ -6494,7 +6410,7 @@ input, select { padding: 10px 14px; }
             background: `linear-gradient(to top, ${t.bg} 65%, transparent)`,
           }}>
             <button
-              onClick={() => { setHomeCat(null); try { window.scrollTo(0, 0); } catch {} }}
+              onClick={() => { setHomeCat(null); setView("title"); try { window.scrollTo(0, 0); } catch {} }}
               style={{
                 width: "100%", padding: "15px 8px", borderRadius: 12,
                 border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
@@ -9048,7 +8964,7 @@ input, select { padding: 10px 14px; }
             <button aria-label="対局を保留" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
               onClick={() => {
                 setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
-                setGameStarted(false); setView("home"); setHomeCat(null);
+                setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
             <button style={{ ...smallBtn("p"), flex: 1 }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmWinStep("winner"); }}>アガリ入力</button>
             <button style={{ ...smallBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
