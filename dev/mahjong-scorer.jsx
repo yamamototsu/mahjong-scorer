@@ -60,6 +60,8 @@ const GOLD = (pt, rate) => Math.round(pt * 1000 * rate * 1000) / 1000;  // ptは
 const GOLD_LABEL = (g) => (g % 1 === 0 ? g.toLocaleString() : parseFloat(g.toFixed(3)).toLocaleString());
 const TABLE_IMG = "assets/table.jpg";   // 麻雀卓の画像
 const INTRO_IMG = "assets/intro.jpg";   // 起動演出の写真（卓の真ん中に置いたところ）
+// 起動画面の題字とタイトルに使う明朝体（端末に入っているものを順に試す）
+const MINCHO = '"Hiragino Mincho ProN", "Hiragino Mincho Pro", "Yu Mincho", YuMincho, "Noto Serif JP", "Noto Serif CJK JP", "Songti SC", "MS PMincho", "IPAPMincho", "IPAMincho", serif';
 // 人数に応じた席風（三麻は北家なし）
 const SEATS_OF = (pc) => pc === 3 ? ["東", "南", "西"] : WINDS;
 // 三人麻雀（連盟ルール）の既定値
@@ -292,8 +294,12 @@ export default function MahjongScorer() {
 
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
   // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
-  // 起動画面はタップするまで出したままにする（自動では切り替えない）
+  // 起動画面は3秒でメニューへ。待たずに始めたければタップでも進める
   const [booting, setBooting] = useState(true);
+  React.useEffect(() => {
+    const tm = setTimeout(() => setBooting(false), 3000);
+    return () => clearTimeout(tm);
+  }, []);
   // メニューが出そろったあとの目印。タイトルへ戻るたびに出現アニメーションが
   // 再生されないよう、これが立ったら演出は一切かけない
   const [introDone, setIntroDone] = useState(false);
@@ -5812,12 +5818,12 @@ input, select { padding: 10px 14px; }
           <div style={{
             position: "fixed", left: 0, right: 0, bottom: "9%", zIndex: 4,
             textAlign: "center", pointerEvents: "none",
-            animation: "tapHint 0.9s 2.0s ease-out both",
+            animation: "tapHint 0.7s 1.0s ease-out both",
           }}>
             <span style={{
               fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)", letterSpacing: "0.18em",
               textShadow: "0 2px 10px rgba(0,0,0,0.8)",
-              animation: "tapPulse 2.2s 2.9s ease-in-out infinite",
+              animation: "tapPulse 1.8s 1.7s ease-in-out infinite",
               display: "inline-block",
             }}>Tap to start</span>
           </div>
@@ -5837,18 +5843,15 @@ input, select { padding: 10px 14px; }
                 background: "linear-gradient(158deg, #fffdf6 0%, #f4eee2 58%, #e4dccb 100%)",
                 border: "1px solid rgba(0,0,0,0.28)",
                 boxShadow: "0 3px 8px rgba(0,0,0,0.55), inset 0 -3px 0 rgba(0,0,0,0.09)",
-                fontSize: 25, fontWeight: 900, color: tile.c || undefined, lineHeight: 1,
+                fontSize: 26, fontWeight: 700, color: tile.c || undefined, lineHeight: 1,
+                fontFamily: MINCHO,
                 animation: intro ? `bootTile 0.75s ${(i * 0.13).toFixed(2)}s cubic-bezier(.2,1.4,.4,1) both` : undefined,
-              }}>
-                {tile.ch || (
-                  // 白は字がなく、内側の枠だけ
-                  <span style={{ width: 19, height: 30, border: "2px solid #2f6fb3", borderRadius: 3 }} />
-                )}
-              </span>
+              }}>{tile.ch}</span>
             ))}
           </div>
           <div style={{
-            fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 9,
+            fontSize: 16, fontWeight: 700, color: t.gd, letterSpacing: "0.22em", marginTop: 11,
+            fontFamily: MINCHO,
             animation: intro ? "bootSub 0.7s 0.3s ease-out both" : undefined,
             opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>麻雀スコアラー</div>
@@ -5859,7 +5862,8 @@ input, select { padding: 10px 14px; }
           }}>
             {["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => (
               <span key={i} style={{
-                fontSize: 34, fontWeight: 900, color: "#fff", lineHeight: 1.2,
+                fontSize: 34, fontWeight: 700, color: "#fff", lineHeight: 1.25,
+                fontFamily: MINCHO,
                 animation: intro
                   ? `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both`
                     + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`
@@ -5882,7 +5886,7 @@ input, select { padding: 10px 14px; }
             animation: intro ? "bootLine 0.7s 1.15s ease-out both" : undefined,
           }} />
           <div style={{
-            fontSize: 10, color: t.dm, marginTop: 2,
+            fontSize: 11, color: t.dm, marginTop: 2, fontFamily: MINCHO,
             animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
             opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>卓の真ん中に置いて使えます</div>
