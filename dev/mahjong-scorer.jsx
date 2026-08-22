@@ -2527,14 +2527,6 @@ input, select { padding: 10px 14px; }
   0%   { transform: scale(1.16); }
   100% { transform: scale(1); }
 }
-@keyframes tapHint {
-  0%   { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes tapPulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
-}
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -5874,21 +5866,6 @@ input, select { padding: 10px 14px; }
           }} />
         )}
 
-        {/* タップを促す表示（自動では切り替わらないので、押せることを伝える） */}
-        {intro && (
-          <div style={{
-            position: "fixed", left: 0, right: 0, bottom: "9%", zIndex: 4,
-            textAlign: "center", pointerEvents: "none",
-            animation: "tapHint 0.7s 1.0s ease-out both",
-          }}>
-            <span style={{
-              fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)", letterSpacing: "0.18em",
-              textShadow: "0 2px 10px rgba(0,0,0,0.8)",
-              animation: "tapPulse 1.8s 1.7s ease-in-out infinite",
-              display: "inline-block",
-            }}>Tap to start</span>
-          </div>
-        )}
         {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
         <div style={{
           textAlign: "center", marginBottom: 22, position: "relative", zIndex: 1,

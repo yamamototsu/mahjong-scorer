@@ -4718,14 +4718,6 @@ input, select { padding: 10px 14px; }
   0%   { transform: scale(1.16); }
   100% { transform: scale(1); }
 }
-@keyframes tapHint {
-  0%   { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes tapPulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
-}
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -11655,28 +11647,7 @@ input, select { padding: 10px 14px; }
         zIndex: 3,
         cursor: "pointer"
       }
-    }), intro && React.createElement("div", {
-      style: {
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: "9%",
-        zIndex: 4,
-        textAlign: "center",
-        pointerEvents: "none",
-        animation: "tapHint 0.7s 1.0s ease-out both"
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 13,
-        fontWeight: 700,
-        color: "rgba(255,255,255,0.92)",
-        letterSpacing: "0.18em",
-        textShadow: "0 2px 10px rgba(0,0,0,0.8)",
-        animation: "tapPulse 1.8s 1.7s ease-in-out infinite",
-        display: "inline-block"
-      }
-    }, "Tap to start")), React.createElement("div", {
+    }), React.createElement("div", {
       style: {
         textAlign: "center",
         marginBottom: 22,
