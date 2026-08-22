@@ -1442,6 +1442,34 @@ function MahjongScorer() {
     if (splashTimer.current) clearTimeout(splashTimer.current);
     splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
   }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
+  const prevRoundKey = React.useRef(null);
+  React.useEffect(() => {
+    if (!gameStarted || gameFinished) {
+      prevRoundKey.current = null;
+      return;
+    }
+    const key = `${roundWind}/${dealerIdx}/${honba}`;
+    if (prevRoundKey.current === null) {
+      prevRoundKey.current = key;
+      return;
+    }
+    if (prevRoundKey.current === key) return;
+    prevRoundKey.current = key;
+    if (reviewing || correctingIdx !== null || correctingDrawIdx !== null) return;
+    setStartSplash({
+      league: null,
+      matchType,
+      date: gameConfig?.date || gameDate,
+      seats: [],
+      round: {
+        wind: roundWind,
+        dealer: dealerIdx,
+        honba
+      }
+    });
+    if (splashTimer.current) clearTimeout(splashTimer.current);
+    splashTimer.current = setTimeout(() => setStartSplash(null), 2200);
+  }, [roundWind, dealerIdx, honba, gameStarted, gameFinished]);
   const t = {
     bg: "#0c1117",
     sf: "#161d27",
@@ -10820,7 +10848,28 @@ input, select { padding: 10px 14px; }
         width: "78%",
         animation: "splashLine 0.7s 0.2s ease-out both"
       }
-    }), React.createElement("div", {
+    }), sp.round ? React.createElement("div", {
+      style: {
+        animation: "splashRow 0.45s 0.3s ease-out both"
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 40,
+        fontWeight: 900,
+        color: "#fff",
+        lineHeight: 1.2,
+        letterSpacing: "0.06em",
+        textShadow: "0 2px 20px rgba(0,0,0,0.6)"
+      }
+    }, sp.round.wind, sp.round.dealer + 1, "局"), React.createElement("div", {
+      style: {
+        fontSize: 20,
+        fontWeight: 800,
+        marginTop: 8,
+        letterSpacing: "0.08em",
+        color: sp.round.honba > 0 ? t.gd : "rgba(255,255,255,0.65)"
+      }
+    }, sp.round.honba, "本場")) : React.createElement("div", {
       style: {
         display: "inline-block",
         textAlign: "left"
