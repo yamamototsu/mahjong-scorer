@@ -5828,11 +5828,25 @@ input, select { padding: 10px 14px; }
           transform: intro ? "translateY(76px) scale(1.06)" : "translateY(0) scale(1)",
           transition: "transform 0.85s cubic-bezier(.2,.9,.3,1)",
         }}>
-          {/* lineHeight は 1 にしない（絵文字の字面が行の高さを超えてはみ出す） */}
-          <div style={{
-            fontSize: 40, lineHeight: 1.1,
-            animation: intro ? "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both" : undefined,
-          }}>🀄</div>
+          {/* 三元牌（白・発・中）。絵文字だと色が付くのが中だけで揃わないので、牌そのものを描く */}
+          <div style={{ display: "flex", justifyContent: "center", gap: 6 }}>
+            {[{ ch: "", c: null }, { ch: "發", c: "#1f7a43" }, { ch: "中", c: "#c0272d" }].map((tile, i) => (
+              <span key={i} style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 36, height: 48, borderRadius: 7, flexShrink: 0,
+                background: "linear-gradient(158deg, #fffdf6 0%, #f4eee2 58%, #e4dccb 100%)",
+                border: "1px solid rgba(0,0,0,0.28)",
+                boxShadow: "0 3px 8px rgba(0,0,0,0.55), inset 0 -3px 0 rgba(0,0,0,0.09)",
+                fontSize: 25, fontWeight: 900, color: tile.c || undefined, lineHeight: 1,
+                animation: intro ? `bootTile 0.75s ${(i * 0.13).toFixed(2)}s cubic-bezier(.2,1.4,.4,1) both` : undefined,
+              }}>
+                {tile.ch || (
+                  // 白は字がなく、内側の枠だけ
+                  <span style={{ width: 19, height: 30, border: "2px solid #2f6fb3", borderRadius: 3 }} />
+                )}
+              </span>
+            ))}
+          </div>
           <div style={{
             fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 9,
             animation: intro ? "bootSub 0.7s 0.3s ease-out both" : undefined,
