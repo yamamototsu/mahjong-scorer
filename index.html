@@ -769,11 +769,23 @@ function MahjongScorer() {
       localStorage.setItem("mj_riichi_voice", on ? "1" : "0");
     } catch {}
   };
-  const playVoice = text => {
-    if (!riichiVoiceOn) return;
+  const playVoice = (text, done) => {
+    let called = false;
+    const finish = () => {
+      if (called) return;
+      called = true;
+      if (done) done();
+    };
+    if (!riichiVoiceOn) {
+      finish();
+      return;
+    }
     try {
       const syn = window.speechSynthesis;
-      if (!syn) return;
+      if (!syn) {
+        finish();
+        return;
+      }
       syn.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
@@ -783,8 +795,13 @@ function MahjongScorer() {
         const ja = (syn.getVoices() || []).find(v => v && /^ja/i.test(v.lang || ""));
         if (ja) u.voice = ja;
       } catch {}
+      u.onend = finish;
+      u.onerror = finish;
       syn.speak(u);
-    } catch {}
+      if (done) setTimeout(finish, 1400);
+    } catch {
+      finish();
+    }
   };
   const toggleDeclaredRiichi = i => {
     setDeclaredRiichi(prev => {
@@ -17921,29 +17938,30 @@ input, select { padding: 10px 14px; }
     }, "ホウジュウ", React.createElement("br", null), "した人を選択")) : ronLoserPick !== null ? React.createElement("button", {
       onClick: e => {
         e.stopPropagation();
-        playVoice("ロン");
         const i = ronLoserPick;
-        setTmWinStep(null);
-        setGTsumo(false);
-        setGLoser(i);
-        if (ronPick.length >= 2) {
-          const order = [...ronPick].sort((x, y) => (x - i + PC) % PC - (y - i + PC) % PC);
-          setMultiRon({
-            loser: i,
-            queue: order,
-            done: []
-          });
-          setGWinner(order[0]);
-        } else {
-          setMultiRon(null);
-          if (ronPick.length === 1) setGWinner(ronPick[0]);
-        }
-        setRonLoserPick(null);
-        setGHan(null);
-        setGFu(null);
-        setFuGuide(null);
-        setShowGW(true);
-        setGStep(5);
+        playVoice("ロン", () => {
+          setTmWinStep(null);
+          setGTsumo(false);
+          setGLoser(i);
+          if (ronPick.length >= 2) {
+            const order = [...ronPick].sort((x, y) => (x - i + PC) % PC - (y - i + PC) % PC);
+            setMultiRon({
+              loser: i,
+              queue: order,
+              done: []
+            });
+            setGWinner(order[0]);
+          } else {
+            setMultiRon(null);
+            if (ronPick.length === 1) setGWinner(ronPick[0]);
+          }
+          setRonLoserPick(null);
+          setGHan(null);
+          setGFu(null);
+          setFuGuide(null);
+          setShowGW(true);
+          setGStep(5);
+        });
       },
       style: {
         width: "100%",
@@ -17972,13 +17990,14 @@ input, select { padding: 10px 14px; }
     }, "確定")) : React.createElement("button", {
       onClick: e => {
         e.stopPropagation();
-        playVoice("ツモ");
-        setGTsumo(true);
-        setGLoser(null);
-        setTmWinStep(null);
-        if (ronPick.length === 1) setGWinner(ronPick[0]);
-        setShowGW(true);
-        setGStep(5);
+        playVoice("ツモ", () => {
+          setGTsumo(true);
+          setGLoser(null);
+          setTmWinStep(null);
+          if (ronPick.length === 1) setGWinner(ronPick[0]);
+          setShowGW(true);
+          setGStep(5);
+        });
       },
       style: {
         width: "100%",
@@ -18542,18 +18561,16 @@ input, select { padding: 10px 14px; }
     }
   }, React.createElement("button", {
     style: bigBtn(t.gn, t.gnS),
-    onClick: () => {
-      playVoice("ツモ");
+    onClick: () => playVoice("ツモ", () => {
       setGTsumo(true);
       setGStep(4);
-    }
+    })
   }, "ツモ"), React.createElement("button", {
     style: bigBtn(t.rd, t.rdS),
-    onClick: () => {
-      playVoice("ロン");
+    onClick: () => playVoice("ロン", () => {
       setGTsumo(false);
       setGStep(3);
-    }
+    })
   }, "ロン"))), gStep === 3 && React.createElement("div", {
     style: card
   }, React.createElement(Back, {
