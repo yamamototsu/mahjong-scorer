@@ -561,30 +561,76 @@ export default function MahjongScorer() {
   };
   // done を渡すと、読み上げが終わってから実行する（読み上げの途中で画面が変わらないように）。
   // 読み上げなし・音声が使えない端末では、待たずにその場で実行する
+  // 牌を倒す「パシッ」（Web Audioでその場で合成。音声ファイルは持たない）。
+  // 声だけだと読み上げに聞こえるので、手牌を倒す音を先に鳴らして実感を出す
+  const playTileSlap = () => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new AC();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const t0 = ctx.currentTime + 0.005;
+      // 牌がぶつかる高い音
+      const dur = 0.085;
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2);
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 2600; bp.Q.value = 0.9;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.5, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+      src.start(t0); src.stop(t0 + dur);
+      // 卓に響く低い音
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(190, t0);
+      osc.frequency.exponentialRampToValueAtTime(85, t0 + 0.13);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.26, t0);
+      og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.15);
+      osc.connect(og); og.connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + 0.16);
+    } catch {}
+  };
+
   const playVoice = (text, done) => {
     let called = false;
     const finish = () => { if (called) return; called = true; if (done) done(); };
     if (!riichiVoiceOn) { finish(); return; }
-    try {
-      const syn = window.speechSynthesis;
-      if (!syn) { finish(); return; }
-      syn.cancel();   // 続けて押されたときに重ならないようにする
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "ja-JP";
-      u.rate = 1.05;
-      u.pitch = 1.0;
-      // 日本語の声が入っていればそれを使う（無ければ端末の既定にまかせる）。
-      // ここで失敗しても読み上げ自体は続ける
+    // ツモ・ロンは牌を倒す音を先に鳴らしてから声を出す
+    const withSlap = text === "ツモ" || text === "ロン";
+    if (withSlap) playTileSlap();
+    const speak = () => {
       try {
-        const ja = (syn.getVoices() || []).find(v => v && /^ja/i.test(v.lang || ""));
-        if (ja) u.voice = ja;
-      } catch {}
-      u.onend = finish;
-      u.onerror = finish;
-      syn.speak(u);
-      // 保険: 終了が通知されない端末でも画面が止まらないようにする
-      if (done) setTimeout(finish, 1400);
-    } catch { finish(); }
+        const syn = window.speechSynthesis;
+        if (!syn) { finish(); return; }
+        syn.cancel();   // 続けて押されたときに重ならないようにする
+        // 「！」を付けると端末によっては強めに読んでくれる
+        const u = new SpeechSynthesisUtterance(text + "！");
+        u.lang = "ja-JP";
+        u.rate = 1.15;    // 読み上げよりは、卓での掛け声に近い速さ
+        u.pitch = 0.95;
+        u.volume = 1;
+        // 日本語の声を選ぶ。拡張版・高品質版があればそちらを優先する。
+        // ここで失敗しても読み上げ自体は続ける
+        try {
+          const ja = (syn.getVoices() || []).filter(v => v && /^ja/i.test(v.lang || ""));
+          if (ja.length) {
+            const better = ja.find(v => /拡張|premium|enhanced|neural/i.test(v.name || ""));
+            u.voice = better || ja[0];
+          }
+        } catch {}
+        u.onend = finish;
+        u.onerror = finish;
+        syn.speak(u);
+      } catch { finish(); }
+    };
+    if (withSlap) setTimeout(speak, 130); else speak();
+    // 保険: 終了が通知されない端末でも画面が止まらないようにする
+    if (done) setTimeout(finish, 1700);
   };
 
   const toggleDeclaredRiichi = (i) => {
