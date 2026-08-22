@@ -290,10 +290,15 @@ export default function MahjongScorer() {
   const tileScale = isLandscape ? Math.min(2.2, Math.max(1.3, vp.w / 440)) : 1;
 
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
+  // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
   const [booting, setBooting] = useState(true);
+  // メニューが出そろったあとの目印。タイトルへ戻るたびに出現アニメーションが
+  // 再生されないよう、これが立ったら演出は一切かけない
+  const [introDone, setIntroDone] = useState(false);
   React.useEffect(() => {
-    const tm = setTimeout(() => setBooting(false), 2600);
-    return () => clearTimeout(tm);
+    const tm = setTimeout(() => setBooting(false), 2900);
+    const tm2 = setTimeout(() => setIntroDone(true), 3900);
+    return () => { clearTimeout(tm); clearTimeout(tm2); };
   }, []);
 
   const [gameConfig, setGameConfig] = useState(null); // saved config after setup
@@ -1028,7 +1033,9 @@ export default function MahjongScorer() {
   const card = { background: t.card, borderRadius: 14, padding: 22, marginBottom: 18, border: `1px solid ${t.bd}`, boxSizing: "border-box", maxWidth: "100%", overflow: "hidden", lineHeight: 1.7 };
   const question = { fontSize: 16, fontWeight: 700, margin: "4px 0 20px", textAlign: "center", lineHeight: 1.6, letterSpacing: "0.02em" };
   const bigBtn = (c, s) => ({ flex: "1 1 140px", maxWidth: 200, padding: "20px 8px", border: `2px solid ${c}`, borderRadius: 14, background: s, color: c, fontSize: 20, fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.12s" });
-  const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 19, fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
+  // 文字を画面幅に追従させる。19pxのままだと狭い端末（280〜320px）で
+  // 4列のマス目が枠や画面の外へはみ出る。365px以上では19pxのまま変わらない。
+  const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: "clamp(14px, 5.2vw, 19px)", fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
   const actionBtn = (v) => ({ width: "100%", padding: "15px 12px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 10, boxSizing: "border-box", lineHeight: 1.5, ...(v === "p" ? { background: t.ac, color: "#fff" } : v === "d" ? { background: t.rd, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }) });
   const pSelBtn = (on) => ({ padding: "14px 8px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center", flex: 1, transition: "all 0.1s" });
   // 対局ルールの説明（設定・セットアップ・リーグで共用）
@@ -1238,18 +1245,23 @@ export default function MahjongScorer() {
   };
   const inputStyle = { background: t.sf, border: `1px solid ${t.bd}`, borderRadius: 10, padding: "10px 14px", color: t.tx, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none" };
   const selectStyle = { ...inputStyle, appearance: "none", WebkitAppearance: "none", backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center", paddingRight: 32 };
-  const toggleRow = (label, on, onToggle) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
-      <span style={{ fontSize: 14 }}>{label}</span>
-      <button onClick={onToggle} style={{
-        width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-        background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
-      }}>
-        <div style={{
-          width: 20, height: 20, borderRadius: "50%", background: "#fff",
-          position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
-        }} />
-      </button>
+  // desc を渡すと、説明文も同じ枠の中（区切り線の内側）に入る。
+  // 枠の外に置くと、区切り線が説明文の上を通ってしまう。
+  const toggleRow = (label, on, onToggle, desc) => (
+    <div style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 14 }}>{label}</span>
+        <button onClick={onToggle} style={{
+          width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer", flexShrink: 0,
+          background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
+        }}>
+          <div style={{
+            width: 20, height: 20, borderRadius: "50%", background: "#fff",
+            position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
+          }} />
+        </button>
+      </div>
+      {desc && <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 4 }}>{desc}</div>}
     </div>
   );
 
@@ -2425,9 +2437,14 @@ input, select { padding: 10px 14px; }
   0%, 100% { text-shadow: 0 0 18px rgba(234,179,8,0.35), 0 3px 14px rgba(0,0,0,0.7); }
   50%      { text-shadow: 0 0 34px rgba(234,179,8,0.7), 0 3px 14px rgba(0,0,0,0.7); }
 }
-@keyframes bootFade {
-  0%, 72% { opacity: 1; }
-  100%    { opacity: 0; visibility: hidden; }
+@keyframes bootShine {
+  0%   { opacity: 0; transform: translateX(-115%); }
+  35%  { opacity: 1; }
+  100% { opacity: 0; transform: translateX(115%); }
+}
+@keyframes menuIn {
+  0%   { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
@@ -3298,7 +3315,7 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", gap: 4, marginBottom: 14, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {YAKU_CATEGORIES.map(cat => (
           <button key={cat} style={{
-            padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+            padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
             border: `1px solid ${dictCat === cat ? t.ac : t.bd}`,
             background: dictCat === cat ? t.acS : "transparent",
             color: dictCat === cat ? t.ac : t.dm,
@@ -5307,47 +5324,6 @@ input, select { padding: 10px 14px; }
     );
   };
 
-  // 起動時のオープニング（タップでスキップ）
-  const BootSplash = () => {
-    if (!booting) return null;
-    const chars = ["卓", "上", "ポ", "ン", "づ", "け"];
-    return (
-      <div onClick={() => setBooting(false)} style={{
-        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 400,
-        background: "radial-gradient(circle at 50% 42%, #164a32 0%, #0a0f14 60%, #05080b 100%)",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        animation: "bootFade 2.6s ease-in forwards",
-      }}>
-        <div style={{ fontSize: 46, animation: "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both", lineHeight: 1 }}>🀄</div>
-
-        <div style={{
-          marginTop: 14, fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em",
-          animation: "bootSub 0.7s 0.3s ease-out both",
-        }}>麻雀スコアラー</div>
-
-        <div style={{ display: "flex", gap: 2, marginTop: 8 }}>
-          {chars.map((c, i) => (
-            <span key={i} style={{
-              fontSize: 40, fontWeight: 900, color: "#fff", letterSpacing: "0.02em",
-              animation: `bootChar 0.5s ${0.45 + i * 0.11}s cubic-bezier(.2,1.1,.35,1) both, bootGlow 2.2s ${1.2 + i * 0.05}s ease-in-out infinite`,
-            }}>{c}</span>
-          ))}
-        </div>
-
-        <div style={{
-          height: 2, width: 210, marginTop: 14,
-          background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-          animation: "bootLine 0.7s 1.05s ease-out both",
-        }} />
-
-        <div style={{
-          marginTop: 22, fontSize: 10, color: "rgba(255,255,255,0.4)",
-          animation: "bootSub 0.8s 1.6s ease-out both",
-        }}>卓の真ん中に置いて使えます</div>
-      </div>
-    );
-  };
-
   // 卓上表示: 誰から誰へいくら動くかを、卓の配置＋矢印で見せる
   const PayTableView = () => {
     if (!showPayView || gWinner === null || !gResult) return null;
@@ -5437,8 +5413,7 @@ input, select { padding: 10px 14px; }
               {/* markerUnits=userSpaceOnUse: 線の太さで矢じりの大きさが変わらないようにする */}
               <marker id="payArrow" markerUnits="userSpaceOnUse"
                 markerWidth="7.2" markerHeight="7.2" refX="6.8" refY="3.6" orient="auto">
-                <path d="M0.5,0.7 L6.8,3.6 L0.5,6.5 z" fill={t.gd}
-                  stroke="rgba(0,0,0,0.8)" strokeWidth="0.9" strokeLinejoin="round" />
+                <path d="M0.5,0.7 L6.8,3.6 L0.5,6.5 z" fill={t.gd} />
               </marker>
             </defs>
             {flows.map((f, k) => {
@@ -5451,9 +5426,6 @@ input, select { padding: 10px 14px; }
               const b = edgeOf(win, -ux, -uy, extOf(gWinner), 2.5);
               return (
                 <g key={k}>
-                  {/* 卓の緑に埋もれないよう、黒い縁取りを下に敷く */}
-                  <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="rgba(0,0,0,0.8)" strokeWidth="2.8"
-                    strokeLinecap="round" />
                   <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={t.gd} strokeWidth="1.4"
                     strokeLinecap="round" markerEnd="url(#payArrow)" />
                 </g>
@@ -5478,18 +5450,30 @@ input, select { padding: 10px 14px; }
                 width: "30%", height: "22%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               }}>
+                {/* 名前と「親」を並べても枠の幅を超えないようにする。
+                    「親」が付く席はそのぶん名前を小さくし、それでも入らない長い名前は末尾を省略する */}
                 <div style={{
-                  fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length))))),
-                  fontWeight: 800, color: "#fff", lineHeight: 1.15,
-                  whiteSpace: "nowrap", maxWidth: "100%",
-                }}>{players[i]}{i === dealerIdx ? <span style={{ fontSize: fs(10), color: t.gd, marginLeft: 3 }}>親</span> : null}</div>
+                  display: "flex", alignItems: "baseline", justifyContent: "center",
+                  gap: 3, width: "100%", maxWidth: "100%",
+                }}>
+                  <span style={{
+                    // 「親」のぶんを見込んで少しだけ縮める。はみ出しは末尾の省略で受けるので
+                    // 縮めすぎない（0.6にすると6文字の親名で10px未満になる）
+                    fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
+                    fontWeight: 800, color: "#fff", lineHeight: 1.15,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
+                  }}>{players[i]}</span>
+                  {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.15, flexShrink: 0 }}>親</span>}
+                </div>
                 <div style={{
                   fontSize: fs(19), fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1.1,
                   color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
                 }}>
                   {amt > 0 ? "+" : ""}{amt.toLocaleString()}
                 </div>
-                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.1, height: "3.2%" }}>{isWin ? "アガリ" : ""}</div>
+                {/* あがった人だけ「アガリ」。高さを固定すると文字があふれて点数と重なるので
+                    行の高さで確保し、他の席は空白1文字を置いて4枠の高さを揃える */}
+                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.25 }}>{isWin ? "アガリ" : " "}</div>
               </div>
             );
           })}
@@ -5750,30 +5734,73 @@ input, select { padding: 10px 14px; }
         <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
+    // 起動直後はタイトルだけを見せる。演出が終わったらメニューを順に出す。
+    // 中身は常に置いたまま透明にするので、メニューが出るときに位置が飛ばない。
+    const intro = booting;
+    const reveal = (i) => intro
+      ? { opacity: 0, transform: "translateY(14px)", pointerEvents: "none" }
+      : introDone
+        ? undefined   // 起動後にタイトルへ戻ったときは、そのまま出す
+        : { animation: `menuIn 0.5s ${(i * 0.07).toFixed(2)}s cubic-bezier(.2,.9,.3,1) both` };
+
     return (
-      <div style={{ ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8 }}>
-        {/* ロゴ */}
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
-          <div style={{ fontSize: 40, lineHeight: 1, animation: "bootTile 0.7s cubic-bezier(.2,1.4,.4,1) both" }}>🀄</div>
+      <div onClick={intro ? () => setBooting(false) : undefined} style={{
+        ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8,
+        background: intro
+          ? "radial-gradient(circle at 50% 44%, rgba(22,74,50,0.55) 0%, rgba(10,15,20,0) 62%)"
+          : "radial-gradient(circle at 50% 44%, rgba(22,74,50,0) 0%, rgba(10,15,20,0) 62%)",
+        transition: "background 1.1s ease-out",
+      }}>
+        {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
+        <div style={{
+          textAlign: "center", marginBottom: 22,
+          transform: intro ? "translateY(76px) scale(1.06)" : "translateY(0) scale(1)",
+          transition: "transform 0.85s cubic-bezier(.2,.9,.3,1)",
+        }}>
+          {/* lineHeight は 1 にしない（絵文字の字面が行の高さを超えてはみ出す） */}
           <div style={{
-            fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 12,
-            animation: "bootSub 0.6s 0.15s ease-out both",
+            fontSize: 40, lineHeight: 1.1,
+            animation: intro ? "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both" : undefined,
+          }}>🀄</div>
+          <div style={{
+            fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 9,
+            animation: intro ? "bootSub 0.7s 0.3s ease-out both" : undefined,
+            opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>麻雀スコアラー</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 6 }}>
+          {/* 題字。光の帯の基準にするため、文字の幅ぴったりの枠で包む */}
+          <div style={{
+            display: "inline-flex", justifyContent: "center", gap: 2, marginTop: 6,
+            position: "relative", overflow: "hidden", borderRadius: 8, padding: "2px 6px",
+          }}>
             {["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => (
               <span key={i} style={{
                 fontSize: 34, fontWeight: 900, color: "#fff", lineHeight: 1.2,
-                animation: `bootChar 0.45s ${0.2 + i * 0.08}s cubic-bezier(.2,1.1,.35,1) both`,
+                animation: intro
+                  ? `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both`
+                    + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`
+                  : undefined,
                 textShadow: "0 0 22px rgba(234,179,8,0.28), 0 3px 12px rgba(0,0,0,0.6)",
               }}>{c}</span>
             ))}
+            {/* 文字の上を一度だけ光が走る（枠の中だけを通るので、外に長方形が出ない） */}
+            {intro && (
+              <span style={{
+                position: "absolute", top: 0, bottom: 0, left: 0, right: 0, pointerEvents: "none",
+                background: "linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.5) 50%, transparent 62%)",
+                animation: "bootShine 1.1s 1.35s ease-out both",
+              }} />
+            )}
           </div>
           <div style={{
             height: 2, width: 200, margin: "12px auto 9px",
             background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-            animation: "bootLine 0.6s 0.6s ease-out both",
+            animation: intro ? "bootLine 0.7s 1.15s ease-out both" : undefined,
           }} />
-          <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>卓の真ん中に置いて使えます</div>
+          <div style={{
+            fontSize: 10, color: t.dm, marginTop: 2,
+            animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
+            opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
+          }}>卓の真ん中に置いて使えます</div>
         </div>
 
         {/* 保留中があれば最優先で出す */}
@@ -5781,7 +5808,7 @@ input, select { padding: 10px 14px; }
           <button onClick={resumeGame} style={{
             width: "100%", padding: "14px 12px", borderRadius: 14, cursor: "pointer", marginBottom: 10,
             border: `2px solid ${t.gd}`, background: t.gdS, color: t.tx, textAlign: "left",
-            display: "flex", alignItems: "center", gap: 10,
+            display: "flex", alignItems: "center", gap: 10, ...reveal(0),
           }}>
             <span style={{ fontSize: 20 }}>⏸</span>
             <span style={{ flex: 1, minWidth: 0 }}>
@@ -5798,19 +5825,19 @@ input, select { padding: 10px 14px; }
         <button onClick={startPlay} style={{
           width: "100%", padding: "20px 12px", borderRadius: 16, cursor: "pointer", marginBottom: 12,
           border: "none", background: t.ac, color: "#fff",
-          boxShadow: "0 8px 24px rgba(91,155,255,0.28)",
+          boxShadow: "0 8px 24px rgba(91,155,255,0.28)", ...reveal(1),
         }}>
           <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: "0.05em" }}>対局をはじめる</div>
           <div style={{ fontSize: 11, opacity: 0.9, marginTop: 3 }}>東風戦・半荘戦・全荘戦 / 四人・三人麻雀</div>
         </button>
 
         {/* サブメニュー */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, ...reveal(2) }}>
           {subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league"))}
           {subBtn("🔢", "1局戦", "点数計算", () => { resetCalc(); setView("calc"); })}
           {subBtn("📋", "履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, ...reveal(3) }}>
           {subBtn("🎓", "練習問題", "点数・役・符", () => { setView("home"); setHomeCat("practice"); })}
           {subBtn("🎴", "始め方", "図解で解説", () => { setView("startguide"); setGuideStep(0); })}
           {subBtn("⚙️", "設定", "ルール初期値", () => {
@@ -5821,6 +5848,7 @@ input, select { padding: 10px 14px; }
         <button onClick={() => { setHomeCat(null); setView("home"); }} style={{
           width: "100%", marginTop: 14, padding: "11px 8px", borderRadius: 11, cursor: "pointer",
           border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 12, fontWeight: 700,
+          ...reveal(4),
         }}>すべてのメニュー</button>
       </div>
     );
@@ -6525,7 +6553,7 @@ input, select { padding: 10px 14px; }
           </div>
           <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
             background: "none", border: "none", color: t.ac, fontSize: 11,
-            cursor: "pointer", textDecoration: "underline", marginTop: 10,
+            cursor: "pointer", textDecoration: "underline", marginTop: 6, padding: "9px 10px",
           }}>👤 名前を追加・編集する</button>
         </div>
 
@@ -7728,7 +7756,7 @@ input, select { padding: 10px 14px; }
               <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 10 }}>または直接選択</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                 {validFuOptions(cHan, cTsumo).map(f => (
-                  <button key={f} style={{ ...numBtn(cFu===f), fontSize: f >= 100 ? 16 : 19 }} onClick={() => { setCFu(f); setCalcStep(4); }}>{f}符</button>
+                  <button key={f} style={{ ...numBtn(cFu===f), fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)" }} onClick={() => { setCFu(f); setCalcStep(4); }}>{f}符</button>
                 ))}
               </div>
             </>
@@ -8173,36 +8201,25 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>
               {matchType === "tonpu" ? "東4局" : matchType === "zenchan" ? "北4局" : "南4局"}で親がアガった、または流局で親が続く場合の扱い
             </div>
-            {toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({ ...r, orasYame: r.orasYame === false })))}
-            <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 6 }}>
-              {rules.orasYame !== false
+            {/* 説明文は toggleRow に渡す（外に置くと区切り線が文字の上を横切る） */}
+            {toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({ ...r, orasYame: r.orasYame === false })),
+              rules.orasYame !== false
                 ? "ON：親がトップの状態でアガる／テンパイで流局すると、そこで対局終了（アガリやめ・テンパイやめ）。トップでなければ連荘して続行します。"
-                : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。"}
-            </div>
+                : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。")}
           </div>
 
           <div style={{ marginBottom: 8, marginTop: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8, letterSpacing: "0.05em" }}>その他</div>
-            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6, lineHeight: 1.7 }}>
-              鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます
-            </div>
-            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6, lineHeight: 1.7 }}>
-              役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け
-            </div>
-            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              ONにすると4翻30符・3翻60符を満貫扱い
-            </div>
-            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます
-            </div>
-            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })))}
-            <div style={{ fontSize: 10, color: t.dm, paddingLeft: 2, marginTop: -4, marginBottom: 6 }}>
-              誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）
-            </div>
+            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })),
+              "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます")}
+            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })),
+              "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け")}
+            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })),
+              "ONにすると4翻30符・3翻60符を満貫扱い")}
+            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })),
+              "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます")}
+            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })),
+              "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")}
           </div>
 
           <div style={{ marginTop: 18, marginBottom: 8 }}>
@@ -8237,7 +8254,7 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 6 }}>名前の欄をタップして選択</div>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
             <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
-              background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline",
+              background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: "9px 10px",
             }}>👤 リストの名前を編集</button>
           </div>
 
@@ -9185,7 +9202,6 @@ input, select { padding: 10px 14px; }
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
         </div>
-        <BootSplash />
         <StartSplash />
         <PayTableView />
         <RankPeekOverlay />
@@ -9289,7 +9305,6 @@ input, select { padding: 10px 14px; }
       <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 10, marginTop: -8 }}>
         点数を長押しすると順位と点差が見られます
       </div>
-      <BootSplash />
       <StartSplash />
       <PayTableView />
       <RankPeekOverlay />
@@ -9300,7 +9315,9 @@ input, select { padding: 10px 14px; }
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button style={{ ...actionBtn("p"), flex: 1 }} onClick={() => { resetGW(); setShowGW(true); setGStep(1); }}>アガリ入力</button>
         <button style={{ ...actionBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setShowDrawWiz(true); }}>流局</button>
-        <button style={{ ...actionBtn(), flex: "0 0 92px" }} onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
+        {/* 左右の余白を詰めて「ルー/ル」と途中で折り返さないようにする */}
+        <button style={{ ...actionBtn(), flex: "0 0 92px", padding: "15px 4px", whiteSpace: "nowrap" }}
+          onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
       </div>
 
       <button style={{ ...actionBtn(), marginBottom: 14, fontSize: 13 }}
@@ -9488,7 +9505,7 @@ input, select { padding: 10px 14px; }
                     <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 10 }}>または直接選択</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
                       {validFuOptions(gHan, gTsumo).map(f => (
-                        <button key={f} style={{ ...numBtn(gFu === f), fontSize: f >= 100 ? 16 : 19 }} onClick={() => { setGFu(f); setGStep(7); }}>{f}符</button>
+                        <button key={f} style={{ ...numBtn(gFu === f), fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)" }} onClick={() => { setGFu(f); setGStep(7); }}>{f}符</button>
                       ))}
                     </div>
                   </>
