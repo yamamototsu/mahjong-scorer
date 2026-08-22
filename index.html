@@ -1528,7 +1528,7 @@ function MahjongScorer() {
         marginTop: 12
       }
     }, React.createElement("button", {
-      onClick: () => setOpen(v => !v),
+      onClick: () => setOpen(true),
       style: {
         width: "100%",
         padding: "13px 8px",
@@ -1540,22 +1540,91 @@ function MahjongScorer() {
         fontSize: 15,
         fontWeight: 700
       }
-    }, open ? "ルールの説明を閉じる" : "それぞれのルールの説明を見る"), open && React.createElement("div", {
+    }, "それぞれのルールの説明を見る"), open && React.createElement("div", {
+      onClick: () => setOpen(false),
       style: {
-        marginTop: 10,
-        padding: "4px 14px 14px",
-        borderRadius: 11,
-        background: t.sf,
-        border: `1px solid ${t.bd}`
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.9)",
+        zIndex: 150,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "20px 16px",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        overflowY: "auto"
       }
-    }, item("流局したときの親", React.createElement(React.Fragment, null, "誰もアガらずに流局したとき、親を続けるかどうかです。", React.createElement("br", null), React.createElement("b", null, "あがり連荘"), "＝流局したら必ず親が流れる（一般的）。", React.createElement("br", null), React.createElement("b", null, "テンパイ連荘"), "＝親がテンパイしていれば続行。", React.createElement("br", null), React.createElement("b", null, "無条件連荘"), "＝ノーテンでも親が続く。", React.createElement("br", null), "どのルールでもノーテン罰符3,000点のやりとりと本場の加算は行われます。")), item("複数人が同時にロン", React.createElement(React.Fragment, null, "1つの捨て牌に2人以上がロンを宣言したときの扱いです。", React.createElement("br", null), React.createElement("b", null, "頭ハネ"), "＝放銃者に近い1人だけがアガリ。", React.createElement("br", null), React.createElement("b", null, "ダブロン"), "＝2人まで、", React.createElement("b", null, "トリプルロン"), "＝3人まで同時に成立。", React.createElement("br", null), "複数で成立する場合、本場と供託は放銃者から反時計回りに最も近い人が受け取ります。")), item("食いタン", React.createElement(React.Fragment, null, "鳴いた状態のタンヤオを認めるかどうかです。認めないルールでは、鳴くと役なしになる場面が増えるため打ち方が大きく変わります。")), item("後付け", React.createElement(React.Fragment, null, "鳴いた時点で役がなくても、アガリの瞬間（ロン・ツモの牌が入った時点）に役が確定していればアガリを認めるかどうかです。役牌をあとからポンして役を付ける「役牌バック」や、役の付く側の牌でだけアガれる「片アガリ」がこれにあたります。認めないルール（先付け）では、鳴いた時点で役が確定している必要があります。")), item("切り上げ満貫", React.createElement(React.Fragment, null, "4翻30符（子7,700・親11,600）と3翻60符を、満貫として扱うルールです。ONにすると子8,000・親12,000になります。")), item("ダブル役満", React.createElement(React.Fragment, null, "大三元＋字一色のように役満が複合したとき、2倍（子64,000・親96,000）・3倍で計算するルールです。OFFでは複合してもシングル役満（子32,000・親48,000）です。「役を選んで計算する」から役満を複数選ぶと適用されます。")), item("オーラスは親トップで終了", React.createElement(React.Fragment, null, "最終局で親がトップの状態でアガる、またはテンパイで流局したときに、そこで対局を終える設定です（アガリやめ・テンパイやめ）。OFFにすると親がトップでも連荘を続けます。")), item("トビで終了", React.createElement(React.Fragment, null, "誰かの持ち点が0未満になった時点で対局を終える設定です。ハコ下・ドボンとも呼びます。OFFにするとマイナスのまま最後まで打ち切ります。")), item("持ち点・返し点", React.createElement(React.Fragment, null, "持ち点は開始時の点数、返し点は精算の基準です。差額の合計がオカとしてトップに渡ります。持ち点と返し点が同じならオカは発生しません。")), React.createElement("div", {
+    }, React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: {
+        width: "100%",
+        maxWidth: 400
+      }
+    }, React.createElement("div", {
+      style: {
+        ...card,
+        padding: "4px 14px 14px"
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "12px 4px 10px",
+        margin: "0 -4px",
+        borderBottom: `1px solid ${t.bd}44`,
+        position: "sticky",
+        top: 0,
+        background: t.card,
+        zIndex: 1
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 15,
+        fontWeight: 800,
+        color: t.tx
+      }
+    }, "それぞれのルールの説明"), React.createElement("button", {
+      style: {
+        background: "none",
+        border: "none",
+        color: t.dm,
+        fontSize: 20,
+        cursor: "pointer",
+        width: 36,
+        height: 36,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0
+      },
+      onClick: () => setOpen(false)
+    }, "✕")), item("流局したときの親", React.createElement(React.Fragment, null, "誰もアガらずに流局したとき、親を続けるかどうかです。", React.createElement("br", null), React.createElement("b", null, "あがり連荘"), "＝流局したら必ず親が流れる（一般的）。", React.createElement("br", null), React.createElement("b", null, "テンパイ連荘"), "＝親がテンパイしていれば続行。", React.createElement("br", null), React.createElement("b", null, "無条件連荘"), "＝ノーテンでも親が続く。", React.createElement("br", null), "どのルールでもノーテン罰符3,000点のやりとりと本場の加算は行われます。")), item("複数人が同時にロン", React.createElement(React.Fragment, null, "1つの捨て牌に2人以上がロンを宣言したときの扱いです。", React.createElement("br", null), React.createElement("b", null, "頭ハネ"), "＝放銃者に近い1人だけがアガリ。", React.createElement("br", null), React.createElement("b", null, "ダブロン"), "＝2人まで、", React.createElement("b", null, "トリプルロン"), "＝3人まで同時に成立。", React.createElement("br", null), "複数で成立する場合、本場と供託は放銃者から反時計回りに最も近い人が受け取ります。")), item("食いタン", React.createElement(React.Fragment, null, "鳴いた状態のタンヤオを認めるかどうかです。認めないルールでは、鳴くと役なしになる場面が増えるため打ち方が大きく変わります。")), item("後付け", React.createElement(React.Fragment, null, "鳴いた時点で役がなくても、アガリの瞬間（ロン・ツモの牌が入った時点）に役が確定していればアガリを認めるかどうかです。役牌をあとからポンして役を付ける「役牌バック」や、役の付く側の牌でだけアガれる「片アガリ」がこれにあたります。認めないルール（先付け）では、鳴いた時点で役が確定している必要があります。")), item("切り上げ満貫", React.createElement(React.Fragment, null, "4翻30符（子7,700・親11,600）と3翻60符を、満貫として扱うルールです。ONにすると子8,000・親12,000になります。")), item("ダブル役満", React.createElement(React.Fragment, null, "大三元＋字一色のように役満が複合したとき、2倍（子64,000・親96,000）・3倍で計算するルールです。OFFでは複合してもシングル役満（子32,000・親48,000）です。「役を選んで計算する」から役満を複数選ぶと適用されます。")), item("オーラスは親トップで終了", React.createElement(React.Fragment, null, "最終局で親がトップの状態でアガる、またはテンパイで流局したときに、そこで対局を終える設定です（アガリやめ・テンパイやめ）。OFFにすると親がトップでも連荘を続けます。")), item("トビで終了", React.createElement(React.Fragment, null, "誰かの持ち点が0未満になった時点で対局を終える設定です。ハコ下・ドボンとも呼びます。OFFにするとマイナスのまま最後まで打ち切ります。")), item("持ち点・返し点", React.createElement(React.Fragment, null, "持ち点は開始時の点数、返し点は精算の基準です。差額の合計がオカとしてトップに渡ります。持ち点と返し点が同じならオカは発生しません。")), React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
         marginTop: 12,
         lineHeight: 1.9
       }
-    }, "ここに無いルール（責任払い、途中流局、四家立直、九種九牌、三家和など）はアプリでは自動処理していません。 必要な場合は結果画面の「点数を直接修正」で調整するか、その局を流局として入力してください。")));
+    }, "ここに無いルール（責任払い、途中流局、四家立直、九種九牌、三家和など）はアプリでは自動処理していません。 必要な場合は結果画面の「点数を直接修正」で調整するか、その局を流局として入力してください。"), React.createElement("button", {
+      onClick: () => setOpen(false),
+      style: {
+        width: "100%",
+        marginTop: 16,
+        padding: "14px 8px",
+        borderRadius: 11,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.tx,
+        fontSize: 15,
+        fontWeight: 700
+      }
+    }, "閉じる")))));
   };
   const UmaOkaSettings = ({
     rules: r,

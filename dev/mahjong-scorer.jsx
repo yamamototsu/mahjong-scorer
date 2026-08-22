@@ -1057,14 +1057,37 @@ export default function MahjongScorer() {
     );
     return (
       <div style={{ marginTop: 12 }}>
-        <button onClick={() => setOpen(v => !v)} style={{
+        <button onClick={() => setOpen(true)} style={{
           width: "100%", padding: "13px 8px", borderRadius: 9, cursor: "pointer",
           border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
           fontSize: 15, fontWeight: 700,
-        }}>{open ? "ルールの説明を閉じる" : "それぞれのルールの説明を見る"}</button>
+        }}>それぞれのルールの説明を見る</button>
 
         {open && (
-          <div style={{ marginTop: 10, padding: "4px 14px 14px", borderRadius: 11, background: t.sf, border: `1px solid ${t.bd}` }}>
+          <div onClick={() => setOpen(false)} style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150,
+            display: "flex", alignItems: "flex-start", justifyContent: "center",
+            padding: "20px 16px",
+            paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+            paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+            overflowY: "auto",
+          }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400 }}>
+            <div style={{ ...card, padding: "4px 14px 14px" }}>
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              // 左右に少し余白を持たせつつ、外側へ引いて本文と行頭を揃える
+              padding: "12px 4px 10px", margin: "0 -4px",
+              borderBottom: `1px solid ${t.bd}44`,
+              position: "sticky", top: 0, background: t.card, zIndex: 1,
+            }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: t.tx }}>それぞれのルールの説明</div>
+              <button style={{
+                background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer",
+                width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+              }} onClick={() => setOpen(false)}>✕</button>
+            </div>
+
             {item("流局したときの親", <>誰もアガらずに流局したとき、親を続けるかどうかです。<br />
               <b>あがり連荘</b>＝流局したら必ず親が流れる（一般的）。<br />
               <b>テンパイ連荘</b>＝親がテンパイしていれば続行。<br />
@@ -1093,6 +1116,13 @@ export default function MahjongScorer() {
             <div style={{ fontSize: 11, color: t.dm, marginTop: 12, lineHeight: 1.9 }}>
               ここに無いルール（責任払い、途中流局、四家立直、九種九牌、三家和など）はアプリでは自動処理していません。
               必要な場合は結果画面の「点数を直接修正」で調整するか、その局を流局として入力してください。
+            </div>
+
+            <button onClick={() => setOpen(false)} style={{
+              width: "100%", marginTop: 16, padding: "14px 8px", borderRadius: 11, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 15, fontWeight: 700,
+            }}>閉じる</button>
+            </div>
             </div>
           </div>
         )}
