@@ -2112,6 +2112,39 @@ export default function MahjongScorer() {
     });
     return m;
   })();
+  // 手牌は4面子＋雀頭。役ごとに「最低これだけの面子を使う」を数え、4を超える
+  // 組み合わせは成立しない（例: 一気通貫3面子 + 役牌3種3面子 = 6面子）。
+  // 2つずつの矛盾（YAKU_CONFLICT_PAIRS）では見つからない、3つ以上の重ね過ぎを防ぐ。
+  const YAKU_SETS_NEEDED = (names) => {
+    const has = (n) => names.includes(n);
+    // 順子を使う役。同じ順子を共有できるので、合計ではなく一番多いものを取る
+    // （例: 三色同順3 + 一盃口2 は、順子4組で両立する）
+    const runNeed = Math.max(
+      has("平和（ピンフ）") ? 4 : 0,
+      has("二盃口（リャンペーコー）") ? 4 : 0,
+      has("一気通貫（イッキツウカン）") ? 3 : 0,
+      has("三色同順（サンショクドウジュン）") ? 3 : 0,
+      has("一盃口（イーペーコー）") ? 2 : 0,
+    );
+    // 役牌はそれぞれ別の刻子。場風と自風は同じ牌のことがある（連風牌）ので合わせて1
+    const yakuhai =
+      (has("役牌 白（ハク）") ? 1 : 0) +
+      (has("役牌 發（ハツ）") ? 1 : 0) +
+      (has("役牌 中（チュン）") ? 1 : 0) +
+      ((has("場風牌（バカゼハイ）") || has("自風牌（ジカゼハイ）")) ? 1 : 0) +
+      (has("小三元（ショウサンゲン）") ? 2 : 0);
+    // 刻子をまとめて使う役は、役牌の刻子と重なりうるので一番多いものを取る
+    const tripletNeed = Math.max(
+      has("対々和（トイトイ）") ? 4 : 0,
+      has("三暗刻（サンアンコー）") ? 3 : 0,
+      has("三色同刻（サンショクドウコー）") ? 3 : 0,
+      has("三槓子（サンカンツ）") ? 3 : 0,
+      yakuhai,
+    );
+    return runNeed + tripletNeed;
+  };
+  const YAKU_SETS_MAX = 4;
+
   const YAKUMAN_LABEL = (h) => h >= 39 ? "トリプル役満" : h >= 26 ? "ダブル役満" : "役満";
 
   const YakuPicker = ({ onConfirm, onCancel, isTsumo, isParent, lockedRiichi }) => {
@@ -2376,6 +2409,16 @@ export default function MahjongScorer() {
                             return !conf.includes(n);
                           });
                           next = [...next, y.name];
+                          // 4面子に収まらなくなったら、古く選んだ役から外していく
+                          // （例: 一気通貫＋役牌3種は6面子ぶん必要で成立しない）
+                          if (!isYk) {
+                            while (YAKU_SETS_NEEDED(next) > YAKU_SETS_MAX) {
+                              const drop = next.findIndex(n =>
+                                n !== y.name && YAKU_SETS_NEEDED(next.filter(x => x !== n)) < YAKU_SETS_NEEDED(next));
+                              if (drop < 0) break;
+                              next = next.filter((_, k) => k !== drop);
+                            }
+                          }
                           // 白・發・中がそろったら大三元（役満）へ自動昇格
                           const dragons = ["役牌 白（ハク）", "役牌 發（ハツ）", "役牌 中（チュン）"];
                           if (dragons.every(d => next.includes(d))) {
