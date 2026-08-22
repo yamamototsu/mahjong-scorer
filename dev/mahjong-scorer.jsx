@@ -9196,8 +9196,10 @@ input, select { padding: 10px 14px; }
               )
             )}
             {tmWinStep === "how" && (
-              ronPick.length >= 2 ? (
-                /* 複数ロンではツモはありえない */
+              /* 放銃者を選んだら「確定」を出す。複数ロンでも同じ（先に複数ロンの
+                 案内を出していたため、選んでも確定ボタンに変わらなかった） */
+              ronPick.length >= 2 && ronLoserPick === null ? (
+                /* 複数ロンではツモはありえないので、放銃者を選ぶ案内だけ出す */
                 <div style={{
                   width: "100%", height: "100%", borderRadius: 16,
                   border: `2px dashed ${t.rd}77`, background: t.rdS,
