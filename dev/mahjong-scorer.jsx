@@ -292,15 +292,16 @@ export default function MahjongScorer() {
 
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
   // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
+  // 起動画面はタップするまで出したままにする（自動では切り替えない）
   const [booting, setBooting] = useState(true);
   // メニューが出そろったあとの目印。タイトルへ戻るたびに出現アニメーションが
   // 再生されないよう、これが立ったら演出は一切かけない
   const [introDone, setIntroDone] = useState(false);
   React.useEffect(() => {
-    const tm = setTimeout(() => setBooting(false), 2900);
-    const tm2 = setTimeout(() => setIntroDone(true), 3900);
-    return () => { clearTimeout(tm); clearTimeout(tm2); };
-  }, []);
+    if (booting) return;
+    const tm = setTimeout(() => setIntroDone(true), 1000);
+    return () => clearTimeout(tm);
+  }, [booting]);
 
   const [gameConfig, setGameConfig] = useState(null); // saved config after setup
   const [gameStarted, setGameStarted] = useState(false);
@@ -2456,8 +2457,16 @@ input, select { padding: 10px 14px; }
   100% { opacity: 0; }
 }
 @keyframes introZoom {
-  0%   { transform: scale(1.14); }
+  0%   { transform: scale(1.16); }
   100% { transform: scale(1); }
+}
+@keyframes tapHint {
+  0%   { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes tapPulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
 }
 @keyframes titlePop {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
@@ -5769,22 +5778,48 @@ input, select { padding: 10px 14px; }
             上下を暗く落として題字が読めるようにする */}
         {!introDone && (
           <div style={{
-            position: "fixed", left: 0, right: 0, bottom: 0, height: "54%", zIndex: 0,
+            position: "fixed", left: 0, right: 0, bottom: 0, height: "58%", zIndex: 0,
             pointerEvents: "none", overflow: "hidden",
-            WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 24%, #000 84%, transparent 100%)",
-            maskImage: "linear-gradient(to bottom, transparent 0%, #000 24%, #000 84%, transparent 100%)",
+            // 上のふちは暗闇に溶かして、題字と写真がぶつからないようにする
+            WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 30%, #000 90%, transparent 100%)",
+            maskImage: "linear-gradient(to bottom, transparent 0%, #000 30%, #000 90%, transparent 100%)",
             // 演出が終わったら、メニューが出るのに合わせて静かに消す
-            animation: intro ? "introPhoto 1.6s 0.55s ease-out both" : "introPhotoOut 0.9s ease-out both",
+            animation: intro ? "introPhoto 1.6s 0.35s ease-out both" : "introPhotoOut 0.9s ease-out both",
           }}>
             <div style={{
-              position: "absolute", inset: 0,
-              backgroundImage: `url(${INTRO_IMG})`, backgroundSize: "cover", backgroundPosition: "center 42%",
-              animation: "introZoom 7s ease-out both",
+              position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+              backgroundImage: `url(${INTRO_IMG})`, backgroundSize: "cover", backgroundPosition: "center",
+              animation: "introZoom 14s ease-out both",
             }} />
             <div style={{
-              position: "absolute", inset: 0,
-              background: "linear-gradient(to bottom, rgba(5,8,11,0.62) 0%, rgba(5,8,11,0.22) 45%, rgba(5,8,11,0.72) 100%)",
+              position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+              background: "linear-gradient(to bottom, rgba(5,8,11,0.85) 0%, rgba(5,8,11,0.30) 34%,"
+                + " rgba(5,8,11,0.24) 64%, rgba(5,8,11,0.70) 100%)",
             }} />
+          </div>
+        )}
+
+        {/* 画面のどこを押しても始められるようにする。タイトルの中身は画面下まで
+            届いていないので、受け皿を全面に敷く */}
+        {intro && (
+          <div onClick={() => setBooting(false)} style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 3, cursor: "pointer",
+          }} />
+        )}
+
+        {/* タップを促す表示（自動では切り替わらないので、押せることを伝える） */}
+        {intro && (
+          <div style={{
+            position: "fixed", left: 0, right: 0, bottom: "9%", zIndex: 4,
+            textAlign: "center", pointerEvents: "none",
+            animation: "tapHint 0.9s 2.0s ease-out both",
+          }}>
+            <span style={{
+              fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)", letterSpacing: "0.18em",
+              textShadow: "0 2px 10px rgba(0,0,0,0.8)",
+              animation: "tapPulse 2.2s 2.9s ease-in-out infinite",
+              display: "inline-block",
+            }}>Tap to start</span>
           </div>
         )}
         {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
