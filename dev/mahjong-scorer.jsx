@@ -4827,6 +4827,7 @@ input, select { padding: 10px 14px; }
   const [gEditId, setGEditId] = useState(null);       // 編集中のグループ（新規は null）
   const [gEditName, setGEditName] = useState("");
   const [gEditMembers, setGEditMembers] = useState([]);
+  const [gEditSize, setGEditSize] = useState(4);      // 4人グループ / 3人グループ
   const [editNameVal, setEditNameVal] = useState("");
 
   // ══════════════════════════════════
@@ -6225,7 +6226,7 @@ input, select { padding: 10px 14px; }
                 }}>👥</span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>グループ</div>
-                  <div style={{ fontSize: 11, color: t.dm }}>よく打つ4人の組み合わせ</div>
+                  <div style={{ fontSize: 11, color: t.dm }}>よく打つメンバーの組み合わせ（4人・3人）</div>
                 </div>
               </div>
               {groups.length === 0 && !gEditOpen && (
@@ -6239,7 +6240,13 @@ input, select { padding: 10px 14px; }
                   padding: "11px 0", borderBottom: `1px solid ${t.bd}33`,
                 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>{g.name}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: t.tx, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{g.name}</span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, color: t.dm, flexShrink: 0,
+                        border: `1px solid ${t.bd}`, borderRadius: 6, padding: "1px 6px",
+                      }}>{(g.members || []).length === 3 ? "三人" : "四人"}</span>
+                    </div>
                     <div style={{
                       fontSize: 11, color: t.dm, marginTop: 2,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
@@ -6247,7 +6254,9 @@ input, select { padding: 10px 14px; }
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     <button onClick={() => {
-                      setGEditId(g.id); setGEditName(g.name); setGEditMembers([...g.members]); setGEditOpen(true);
+                      setGEditId(g.id); setGEditName(g.name); setGEditMembers([...g.members]);
+                      setGEditSize((g.members || []).length === 3 ? 3 : 4);
+                      setGEditOpen(true);
                     }} style={{
                       background: "none", border: `1px solid ${t.bd}`, borderRadius: 8,
                       padding: "6px 11px", color: t.ac, fontSize: 11, cursor: "pointer",
@@ -6274,8 +6283,25 @@ input, select { padding: 10px 14px; }
                     placeholder="例: 金曜メンバー"
                     style={{ ...inputStyle, fontSize: 15, marginBottom: 12 }} />
 
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>人数</div>
+                  <div style={{ display: "flex", gap: 7, marginBottom: 12 }}>
+                    {[4, 3].map(n => (
+                      <button key={n} onClick={() => {
+                        setGEditSize(n);
+                        // 人数を減らしたときは、選びすぎたメンバーを後ろから外す
+                        if (gEditMembers.length > n) setGEditMembers(gEditMembers.slice(0, n));
+                      }} style={{
+                        flex: 1, padding: "10px 6px", borderRadius: 9, cursor: "pointer",
+                        border: `2px solid ${gEditSize === n ? t.ac : t.bd}`,
+                        background: gEditSize === n ? t.acS : "transparent",
+                        color: gEditSize === n ? t.ac : t.tx, fontSize: 13, fontWeight: 700,
+                        whiteSpace: "nowrap",
+                      }}>{n === 4 ? "四人麻雀" : "三人麻雀"}</button>
+                    ))}
+                  </div>
+
                   <div style={{ fontSize: 11, color: t.dm, marginBottom: 3 }}>
-                    メンバーを4人選ぶ（{gEditMembers.length}/4）
+                    メンバーを{gEditSize}人選ぶ（{gEditMembers.length}/{gEditSize}）
                   </div>
                   <div style={{ fontSize: 10, color: t.dm, marginBottom: 7, lineHeight: 1.7 }}>
                     ここに出るのは「プレイヤー名の登録」に入っている名前です。
@@ -6284,7 +6310,7 @@ input, select { padding: 10px 14px; }
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 12 }}>
                     {presetNames.map(nm => {
                       const on = gEditMembers.includes(nm);
-                      const full = gEditMembers.length >= 4 && !on;
+                      const full = gEditMembers.length >= gEditSize && !on;
                       return (
                         <button key={nm} onClick={() => setGEditMembers(
                           on ? gEditMembers.filter(x => x !== nm) : (full ? gEditMembers : [...gEditMembers, nm])
@@ -6298,7 +6324,7 @@ input, select { padding: 10px 14px; }
                       );
                     })}
                   </div>
-                  {presetNames.length < 4 && (
+                  {presetNames.length < gEditSize && (
                     <div style={{
                       padding: "11px 12px", marginBottom: 11, borderRadius: 9,
                       background: t.rdS, border: `1px solid ${t.rd}55`,
@@ -6307,7 +6333,7 @@ input, select { padding: 10px 14px; }
                         名前の登録が足りません
                       </div>
                       <div style={{ fontSize: 11, color: t.tx, lineHeight: 1.8, marginBottom: 9 }}>
-                        グループには4人必要ですが、登録されている名前は{presetNames.length}人ぶんです。
+                        グループには{gEditSize}人必要ですが、登録されている名前は{presetNames.length}人ぶんです。
                         先にプレイヤー名を登録してください。
                       </div>
                       <button onClick={() => {
@@ -6322,7 +6348,7 @@ input, select { padding: 10px 14px; }
 
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
-                      disabled={!gEditName.trim() || gEditMembers.length !== 4}
+                      disabled={!gEditName.trim() || gEditMembers.length !== gEditSize}
                       onClick={() => {
                         const entry = { name: gEditName.trim(), members: [...gEditMembers] };
                         if (gEditId) saveGroups(groups.map(x => x.id === gEditId ? { ...x, ...entry } : x));
@@ -6332,7 +6358,7 @@ input, select { padding: 10px 14px; }
                       style={{
                         flex: 1, padding: "12px 8px", borderRadius: 10, border: "none", cursor: "pointer",
                         background: t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
-                        opacity: (gEditName.trim() && gEditMembers.length === 4) ? 1 : 0.4,
+                        opacity: (gEditName.trim() && gEditMembers.length === gEditSize) ? 1 : 0.4,
                       }}>{gEditId ? "更新する" : "保存する"}</button>
                     <button onClick={() => { setGEditOpen(false); setGEditId(null); setGEditName(""); setGEditMembers([]); }}
                       style={{
@@ -6342,7 +6368,7 @@ input, select { padding: 10px 14px; }
                   </div>
                 </div>
               ) : (
-                <button onClick={() => { setGEditId(null); setGEditName(""); setGEditMembers([]); setGEditOpen(true); }}
+                <button onClick={() => { setGEditId(null); setGEditName(""); setGEditMembers([]); setGEditSize(4); setGEditOpen(true); }}
                   style={{
                     width: "100%", marginTop: 14, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
                     border: `1px dashed ${t.ac}77`, background: "transparent", color: t.ac,
