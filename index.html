@@ -734,9 +734,6 @@ function MahjongScorer() {
   const [draftRules, setDraftRules] = useState(loadDefaultRules);
   const [rulesSaved, setRulesSaved] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
-  React.useEffect(() => {
-    if (!lastRules) setRulesOpen(true);
-  }, [lastRules]);
   const rulesDirty = JSON.stringify(draftRules) !== JSON.stringify(defaultRules);
   const editDraft = patch => {
     setDraftRules(d => ({
@@ -16184,25 +16181,28 @@ input, select { padding: 10px 14px; }
       opacity: 0.85,
       whiteSpace: "nowrap"
     }
-  }, sub)))), lastRules && (() => {
-    const same = JSON.stringify(rules) === JSON.stringify(lastRules);
-    const sum = [lastRules.agariRenchan ? "あがり連荘" : lastRules.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘", lastRules.multiRon === "triple" ? "トリプルロン" : lastRules.multiRon === "double" ? "ダブロン" : "頭ハネ", lastRules.kuitan ? "食いタンあり" : "食いタンなし", lastRules.doubleYakuman ? "ダブル役満あり" : null, `持ち点${(lastRules.startPoints || 0).toLocaleString()}`].filter(Boolean).join(" ・ ");
+  }, sub)))), (() => {
+    const hasLast = !!lastRules;
+    const base = lastRules || defaultRules;
+    const same = JSON.stringify(rules) === JSON.stringify(base);
+    const ok = hasLast && same;
+    const sum = [base.agariRenchan ? "あがり連荘" : base.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘", base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ", base.kuitan ? "食いタンあり" : "食いタンなし", base.doubleYakuman ? "ダブル役満あり" : null, `持ち点${(base.startPoints || 0).toLocaleString()}`].filter(Boolean).join(" ・ ");
     return React.createElement("div", {
       style: {
         padding: 14,
         marginBottom: 18,
         borderRadius: 12,
-        background: same ? t.gnS : t.acS,
-        border: `1px solid ${same ? t.gn : t.ac}55`
+        background: ok ? t.gnS : t.acS,
+        border: `1px solid ${ok ? t.gn : t.ac}55`
       }
     }, React.createElement("div", {
       style: {
         fontSize: 12,
         fontWeight: 800,
-        color: same ? t.gn : t.ac,
+        color: ok ? t.gn : t.ac,
         marginBottom: 5
       }
-    }, same ? "✓ 前回と同じルールです" : "前回のルール"), React.createElement("div", {
+    }, !hasLast ? "初期設定ルール" : same ? "✓ 前回と同じルールです" : "前回のルール"), React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
@@ -16213,7 +16213,7 @@ input, select { padding: 10px 14px; }
       disabled: !matchType,
       onClick: () => {
         setRules({
-          ...lastRules
+          ...base
         });
         setSetupStep(0);
       },
@@ -16223,13 +16223,13 @@ input, select { padding: 10px 14px; }
         borderRadius: 10,
         cursor: matchType ? "pointer" : "default",
         border: "none",
-        background: same ? t.gn : t.ac,
+        background: ok ? t.gn : t.ac,
         color: "#fff",
         fontSize: 14,
         fontWeight: 800,
         opacity: matchType ? 1 : 0.4
       }
-    }, same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"), React.createElement("div", {
+    }, !hasLast ? "初期設定ルールでメンバー決定へ" : same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: matchType ? t.dm : t.gd,
@@ -16524,7 +16524,7 @@ input, select { padding: 10px 14px; }
       ...r,
       rateUnit: u
     }))
-  }))), (rulesOpen || !lastRules) && React.createElement("div", {
+  }))), rulesOpen && React.createElement("div", {
     style: {
       marginTop: 16
     }
