@@ -5923,7 +5923,7 @@ input, select { padding: 10px 14px; }
         {/* サブメニュー */}
         <div style={{ display: "flex", gap: 8, marginBottom: 8, ...reveal(2) }}>
           {subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league"))}
-          {subBtn("🔢", "1局戦", "点数計算", () => { resetCalc(); setView("calc"); })}
+          {subBtn("🔢", "一局計算", "翻・符から", () => { resetCalc(); setView("calc"); })}
           {subBtn("📋", "履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
         </div>
         <div style={{ display: "flex", gap: 8, ...reveal(3) }}>
@@ -6007,7 +6007,7 @@ input, select { padding: 10px 14px; }
               setView("game");
             }, true)}
 
-          {menuItem("▶", "対局", suspendedGame ? "※ 保留中の対局があります" : "対局の開始・1局戦・履歴", () => setHomeCat("play"))}
+          {menuItem("▶", "対局", suspendedGame ? "※ 保留中の対局があります" : "対局の開始・一局計算・履歴", () => setHomeCat("play"))}
           {menuItem("🎓", "練習問題", "点数計算・役・符を学ぶ", () => setHomeCat("practice"))}
           {menuItem("🎴", "麻雀の始め方", "席決め・配牌を図解で解説", () => {
             setView("startguide"); setGuideStep(0);
@@ -6050,7 +6050,7 @@ input, select { padding: 10px 14px; }
               setTableMode(true);
             })}
             {menuItem("🏆", "リーグ戦", "複数の対局を通して順位を争う", () => { setView("league"); })}
-            {menuItem("🔢", "1局戦", "翻・符から点数をすぐ計算", () => {
+            {menuItem("🔢", "一局計算", "翻・符から点数をすぐ計算", () => {
               setView("calc"); setCalcStep(0); setCTsumo(null); setCParent(null); setCHan(null); setCFu(null); resetFuGuide();
             })}
             {menuItem("📋", "対局履歴", `${gameHistory.length}件の記録`, () => {
