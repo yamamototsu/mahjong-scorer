@@ -769,6 +769,45 @@ function MahjongScorer() {
       localStorage.setItem("mj_riichi_voice", on ? "1" : "0");
     } catch {}
   };
+  const playTileSlap = () => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new AC();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const t0 = ctx.currentTime + 0.005;
+      const dur = 0.085;
+      const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 2600;
+      bp.Q.value = 0.9;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.5, t0);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(ctx.destination);
+      src.start(t0);
+      src.stop(t0 + dur);
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(190, t0);
+      osc.frequency.exponentialRampToValueAtTime(85, t0 + 0.13);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0.26, t0);
+      og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.15);
+      osc.connect(og);
+      og.connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.16);
+    } catch {}
+  };
   const playVoice = (text, done) => {
     let called = false;
     const finish = () => {
@@ -780,28 +819,37 @@ function MahjongScorer() {
       finish();
       return;
     }
-    try {
-      const syn = window.speechSynthesis;
-      if (!syn) {
-        finish();
-        return;
-      }
-      syn.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = "ja-JP";
-      u.rate = 1.05;
-      u.pitch = 1.0;
+    const withSlap = text === "ツモ" || text === "ロン";
+    if (withSlap) playTileSlap();
+    const speak = () => {
       try {
-        const ja = (syn.getVoices() || []).find(v => v && /^ja/i.test(v.lang || ""));
-        if (ja) u.voice = ja;
-      } catch {}
-      u.onend = finish;
-      u.onerror = finish;
-      syn.speak(u);
-      if (done) setTimeout(finish, 1400);
-    } catch {
-      finish();
-    }
+        const syn = window.speechSynthesis;
+        if (!syn) {
+          finish();
+          return;
+        }
+        syn.cancel();
+        const u = new SpeechSynthesisUtterance(text + "！");
+        u.lang = "ja-JP";
+        u.rate = 1.15;
+        u.pitch = 0.95;
+        u.volume = 1;
+        try {
+          const ja = (syn.getVoices() || []).filter(v => v && /^ja/i.test(v.lang || ""));
+          if (ja.length) {
+            const better = ja.find(v => /拡張|premium|enhanced|neural/i.test(v.name || ""));
+            u.voice = better || ja[0];
+          }
+        } catch {}
+        u.onend = finish;
+        u.onerror = finish;
+        syn.speak(u);
+      } catch {
+        finish();
+      }
+    };
+    if (withSlap) setTimeout(speak, 130);else speak();
+    if (done) setTimeout(finish, 1700);
   };
   const toggleDeclaredRiichi = i => {
     setDeclaredRiichi(prev => {
