@@ -9808,6 +9808,7 @@ input, select { padding: 10px 14px; }
   const [gEditId, setGEditId] = useState(null);
   const [gEditName, setGEditName] = useState("");
   const [gEditMembers, setGEditMembers] = useState([]);
+  const [gEditSize, setGEditSize] = useState(4);
   const [editNameVal, setEditNameVal] = useState("");
   const [diceOpen, setDiceOpen] = useState(false);
   const [diceVals, setDiceVals] = useState([1, 1]);
@@ -12195,7 +12196,7 @@ input, select { padding: 10px 14px; }
         fontSize: 11,
         color: t.dm
       }
-    }, "よく打つ4人の組み合わせ"))), groups.length === 0 && !gEditOpen && React.createElement("div", {
+    }, "よく打つメンバーの組み合わせ（4人・3人）"))), groups.length === 0 && !gEditOpen && React.createElement("div", {
       style: {
         fontSize: 12,
         color: t.dm,
@@ -12220,9 +12221,28 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 14,
         fontWeight: 700,
-        color: t.tx
+        color: t.tx,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
       }
-    }, g.name), React.createElement("div", {
+    }, React.createElement("span", {
+      style: {
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, g.name), React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: t.dm,
+        flexShrink: 0,
+        border: `1px solid ${t.bd}`,
+        borderRadius: 6,
+        padding: "1px 6px"
+      }
+    }, (g.members || []).length === 3 ? "三人" : "四人")), React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
@@ -12242,6 +12262,7 @@ input, select { padding: 10px 14px; }
         setGEditId(g.id);
         setGEditName(g.name);
         setGEditMembers([...g.members]);
+        setGEditSize((g.members || []).length === 3 ? 3 : 4);
         setGEditOpen(true);
       },
       style: {
@@ -12302,9 +12323,39 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 11,
         color: t.dm,
+        marginBottom: 5
+      }
+    }, "人数"), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 7,
+        marginBottom: 12
+      }
+    }, [4, 3].map(n => React.createElement("button", {
+      key: n,
+      onClick: () => {
+        setGEditSize(n);
+        if (gEditMembers.length > n) setGEditMembers(gEditMembers.slice(0, n));
+      },
+      style: {
+        flex: 1,
+        padding: "10px 6px",
+        borderRadius: 9,
+        cursor: "pointer",
+        border: `2px solid ${gEditSize === n ? t.ac : t.bd}`,
+        background: gEditSize === n ? t.acS : "transparent",
+        color: gEditSize === n ? t.ac : t.tx,
+        fontSize: 13,
+        fontWeight: 700,
+        whiteSpace: "nowrap"
+      }
+    }, n === 4 ? "四人麻雀" : "三人麻雀"))), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
         marginBottom: 3
       }
-    }, "メンバーを4人選ぶ（", gEditMembers.length, "/4）"), React.createElement("div", {
+    }, "メンバーを", gEditSize, "人選ぶ（", gEditMembers.length, "/", gEditSize, "）"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -12320,7 +12371,7 @@ input, select { padding: 10px 14px; }
       }
     }, presetNames.map(nm => {
       const on = gEditMembers.includes(nm);
-      const full = gEditMembers.length >= 4 && !on;
+      const full = gEditMembers.length >= gEditSize && !on;
       return React.createElement("button", {
         key: nm,
         onClick: () => setGEditMembers(on ? gEditMembers.filter(x => x !== nm) : full ? gEditMembers : [...gEditMembers, nm]),
@@ -12339,7 +12390,7 @@ input, select { padding: 10px 14px; }
           whiteSpace: "nowrap"
         }
       }, on ? "✓ " : "", nm);
-    })), presetNames.length < 4 && React.createElement("div", {
+    })), presetNames.length < gEditSize && React.createElement("div", {
       style: {
         padding: "11px 12px",
         marginBottom: 11,
@@ -12361,7 +12412,7 @@ input, select { padding: 10px 14px; }
         lineHeight: 1.8,
         marginBottom: 9
       }
-    }, "グループには4人必要ですが、登録されている名前は", presetNames.length, "人ぶんです。 先にプレイヤー名を登録してください。"), React.createElement("button", {
+    }, "グループには", gEditSize, "人必要ですが、登録されている名前は", presetNames.length, "人ぶんです。 先にプレイヤー名を登録してください。"), React.createElement("button", {
       onClick: () => {
         setGEditOpen(false);
         setGEditId(null);
@@ -12388,7 +12439,7 @@ input, select { padding: 10px 14px; }
         gap: 8
       }
     }, React.createElement("button", {
-      disabled: !gEditName.trim() || gEditMembers.length !== 4,
+      disabled: !gEditName.trim() || gEditMembers.length !== gEditSize,
       onClick: () => {
         const entry = {
           name: gEditName.trim(),
@@ -12416,7 +12467,7 @@ input, select { padding: 10px 14px; }
         color: "#fff",
         fontSize: 14,
         fontWeight: 800,
-        opacity: gEditName.trim() && gEditMembers.length === 4 ? 1 : 0.4
+        opacity: gEditName.trim() && gEditMembers.length === gEditSize ? 1 : 0.4
       }
     }, gEditId ? "更新する" : "保存する"), React.createElement("button", {
       onClick: () => {
@@ -12439,6 +12490,7 @@ input, select { padding: 10px 14px; }
         setGEditId(null);
         setGEditName("");
         setGEditMembers([]);
+        setGEditSize(4);
         setGEditOpen(true);
       },
       style: {
