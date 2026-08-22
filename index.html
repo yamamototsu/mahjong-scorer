@@ -12351,12 +12351,13 @@ input, select { padding: 10px 14px; }
         fontSize: 11,
         color: t.dm
       }
-    }, "新しい対局を始める時の初期設定"))), React.createElement("div", {
+    }, "新しい対局を始める時の初期設定"))), React.createElement(RuleHelp, null), React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
         color: t.dm,
-        marginBottom: 6
+        marginBottom: 6,
+        marginTop: 16
       }
     }, "流局したときの親"), [{
       key: "agari",
@@ -12549,7 +12550,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginTop: 3
       }
-    }, hint))), React.createElement(RuleHelp, null))), secHdr("uma", "🏅", "ウマ・オカ設定", "順位点・持ち点・返し点"), setOpen === "uma" && React.createElement("div", {
+    }, hint))))), secHdr("uma", "🏅", "ウマ・オカ設定", "順位点・持ち点・返し点"), setOpen === "uma" && React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -13528,12 +13529,13 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginBottom: 12
       }
-    }, "リーグ中の全対局に適用されます"), React.createElement("div", {
+    }, "リーグ中の全対局に適用されます"), React.createElement(RuleHelp, null), React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
         color: t.dm,
-        marginBottom: 6
+        marginBottom: 6,
+        marginTop: 16
       }
     }, "流局したときの親"), [{
       key: "agari",
@@ -13741,7 +13743,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginTop: 3
       }
-    }, hint))), React.createElement(RuleHelp, null)), !canSave && React.createElement("div", {
+    }, hint)))), !canSave && React.createElement("div", {
       style: {
         padding: "12px 14px",
         marginBottom: 10,
@@ -16179,9 +16181,10 @@ input, select { padding: 10px 14px; }
       transform: rulesOpen ? "rotate(180deg)" : "none",
       transition: "transform 0.2s"
     }
-  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, React.createElement(RuleHelp, null), React.createElement("div", {
     style: {
-      marginBottom: 8
+      marginBottom: 8,
+      marginTop: 16
     }
   }, React.createElement("div", {
     style: {
@@ -16440,7 +16443,7 @@ input, select { padding: 10px 14px; }
       ...r,
       rateUnit: u
     }))
-  })), React.createElement(RuleHelp, null)), (rulesOpen || !lastRules) && React.createElement("div", {
+  }))), (rulesOpen || !lastRules) && React.createElement("div", {
     style: {
       marginTop: 16
     }
