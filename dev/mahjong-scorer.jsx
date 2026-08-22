@@ -1072,6 +1072,27 @@ export default function MahjongScorer() {
     splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
   }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
 
+  // 局や本場が変わったら、次の局が始まる前に演出を挟む
+  const prevRoundKey = React.useRef(null);
+  React.useEffect(() => {
+    if (!gameStarted || gameFinished) { prevRoundKey.current = null; return; }
+    const key = `${roundWind}/${dealerIdx}/${honba}`;
+    // 対局開始の1回目は開始の演出が出るので、ここでは出さない
+    if (prevRoundKey.current === null) { prevRoundKey.current = key; return; }
+    if (prevRoundKey.current === key) return;
+    prevRoundKey.current = key;
+    // 過去の局を修正しているときは出さない
+    if (reviewing || correctingIdx !== null || correctingDrawIdx !== null) return;
+    setStartSplash({
+      league: null, matchType,
+      date: gameConfig?.date || gameDate,
+      seats: [],
+      round: { wind: roundWind, dealer: dealerIdx, honba },
+    });
+    if (splashTimer.current) clearTimeout(splashTimer.current);
+    splashTimer.current = setTimeout(() => setStartSplash(null), 2200);
+  }, [roundWind, dealerIdx, honba, gameStarted, gameFinished]);
+
   // ── Theme ──
   const t = { bg: "#0c1117", sf: "#161d27", card: "#1c2533", ac: "#5b9bff", acS: "rgba(91,155,255,0.14)", gn: "#34d872", gnS: "rgba(52,216,114,0.14)", rd: "#f26d6d", rdS: "rgba(242,109,109,0.14)", gd: "#f2c14e", gdS: "rgba(242,193,78,0.14)", tx: "#f5f8fc", dm: "#9db0c7", bd: "#35415a" };
 
@@ -5431,6 +5452,19 @@ input, select { padding: 10px 14px; }
                 height: 2, background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
                 margin: "18px auto", width: "78%", animation: "splashLine 0.7s 0.2s ease-out both",
               }} />
+              {sp.round ? (
+                /* 局や本場が変わったとき。名前のかわりに局と本場を出す */
+                <div style={{ animation: "splashRow 0.45s 0.3s ease-out both" }}>
+                  <div style={{
+                    fontSize: 40, fontWeight: 900, color: "#fff", lineHeight: 1.2,
+                    letterSpacing: "0.06em", textShadow: "0 2px 20px rgba(0,0,0,0.6)",
+                  }}>{sp.round.wind}{sp.round.dealer + 1}局</div>
+                  <div style={{
+                    fontSize: 20, fontWeight: 800, marginTop: 8, letterSpacing: "0.08em",
+                    color: sp.round.honba > 0 ? t.gd : "rgba(255,255,255,0.65)",
+                  }}>{sp.round.honba}本場</div>
+                </div>
+              ) : (
               <div style={{ display: "inline-block", textAlign: "left" }}>
                 {sp.seats.map((x, k) => (
                   <div key={k} style={{
@@ -5448,6 +5482,7 @@ input, select { padding: 10px 14px; }
                   </div>
                 ))}
               </div>
+              )}
             </>
           )}
         </div>
