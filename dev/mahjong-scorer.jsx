@@ -559,11 +559,15 @@ export default function MahjongScorer() {
     setRiichiVoiceOn(on);
     try { localStorage.setItem("mj_riichi_voice", on ? "1" : "0"); } catch {}
   };
-  const playVoice = (text) => {
-    if (!riichiVoiceOn) return;
+  // done を渡すと、読み上げが終わってから実行する（読み上げの途中で画面が変わらないように）。
+  // 読み上げなし・音声が使えない端末では、待たずにその場で実行する
+  const playVoice = (text, done) => {
+    let called = false;
+    const finish = () => { if (called) return; called = true; if (done) done(); };
+    if (!riichiVoiceOn) { finish(); return; }
     try {
       const syn = window.speechSynthesis;
-      if (!syn) return;
+      if (!syn) { finish(); return; }
       syn.cancel();   // 続けて押されたときに重ならないようにする
       const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
@@ -575,8 +579,12 @@ export default function MahjongScorer() {
         const ja = (syn.getVoices() || []).find(v => v && /^ja/i.test(v.lang || ""));
         if (ja) u.voice = ja;
       } catch {}
+      u.onend = finish;
+      u.onerror = finish;
       syn.speak(u);
-    } catch {}
+      // 保険: 終了が通知されない端末でも画面が止まらないようにする
+      if (done) setTimeout(finish, 1400);
+    } catch { finish(); }
   };
 
   const toggleDeclaredRiichi = (i) => {
@@ -9167,22 +9175,24 @@ input, select { padding: 10px 14px; }
                 /* 放銃者を選んだら確定ボタン */
                 <button onClick={(e) => {
                   e.stopPropagation();
-                  playVoice("ロン");
                   const i = ronLoserPick;
-                  setTmWinStep(null);
-                  setGTsumo(false); setGLoser(i);
-                  if (ronPick.length >= 2) {
-                    const order = [...ronPick].sort((x, y) => ((x - i + PC) % PC) - ((y - i + PC) % PC));
-                    setMultiRon({ loser: i, queue: order, done: [] });
-                    setGWinner(order[0]);
-                  } else {
-                    setMultiRon(null);
-                    // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
-                    if (ronPick.length === 1) setGWinner(ronPick[0]);
-                  }
-                  setRonLoserPick(null);
-                  setGHan(null); setGFu(null); setFuGuide(null);
-                  setShowGW(true); setGStep(5);
+                  // 「ロン」と読み上げ終わってから次の画面へ
+                  playVoice("ロン", () => {
+                    setTmWinStep(null);
+                    setGTsumo(false); setGLoser(i);
+                    if (ronPick.length >= 2) {
+                      const order = [...ronPick].sort((x, y) => ((x - i + PC) % PC) - ((y - i + PC) % PC));
+                      setMultiRon({ loser: i, queue: order, done: [] });
+                      setGWinner(order[0]);
+                    } else {
+                      setMultiRon(null);
+                      // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
+                      if (ronPick.length === 1) setGWinner(ronPick[0]);
+                    }
+                    setRonLoserPick(null);
+                    setGHan(null); setGFu(null); setFuGuide(null);
+                    setShowGW(true); setGStep(5);
+                  });
                 }} style={{
                   width: "100%", height: "100%", borderRadius: 16, cursor: "pointer",
                   border: "none", background: t.ac, color: "#fff",
@@ -9194,11 +9204,13 @@ input, select { padding: 10px 14px; }
               ) : (
                 <button onClick={(e) => {
                   e.stopPropagation();
-                  playVoice("ツモ");
-                  setGTsumo(true); setGLoser(null); setTmWinStep(null);
-                  // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
-                  if (ronPick.length === 1) setGWinner(ronPick[0]);
-                  setShowGW(true); setGStep(5);
+                  // 「ツモ」と読み上げ終わってから次の画面へ
+                  playVoice("ツモ", () => {
+                    setGTsumo(true); setGLoser(null); setTmWinStep(null);
+                    // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
+                    if (ronPick.length === 1) setGWinner(ronPick[0]);
+                    setShowGW(true); setGStep(5);
+                  });
                 }} style={{
                   width: "100%", height: "100%", borderRadius: 16, cursor: "pointer",
                   border: `2px solid ${t.gn}`, background: t.gnS,
@@ -9472,8 +9484,8 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>STEP 2</div>
                 <div style={question}>あがり方は？</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-                  <button style={bigBtn(t.gn, t.gnS)} onClick={() => { playVoice("ツモ"); setGTsumo(true); setGStep(4); }}>ツモ</button>
-                  <button style={bigBtn(t.rd, t.rdS)} onClick={() => { playVoice("ロン"); setGTsumo(false); setGStep(3); }}>ロン</button>
+                  <button style={bigBtn(t.gn, t.gnS)} onClick={() => playVoice("ツモ", () => { setGTsumo(true); setGStep(4); })}>ツモ</button>
+                  <button style={bigBtn(t.rd, t.rdS)} onClick={() => playVoice("ロン", () => { setGTsumo(false); setGStep(3); })}>ロン</button>
                 </div>
               </div>
             )}
