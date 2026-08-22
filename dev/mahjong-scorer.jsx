@@ -6243,7 +6243,10 @@ input, select { padding: 10px 14px; }
                 </div>
               </div>
 
-              <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 6 }}>流局したときの親</div>
+              {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
+              <RuleHelp />
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 6, marginTop: 16 }}>流局したときの親</div>
               {[
                 { key: "agari",  label: "あがり連荘",   desc: "流局したら親は必ず流れる" },
                 { key: "tenpai", label: "テンパイ連荘", desc: "親がテンパイなら続行" },
@@ -6330,8 +6333,6 @@ input, select { padding: 10px 14px; }
                   {hint && <div style={{ fontSize: 10, color: t.dm, marginTop: 3 }}>{hint}</div>}
                 </div>
               ))}
-
-              <RuleHelp />
 
             </div>
             </>)}
@@ -6831,8 +6832,11 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. 対局ルール</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>リーグ中の全対局に適用されます</div>
 
+          {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
+          <RuleHelp />
+
           {/* 流局したときの親 */}
-          <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 6 }}>流局したときの親</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 6, marginTop: 16 }}>流局したときの親</div>
           {[
             { key: "agari",  label: "あがり連荘",   desc: "流局したら親は必ず流れる" },
             { key: "tenpai", label: "テンパイ連荘", desc: "親がテンパイなら続行" },
@@ -6913,7 +6917,6 @@ input, select { padding: 10px 14px; }
             {hint && <div style={{ fontSize: 10, color: t.dm, marginTop: 3 }}>{hint}</div>}
             </div>
           ))}
-          <RuleHelp />
         </div>
 
         {!canSave && (
@@ -8214,7 +8217,10 @@ input, select { padding: 10px 14px; }
           </button>
 
           {rulesOpen && (<>
-          <div style={{ marginBottom: 8 }}>
+          {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
+          <RuleHelp />
+
+          <div style={{ marginBottom: 8, marginTop: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>流局したときの親</div>
             <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>誰もアガらずに流局した場合、親を続けるかどうか</div>
             {[
@@ -8320,8 +8326,6 @@ input, select { padding: 10px 14px; }
             <RateSetting rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
               unit={rules.rateUnit} onUnitChange={(u) => setRules(r => ({ ...r, rateUnit: u }))} />
           </div>
-
-          <RuleHelp />
           </>)}
 
 
