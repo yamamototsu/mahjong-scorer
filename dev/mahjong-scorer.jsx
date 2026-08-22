@@ -2433,10 +2433,6 @@ input, select { padding: 10px 14px; }
   0%, 100% { text-shadow: 0 0 18px rgba(234,179,8,0.35), 0 3px 14px rgba(0,0,0,0.7); }
   50%      { text-shadow: 0 0 34px rgba(234,179,8,0.7), 0 3px 14px rgba(0,0,0,0.7); }
 }
-@keyframes bootFade {
-  0%, 72% { opacity: 1; }
-  100%    { opacity: 0; visibility: hidden; }
-}
 @keyframes bootShine {
   0%   { opacity: 0; transform: translateX(-115%); }
   35%  { opacity: 1; }
@@ -5457,7 +5453,9 @@ input, select { padding: 10px 14px; }
                   gap: 3, width: "100%", maxWidth: "100%",
                 }}>
                   <span style={{
-                    fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.6 : 0)))))),
+                    // 「親」のぶんを見込んで少しだけ縮める。はみ出しは末尾の省略で受けるので
+                    // 縮めすぎない（0.6にすると6文字の親名で10px未満になる）
+                    fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
                     fontWeight: 800, color: "#fff", lineHeight: 1.15,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
                   }}>{players[i]}</span>
@@ -5740,7 +5738,7 @@ input, select { padding: 10px 14px; }
       : { animation: `menuIn 0.5s ${(i * 0.07).toFixed(2)}s cubic-bezier(.2,.9,.3,1) both` };
 
     return (
-      <div style={{
+      <div onClick={intro ? () => setBooting(false) : undefined} style={{
         ...body, minHeight: "100%", display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: 8,
         background: intro
           ? "radial-gradient(circle at 50% 44%, rgba(22,74,50,0.55) 0%, rgba(10,15,20,0) 62%)"
@@ -5754,35 +5752,48 @@ input, select { padding: 10px 14px; }
           transition: "transform 0.85s cubic-bezier(.2,.9,.3,1)",
         }}>
           {/* lineHeight は 1 にしない（絵文字の字面が行の高さを超えてはみ出す） */}
-          <div style={{ fontSize: 40, lineHeight: 1.1, animation: "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both" }}>🀄</div>
+          <div style={{
+            fontSize: 40, lineHeight: 1.1,
+            animation: intro ? "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both" : undefined,
+          }}>🀄</div>
           <div style={{
             fontSize: 16, fontWeight: 800, color: t.gd, letterSpacing: "0.22em", marginTop: 9,
-            animation: "bootSub 0.7s 0.3s ease-out both",
+            animation: intro ? "bootSub 0.7s 0.3s ease-out both" : undefined,
+            opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>麻雀スコアラー</div>
-          <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 6, position: "relative" }}>
+          {/* 題字。光の帯の基準にするため、文字の幅ぴったりの枠で包む */}
+          <div style={{
+            display: "inline-flex", justifyContent: "center", gap: 2, marginTop: 6,
+            position: "relative", overflow: "hidden", borderRadius: 8, padding: "2px 6px",
+          }}>
             {["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => (
               <span key={i} style={{
                 fontSize: 34, fontWeight: 900, color: "#fff", lineHeight: 1.2,
-                animation: `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both`
-                  + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`,
+                animation: intro
+                  ? `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both`
+                    + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`
+                  : undefined,
                 textShadow: "0 0 22px rgba(234,179,8,0.28), 0 3px 12px rgba(0,0,0,0.6)",
               }}>{c}</span>
             ))}
-            {/* 文字の上を一度だけ光が走る */}
-            <span style={{
-              position: "absolute", inset: "-6% -12%", pointerEvents: "none", borderRadius: 8,
-              background: "linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.5) 50%, transparent 62%)",
-              animation: "bootShine 1.1s 1.35s ease-out both",
-            }} />
+            {/* 文字の上を一度だけ光が走る（枠の中だけを通るので、外に長方形が出ない） */}
+            {intro && (
+              <span style={{
+                position: "absolute", top: 0, bottom: 0, left: 0, right: 0, pointerEvents: "none",
+                background: "linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.5) 50%, transparent 62%)",
+                animation: "bootShine 1.1s 1.35s ease-out both",
+              }} />
+            )}
           </div>
           <div style={{
             height: 2, width: 200, margin: "12px auto 9px",
             background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-            animation: "bootLine 0.7s 1.15s ease-out both",
+            animation: intro ? "bootLine 0.7s 1.15s ease-out both" : undefined,
           }} />
           <div style={{
             fontSize: 10, color: t.dm, marginTop: 2,
-            animation: "bootSub 0.8s 1.7s ease-out both",
+            animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
+            opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>卓の真ん中に置いて使えます</div>
         </div>
 
@@ -8184,12 +8195,11 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>
               {matchType === "tonpu" ? "東4局" : matchType === "zenchan" ? "北4局" : "南4局"}で親がアガった、または流局で親が続く場合の扱い
             </div>
-            {toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({ ...r, orasYame: r.orasYame === false })))}
-            <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 6 }}>
-              {rules.orasYame !== false
+            {/* 説明文は toggleRow に渡す（外に置くと区切り線が文字の上を横切る） */}
+            {toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({ ...r, orasYame: r.orasYame === false })),
+              rules.orasYame !== false
                 ? "ON：親がトップの状態でアガる／テンパイで流局すると、そこで対局終了（アガリやめ・テンパイやめ）。トップでなければ連荘して続行します。"
-                : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。"}
-            </div>
+                : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。")}
           </div>
 
           <div style={{ marginBottom: 8, marginTop: 16 }}>

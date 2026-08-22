@@ -1444,7 +1444,7 @@ function MahjongScorer() {
     borderRadius: 12,
     background: on ? t.acS : "transparent",
     color: on ? t.ac : t.tx,
-    fontSize: 19,
+    fontSize: "clamp(14px, 5.2vw, 19px)",
     fontWeight: 800,
     cursor: "pointer",
     textAlign: "center",
@@ -1873,13 +1873,16 @@ function MahjongScorer() {
     backgroundPosition: "right 12px center",
     paddingRight: 32
   };
-  const toggleRow = (label, on, onToggle) => React.createElement("div", {
+  const toggleRow = (label, on, onToggle, desc) => React.createElement("div", {
+    style: {
+      padding: "10px 0",
+      borderBottom: `1px solid ${t.bd}33`
+    }
+  }, React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
-      justifyContent: "space-between",
-      padding: "10px 0",
-      borderBottom: `1px solid ${t.bd}33`
+      justifyContent: "space-between"
     }
   }, React.createElement("span", {
     style: {
@@ -1893,6 +1896,7 @@ function MahjongScorer() {
       borderRadius: 13,
       border: "none",
       cursor: "pointer",
+      flexShrink: 0,
       background: on ? t.ac : t.bd,
       position: "relative",
       transition: "background 0.2s"
@@ -1908,7 +1912,14 @@ function MahjongScorer() {
       left: on ? 25 : 3,
       transition: "left 0.2s"
     }
-  })));
+  }))), desc && React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      lineHeight: 1.7,
+      marginTop: 4
+    }
+  }, desc));
   const Dots = ({
     total,
     cur
@@ -4577,10 +4588,6 @@ input, select { padding: 10px 14px; }
   0%, 100% { text-shadow: 0 0 18px rgba(234,179,8,0.35), 0 3px 14px rgba(0,0,0,0.7); }
   50%      { text-shadow: 0 0 34px rgba(234,179,8,0.7), 0 3px 14px rgba(0,0,0,0.7); }
 }
-@keyframes bootFade {
-  0%, 72% { opacity: 1; }
-  100%    { opacity: 0; visibility: hidden; }
-}
 @keyframes bootShine {
   0%   { opacity: 0; transform: translateX(-115%); }
   35%  { opacity: 1; }
@@ -6996,7 +7003,7 @@ input, select { padding: 10px 14px; }
   }, YAKU_CATEGORIES.map(cat => React.createElement("button", {
     key: cat,
     style: {
-      padding: "6px 14px",
+      padding: "8px 14px",
       borderRadius: 8,
       fontSize: 12,
       fontWeight: 700,
@@ -10914,20 +10921,32 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("div", {
         style: {
-          fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length))))),
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "center",
+          gap: 3,
+          width: "100%",
+          maxWidth: "100%"
+        }
+      }, React.createElement("span", {
+        style: {
+          fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
           fontWeight: 800,
           color: "#fff",
           lineHeight: 1.15,
           whiteSpace: "nowrap",
-          maxWidth: "100%"
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          minWidth: 0
         }
-      }, players[i], i === dealerIdx ? React.createElement("span", {
+      }, players[i]), i === dealerIdx && React.createElement("span", {
         style: {
           fontSize: fs(10),
           color: t.gd,
-          marginLeft: 3
+          lineHeight: 1.15,
+          flexShrink: 0
         }
-      }, "親") : null), React.createElement("div", {
+      }, "親")), React.createElement("div", {
         style: {
           fontSize: fs(19),
           fontWeight: 900,
@@ -10940,7 +10959,7 @@ input, select { padding: 10px 14px; }
           fontSize: fs(10),
           color: t.gd,
           fontWeight: 700,
-          lineHeight: 1.3
+          lineHeight: 1.25
         }
       }, isWin ? "アガリ" : " "));
     })), React.createElement("button", {
@@ -11449,6 +11468,7 @@ input, select { padding: 10px 14px; }
       animation: `menuIn 0.5s ${(i * 0.07).toFixed(2)}s cubic-bezier(.2,.9,.3,1) both`
     };
     return React.createElement("div", {
+      onClick: intro ? () => setBooting(false) : undefined,
       style: {
         ...body,
         minHeight: "100%",
@@ -11470,7 +11490,7 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 40,
         lineHeight: 1.1,
-        animation: "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both"
+        animation: intro ? "bootTile 0.75s cubic-bezier(.2,1.4,.4,1) both" : undefined
       }
     }, "🀄"), React.createElement("div", {
       style: {
@@ -11479,15 +11499,19 @@ input, select { padding: 10px 14px; }
         color: t.gd,
         letterSpacing: "0.22em",
         marginTop: 9,
-        animation: "bootSub 0.7s 0.3s ease-out both"
+        animation: intro ? "bootSub 0.7s 0.3s ease-out both" : undefined,
+        opacity: intro ? undefined : 0.9
       }
     }, "麻雀スコアラー"), React.createElement("div", {
       style: {
-        display: "flex",
+        display: "inline-flex",
         justifyContent: "center",
         gap: 2,
         marginTop: 6,
-        position: "relative"
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: 8,
+        padding: "2px 6px"
       }
     }, ["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => React.createElement("span", {
       key: i,
@@ -11496,15 +11520,17 @@ input, select { padding: 10px 14px; }
         fontWeight: 900,
         color: "#fff",
         lineHeight: 1.2,
-        animation: `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both` + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`,
+        animation: intro ? `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both` + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite` : undefined,
         textShadow: "0 0 22px rgba(234,179,8,0.28), 0 3px 12px rgba(0,0,0,0.6)"
       }
-    }, c)), React.createElement("span", {
+    }, c)), intro && React.createElement("span", {
       style: {
         position: "absolute",
-        inset: "-6% -12%",
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
         pointerEvents: "none",
-        borderRadius: 8,
         background: "linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.5) 50%, transparent 62%)",
         animation: "bootShine 1.1s 1.35s ease-out both"
       }
@@ -11514,14 +11540,15 @@ input, select { padding: 10px 14px; }
         width: 200,
         margin: "12px auto 9px",
         background: `linear-gradient(90deg, transparent, ${t.gd}, transparent)`,
-        animation: "bootLine 0.7s 1.15s ease-out both"
+        animation: intro ? "bootLine 0.7s 1.15s ease-out both" : undefined
       }
     }), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
         marginTop: 2,
-        animation: "bootSub 0.8s 1.7s ease-out both"
+        animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
+        opacity: intro ? undefined : 0.9
       }
     }, "卓の真ん中に置いて使えます")), suspendedGame && React.createElement("button", {
       onClick: resumeGame,
@@ -12971,7 +12998,8 @@ input, select { padding: 10px 14px; }
         fontSize: 11,
         cursor: "pointer",
         textDecoration: "underline",
-        marginTop: 10
+        marginTop: 6,
+        padding: "9px 10px"
       }
     }, "👤 名前を追加・編集する")), React.createElement("div", {
       style: {
@@ -15378,7 +15406,7 @@ input, select { padding: 10px 14px; }
     key: f,
     style: {
       ...numBtn(cFu === f),
-      fontSize: f >= 100 ? 16 : 19
+      fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)"
     },
     onClick: () => {
       setCFu(f);
@@ -16231,14 +16259,7 @@ input, select { padding: 10px 14px; }
   }, matchType === "tonpu" ? "東4局" : matchType === "zenchan" ? "北4局" : "南4局", "で親がアガった、または流局で親が続く場合の扱い"), toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({
     ...r,
     orasYame: r.orasYame === false
-  }))), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      lineHeight: 1.7,
-      marginTop: 6
-    }
-  }, rules.orasYame !== false ? "ON：親がトップの状態でアガる／テンパイで流局すると、そこで対局終了（アガリやめ・テンパイやめ）。トップでなければ連荘して続行します。" : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。")), React.createElement("div", {
+  })), rules.orasYame !== false ? "ON：親がトップの状態でアガる／テンパイで流局すると、そこで対局終了（アガリやめ・テンパイやめ）。トップでなければ連荘して続行します。" : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。")), React.createElement("div", {
     style: {
       marginBottom: 8,
       marginTop: 16
@@ -16254,61 +16275,19 @@ input, select { padding: 10px 14px; }
   }, "その他"), toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({
     ...r,
     kuitan: !r.kuitan
-  }))), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      paddingLeft: 2,
-      marginTop: -4,
-      marginBottom: 6,
-      lineHeight: 1.7
-    }
-  }, "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます"), toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({
+  })), "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます"), toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({
     ...r,
     atozuke: !r.atozuke
-  }))), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      paddingLeft: 2,
-      marginTop: -4,
-      marginBottom: 6,
-      lineHeight: 1.7
-    }
-  }, "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け"), toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({
+  })), "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け"), toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({
     ...r,
     kiriage: !r.kiriage
-  }))), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      paddingLeft: 2,
-      marginTop: -4,
-      marginBottom: 6
-    }
-  }, "ONにすると4翻30符・3翻60符を満貫扱い"), toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({
+  })), "ONにすると4翻30符・3翻60符を満貫扱い"), toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({
     ...r,
     doubleYakuman: !r.doubleYakuman
-  }))), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      paddingLeft: 2,
-      marginTop: -4,
-      marginBottom: 6
-    }
-  }, "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます"), toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({
+  })), "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます"), toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({
     ...r,
     tobiEnd: r.tobiEnd === false
-  }))), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      paddingLeft: 2,
-      marginTop: -4,
-      marginBottom: 6
-    }
-  }, "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")), React.createElement("div", {
+  })), "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")), React.createElement("div", {
     style: {
       marginTop: 18,
       marginBottom: 8
@@ -16384,7 +16363,8 @@ input, select { padding: 10px 14px; }
       color: t.ac,
       fontSize: 11,
       cursor: "pointer",
-      textDecoration: "underline"
+      textDecoration: "underline",
+      padding: "9px 10px"
     }
   }, "👤 リストの名前を編集")), React.createElement("div", {
     style: {
@@ -18241,7 +18221,9 @@ input, select { padding: 10px 14px; }
   }, "流局"), React.createElement("button", {
     style: {
       ...actionBtn(),
-      flex: "0 0 92px"
+      flex: "0 0 92px",
+      padding: "15px 4px",
+      whiteSpace: "nowrap"
     },
     onClick: () => setShowRuleCheck(true)
   }, "📋 ルール")), React.createElement("button", {
@@ -18646,7 +18628,7 @@ input, select { padding: 10px 14px; }
     key: f,
     style: {
       ...numBtn(gFu === f),
-      fontSize: f >= 100 ? 16 : 19
+      fontSize: f >= 100 ? "clamp(12px, 4.4vw, 16px)" : "clamp(14px, 5.2vw, 19px)"
     },
     onClick: () => {
       setGFu(f);
