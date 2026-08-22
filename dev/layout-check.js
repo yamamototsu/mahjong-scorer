@@ -98,9 +98,13 @@ const audit = () => {
     };
     const worst = Math.max(over.top, over.bottom, over.left, over.right);
     if (worst > EPS) { out.overflow.push({ text: label(el), 親: label(p), はみ出し: over }); continue; }
-    // 枠のふちに貼りついていないか（枠線や背景がある要素のみ対象）
-    const hasBox = ps.borderTopWidth !== '0px' || (ps.backgroundColor && ps.backgroundColor !== 'rgba(0, 0, 0, 0)');
-    if (hasBox) {
+    // 枠のふちに貼りついていないか。
+    // 区切り線（上だけの罫線）は「枠」ではないので、背景があるか四辺そろって
+    // 枠線がある場合だけを対象にする
+    const hasBg = ps.backgroundColor && ps.backgroundColor !== 'rgba(0, 0, 0, 0)' && ps.backgroundColor !== 'transparent';
+    const allBorders = ['borderTopWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderRightWidth']
+      .every(k => parseFloat(ps[k]) > 0);
+    if (hasBg || allBorders) {
       const pad = Math.min(-over.top, -over.bottom, -over.left, -over.right);
       if (pad < MIN_PAD) out.padding.push({ text: label(el), 親: label(p), 余白: +pad.toFixed(1) });
     }
@@ -142,7 +146,8 @@ const audit = () => {
     const s = getComputedStyle(el);
     if (s.whiteSpace === 'nowrap' || s.whiteSpace === 'pre') continue;
     const txt = (el.textContent || '').trim();
-    if (txt.length < 2 || txt.length > 40) continue;
+    // 短い語（ボタンの見出しなど）が途中で折れるのが問題。長い文章の折り返しは普通なので見ない
+    if (txt.length < 2 || txt.length > 20) continue;
     const lh = parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.2;
     const r = rect(el);
     const lineN = Math.round(r.h / lh);

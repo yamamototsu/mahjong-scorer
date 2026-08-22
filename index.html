@@ -11852,7 +11852,90 @@ input, select { padding: 10px 14px; }
       setRulesSaved(false);
       setView("home");
       setHomeCat("settings");
-    })));
+    })), React.createElement("div", {
+      style: {
+        ...card,
+        marginTop: 18,
+        padding: "14px 16px 16px",
+        ...reveal(4)
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 800,
+        color: t.gd,
+        letterSpacing: "0.08em",
+        marginBottom: 4
+      }
+    }, "使い方"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 12
+      }
+    }, "スマホを卓の真ん中に置いたまま、4人で見て使えます"), [["🀄", "卓の真ん中に置く", "4人ぶんの点数がそれぞれの席の向きで表示されます。対局中は画面が動かないので、置きっぱなしで大丈夫です"], ["👥", "メンバーと席を決める", "名前を登録しておけばワンタップ。牌を引いて席を決めることもできます"], ["🔴", "リーチはボタンを押すだけ", "1,000点の減算と供託への持ち越しは自動です。「リーチ」と読み上げます"], ["🏆", "アガリは選ぶだけ", "あがった人・ツモかロン・翻・符を選ぶと点数を計算します。誰がいくら払うかは矢印で表示します"], ["📋", "流局・本場・連荘も自動", "テンパイした人を選べば、ノーテン罰符と親の継続を判定します"]].map(([icon, title, desc], i) => React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        paddingTop: i === 0 ? 0 : 11,
+        marginTop: i === 0 ? 0 : 11,
+        borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 15,
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        background: t.acS,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 1
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 13,
+        fontWeight: 700,
+        color: t.tx,
+        lineHeight: 1.5
+      }
+    }, title), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginTop: 2
+      }
+    }, desc)))), React.createElement("button", {
+      onClick: () => {
+        setView("startguide");
+        setGuideStep(0);
+      },
+      style: {
+        width: "100%",
+        marginTop: 14,
+        padding: "12px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: "transparent",
+        color: t.ac,
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "麻雀そのものの始め方を見る")));
   };
   const renderHome = () => {
     const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
