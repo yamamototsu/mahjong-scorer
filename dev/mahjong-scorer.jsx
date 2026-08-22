@@ -5849,9 +5849,11 @@ input, select { padding: 10px 14px; }
               }}>{tile.ch}</span>
             ))}
           </div>
+          {/* 明朝体にするのは起動演出の間だけ。メニューではゴシックに戻す */}
           <div style={{
-            fontSize: 16, fontWeight: 700, color: t.gd, letterSpacing: "0.22em", marginTop: 11,
-            fontFamily: MINCHO,
+            fontSize: 16, fontWeight: intro ? 700 : 800, color: t.gd, letterSpacing: "0.22em",
+            marginTop: intro ? 11 : 9,
+            fontFamily: intro ? MINCHO : undefined,
             animation: intro ? "bootSub 0.7s 0.3s ease-out both" : undefined,
             opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>麻雀スコアラー</div>
@@ -5862,8 +5864,9 @@ input, select { padding: 10px 14px; }
           }}>
             {["卓", "上", "ポ", "ン", "づ", "け"].map((c, i) => (
               <span key={i} style={{
-                fontSize: 34, fontWeight: 700, color: "#fff", lineHeight: 1.25,
-                fontFamily: MINCHO,
+                fontSize: 34, fontWeight: intro ? 700 : 900, color: "#fff",
+                lineHeight: intro ? 1.25 : 1.2,
+                fontFamily: intro ? MINCHO : undefined,
                 animation: intro
                   ? `bootChar 0.5s ${0.5 + i * 0.1}s cubic-bezier(.2,1.1,.35,1) both`
                     + `, bootGlow 2.6s ${1.3 + i * 0.05}s ease-in-out infinite`
@@ -5886,7 +5889,8 @@ input, select { padding: 10px 14px; }
             animation: intro ? "bootLine 0.7s 1.15s ease-out both" : undefined,
           }} />
           <div style={{
-            fontSize: 11, color: t.dm, marginTop: 2, fontFamily: MINCHO,
+            fontSize: intro ? 11 : 10, color: t.dm, marginTop: 2,
+            fontFamily: intro ? MINCHO : undefined,
             animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
             opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>卓の真ん中に置いて使えます</div>
