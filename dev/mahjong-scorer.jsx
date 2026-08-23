@@ -6317,7 +6317,7 @@ input, select { padding: 10px 14px; }
                 {rankPeekGold && ptOf ? (
                   <span style={{ textAlign: "right", flexShrink: 0 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: t.dm, fontVariantNumeric: "tabular-nums", display: "block" }}>
-                      {ptOf[r.i] > 0 ? "+" : ""}{ptOf[r.i]}pt
+                      {ptOf[r.i] > 0 ? "+" : ""}{(ptOf[r.i] * 1000).toLocaleString()}<span style={{ fontSize: 10, marginLeft: 1 }}>点</span>
                     </span>
                     <span style={{ fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums",
                       color: ptOf[r.i] > 0 ? t.gd : ptOf[r.i] < 0 ? t.rd : t.dm }}>
@@ -6349,7 +6349,7 @@ input, select { padding: 10px 14px; }
           )}
           {rankPeekGold && ptOf && (
             <div style={{ fontSize: 13, color: t.dm, textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
-              いま終局した場合のポイント（ウマ・オカ込み）を{gameConfig?.rules?.rateUnit || "G"}に換算した値です
+              いま終局した場合の点数（ウマ・オカ込み）を{gameConfig?.rules?.rateUnit || "G"}に換算した値です
             </div>
           )}
           <button style={{

@@ -12176,7 +12176,12 @@ input, select { padding: 10px 14px; }
           fontVariantNumeric: "tabular-nums",
           display: "block"
         }
-      }, ptOf[r.i] > 0 ? "+" : "", ptOf[r.i], "pt"), React.createElement("span", {
+      }, ptOf[r.i] > 0 ? "+" : "", (ptOf[r.i] * 1000).toLocaleString(), React.createElement("span", {
+        style: {
+          fontSize: 10,
+          marginLeft: 1
+        }
+      }, "点")), React.createElement("span", {
         style: {
           fontSize: 15,
           fontWeight: 900,
@@ -12229,7 +12234,7 @@ input, select { padding: 10px 14px; }
         marginTop: 6,
         lineHeight: 1.6
       }
-    }, "いま終局した場合のポイント（ウマ・オカ込み）を", gameConfig?.rules?.rateUnit || "G", "に換算した値です"), React.createElement("button", {
+    }, "いま終局した場合の点数（ウマ・オカ込み）を", gameConfig?.rules?.rateUnit || "G", "に換算した値です"), React.createElement("button", {
       style: {
         width: "100%",
         marginTop: 8,
