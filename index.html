@@ -16330,7 +16330,8 @@ input, select { padding: 10px 14px; }
     style: card
   }, React.createElement(Back, {
     onClick: () => {
-      setView("menu");
+      setHomeCat(null);
+      setView("title");
     }
   }), React.createElement(Dots, {
     total: 5,
@@ -20787,7 +20788,7 @@ input, select { padding: 10px 14px; }
       gap: 8
     }
   }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) ? React.createElement("button", {
-    onClick: () => setView("home"),
+    onClick: () => setView(view === "names" ? namesBackTo : "home"),
     style: {
       background: t.card,
       border: `1px solid ${t.bd}`,

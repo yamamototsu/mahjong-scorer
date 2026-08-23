@@ -10763,7 +10763,7 @@ input, select { padding: 10px 14px; }
           {view !== "home" && !(view === "game" && gameFinished)
             && !(view === "game" && !gameStarted) ? (
             <button
-              onClick={() => setView("home")}
+              onClick={() => setView(view === "names" ? namesBackTo : "home")}
               style={{
                 background: t.card, border: `1px solid ${t.bd}`, borderRadius: 10,
                 padding: "7px 12px", color: t.ac, fontSize: 13, fontWeight: 700,
