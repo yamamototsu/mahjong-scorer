@@ -11321,11 +11321,11 @@ input, select { padding: 10px 14px; }
     const win = posOf(gWinner);
     const fs = px => `max(${Math.min(px, 10)}px, calc(${boxW} * ${(px / 366).toFixed(5)}))`;
     const extOf = i => Math.abs(posOf(i).rot) % 180 === 90 ? {
-      hw: 11,
-      hh: 15
+      hw: 13,
+      hh: 19
     } : {
-      hw: 15,
-      hh: 11
+      hw: 19,
+      hh: 13
     };
     const edgeOf = (c, ux, uy, e, margin) => {
       const tx = Math.abs(ux) < 1e-6 ? Infinity : e.hw / Math.abs(ux);
@@ -11412,8 +11412,8 @@ input, select { padding: 10px 14px; }
           borderRadius: 12,
           background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
           border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
-          width: "30%",
-          height: "22%",
+          width: "38%",
+          height: "26%",
           boxSizing: "border-box",
           display: "flex",
           flexDirection: "column",
@@ -11464,6 +11464,7 @@ input, select { padding: 10px 14px; }
           maxWidth: "100%",
           overflow: "hidden",
           textOverflow: "ellipsis",
+          letterSpacing: "-0.3px",
           color: isWin ? t.gd : "#ff8a8a"
         }
       }, subs.length ? subs.join("・") : "　"));

@@ -5841,8 +5841,8 @@ input, select { padding: 10px 14px; }
     // 小さい画面でも文字は10px未満にしない（名前は末尾の省略で受ける）。
     // 余白などもとから10px未満の指定には下限をかけない（枠の内側が狭くなるため）
     const fs = (px) => `max(${Math.min(px, 10)}px, calc(${boxW} * ${(px / 366).toFixed(5)}))`;
-    // パネルの見た目の半径（幅30% × 高さ22%。左右の席は90度回転しているので入れ替わる）
-    const extOf = (i) => (Math.abs(posOf(i).rot) % 180 === 90 ? { hw: 11, hh: 15 } : { hw: 15, hh: 11 });
+    // パネルの見た目の半径（幅38% × 高さ26%。左右の席は90度回転しているので入れ替わる）
+    const extOf = (i) => (Math.abs(posOf(i).rot) % 180 === 90 ? { hw: 13, hh: 19 } : { hw: 19, hh: 13 });
     // 中心から (ux,uy) 方向へ進んで、パネルの枠を抜ける点
     const edgeOf = (c, ux, uy, e, margin) => {
       const tx = Math.abs(ux) < 1e-6 ? Infinity : e.hw / Math.abs(ux);
@@ -5911,7 +5911,7 @@ input, select { padding: 10px 14px; }
                 textAlign: "center", padding: `${fs(5)} ${fs(6)}`, borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
-                width: "30%", height: "22%", boxSizing: "border-box",
+                width: "38%", height: "26%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               }}>
                 {/* 名前と「親」を並べても枠の幅を超えないようにする。
@@ -5938,7 +5938,7 @@ input, select { padding: 10px 14px; }
                 {/* 本場・リーチ棒の内訳。無い席は空白1文字で高さを揃える */}
                 <div style={{
                   fontSize: fs(10), fontWeight: 700, lineHeight: 1.25, whiteSpace: "nowrap",
-                  maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis",
+                  maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.3px",
                   color: isWin ? t.gd : "#ff8a8a",
                 }}>{subs.length ? subs.join("・") : "　"}</div>
               </div>
