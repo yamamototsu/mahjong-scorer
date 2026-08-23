@@ -11320,14 +11320,16 @@ input, select { padding: 10px 14px; }
               const sorted = g.players.slice(0, g.finalScores.length).map((p, i) => ({ name: p, score: g.finalScores[i] })).sort((a, b) => b.score - a.score);
               const sel = histSelMode && histSel.includes(g.id);
               return (
-                <button
+                <div
                   key={g.id}
+                  role={histSelMode ? "button" : undefined}
                   onClick={() => {
+                    // 詳細はカードの「詳細を見る」ボタンから開く（カード全体のタップは集計の選択のみ）
                     if (histSelMode) setHistSel(prev => prev.includes(g.id) ? prev.filter(x => x !== g.id) : [...prev, g.id]);
-                    else setHistoryDetail(g);
                   }}
                   style={{
-                    ...card, width: "100%", textAlign: "left", cursor: "pointer", padding: 16, transition: "all 0.12s",
+                    ...card, width: "100%", textAlign: "left", padding: 16, transition: "all 0.12s",
+                    cursor: histSelMode ? "pointer" : "default",
                     ...(sel ? { border: `2px solid ${t.ac}`, background: t.acS } : {}),
                   }}
                 >
@@ -11365,8 +11367,18 @@ input, select { padding: 10px 14px; }
                       </span>
                     ))}
                   </div>
-                  <div style={{ fontSize: 11, color: t.dm, marginTop: 6 }}>{g.rounds.length}局</div>
-                </button>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                    <span style={{ fontSize: 11, color: t.dm }}>{g.rounds.length}局</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setHistoryDetail(g); }}
+                      style={{
+                        padding: "8px 16px", borderRadius: 8, cursor: "pointer",
+                        border: `1px solid ${t.ac}`, background: "transparent", color: t.ac,
+                        fontSize: 12, fontWeight: 700,
+                      }}
+                    >詳細を見る</button>
+                  </div>
+                </div>
               );
             })
           )}
