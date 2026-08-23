@@ -685,6 +685,7 @@ export default function MahjongScorer() {
   };
 
   // 局の読み上げ（東一局 一本場 など）。麻雀の読みで発音させるためカタカナで渡す
+  // （収録音声が再生できない端末用のフォールバック）
   const roundKana = (wind, dealer, honba2) => {
     const W = { 東: "トン", 南: "ナン", 西: "シャー", 北: "ペー" };
     const K = ["イッ", "ニー", "サン", "スー"];
@@ -694,8 +695,7 @@ export default function MahjongScorer() {
     const h = honba2 > 0 ? (H[honba2] || `${honba2}ホンバ`) : "";
     return h ? `${k}、${h}` : k;
   };
-  const playRoundVoice = (wind, dealer, honba2, force) => {
-    if (!force && !voiceRoundOn) return;
+  const speakRound = (wind, dealer, honba2) => {
     try {
       const syn = window.speechSynthesis;
       if (!syn) return;
@@ -713,6 +713,58 @@ export default function MahjongScorer() {
       } catch {}
       syn.speak(u);
     } catch {}
+  };
+
+  // 局の読み上げの収録音声（東・南・西・北／1〜4局／オーラス／1〜10本場）。
+  // 部品をつないで「なん・にきょく・いっぽんば」のように順に再生する
+  const ROUND_DIR = "assets/voice/round/";
+  const ROUND_WIND_FILES = { 東: "ton.mp3", 南: "nan.mp3", 西: "sha.mp3", 北: "pei.mp3" };
+  const roundAudioRef = React.useRef({});
+  const roundSeqRef = React.useRef(0);
+  const roundAudioFor = (file) => {
+    try {
+      if (!roundAudioRef.current[file]) {
+        const a = new Audio(ROUND_DIR + file);
+        a.preload = "auto";
+        roundAudioRef.current[file] = a;
+      }
+      return roundAudioRef.current[file];
+    } catch { return null; }
+  };
+  React.useEffect(() => {
+    [...Object.values(ROUND_WIND_FILES), "kyoku1.mp3", "kyoku2.mp3", "kyoku3.mp3", "kyoku4.mp3",
+      "oorasu.mp3", ...Array.from({ length: 10 }, (_, i) => `honba${i + 1}.mp3`)].forEach(roundAudioFor);
+  }, []);
+  const playRoundVoice = (wind, dealer, honba2, force) => {
+    if (!force && !voiceRoundOn) return;
+    // 最終局は「オーラス」と読む
+    const mt = gameConfig?.matchType;
+    const isLast = !!mt && wind === LAST_WIND(mt) && dealer === PC - 1;
+    const files = [];
+    if (isLast) files.push("oorasu.mp3");
+    else if (ROUND_WIND_FILES[wind] && dealer >= 0 && dealer < 4) files.push(ROUND_WIND_FILES[wind], `kyoku${dealer + 1}.mp3`);
+    if (honba2 > 0 && honba2 <= 10) files.push(`honba${honba2}.mp3`);
+    if (!files.length) { speakRound(wind, dealer, honba2); return; }
+
+    // 前の読み上げが残っていたら止めて、新しい列を順に再生する
+    const seq = ++roundSeqRef.current;
+    Object.values(roundAudioRef.current).forEach(a => { try { a.pause(); } catch {} });
+    let failed = false;
+    const fail = () => { if (!failed && seq === roundSeqRef.current) { failed = true; speakRound(wind, dealer, honba2); } };
+    let i = 0;
+    const next = () => {
+      if (seq !== roundSeqRef.current || i >= files.length) return;
+      const a = roundAudioFor(files[i++]);
+      if (!a) { fail(); return; }
+      try {
+        a.currentTime = 0;
+        a.onended = next;
+        a.onerror = fail;
+        const p = a.play();
+        if (p && p.catch) p.catch(fail);
+      } catch { fail(); }
+    };
+    next();
   };
 
   const toggleDeclaredRiichi = (i) => {
@@ -6806,14 +6858,19 @@ input, select { padding: 10px 14px; }
                 <div style={{ padding: "10px 0" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 8 }}>チョンボ罰符の既定額（1,000点刻み）</div>
                   {[
-                    ["chomboOya", "親のチョンボ → 子に払う額", 4000],
-                    ["chomboKoOya", "子のチョンボ → 親に払う額", 4000],
-                    ["chomboKoKo", "子のチョンボ → 子に払う額", 2000],
-                  ].map(([key, label, def]) => {
+                    ["chomboOya", "親のチョンボ → 子に", 4000, 3],
+                    ["chomboKoOya", "子のチョンボ → 親に", 4000, 1],
+                    ["chomboKoKo", "子のチョンボ → 子に", 2000, 2],
+                  ].map(([key, label, def, mult]) => {
                     const cur = draftRules[key] ?? def;
                     return (
                       <div key={key} style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, color: t.tx, marginBottom: 5 }}>{label}</div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
+                          <span style={{ fontSize: 12, color: t.tx }}>{label}</span>
+                          <span style={{ fontSize: 11, color: t.gd, fontWeight: 700, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                            {cur.toLocaleString()}×{mult}
+                          </span>
+                        </div>
                         <div style={{ display: "flex", gap: 5 }}>
                           {[0, 1000, 2000, 3000, 4000].map(v => (
                             <button key={v} onClick={() => editDraft({ [key]: v })} style={{
@@ -6827,8 +6884,9 @@ input, select { padding: 10px 14px; }
                       </div>
                     );
                   })}
-                  <div style={{ fontSize: 10, color: t.dm, marginTop: 4 }}>
-                    標準は満貫払い相当（親のチョンボ 4,000ずつ＝計12,000／子のチョンボ 親4,000・子2,000＝計8,000）
+                  <div style={{ fontSize: 10, color: t.dm, marginTop: 4, lineHeight: 1.7 }}>
+                    標準は満貫払い相当（親のチョンボ 4,000×3＝12,000／子のチョンボ 親4,000×1＋子2,000×2＝8,000）。
+                    三人麻雀は子の人数ぶんになります（親×2・子チョンボは親×1＋子×1）
                   </div>
                 </div>
               )}
@@ -6924,8 +6982,8 @@ input, select { padding: 10px 14px; }
                 </div>
               ))}
               <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
-                リーチ・ロン・ツモは収録した掛け声を再生します（再生できない端末では読み上げで代用）。
-                局の読み上げは端末に入っている音声を使います。音が出ないときは、本体の消音（マナーモード）が
+                掛け声（リーチ・ロン・ツモ）と局の読み上げは収録した音声を再生します
+                （再生できない端末では端末の読み上げで代用）。音が出ないときは、本体の消音（マナーモード）が
                 入っていないか、音量が下がっていないかを確かめてください。
               </div>
             </div>
