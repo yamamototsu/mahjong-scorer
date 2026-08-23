@@ -14378,46 +14378,49 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginBottom: 7
       }
-    }, "第", lg.games.length - gi, "戦 ・ ", g.date, g.matchType && ` ・ ${MATCH_LABEL(g.matchType)}`), g.players.map((nm, i) => React.createElement("div", {
-      key: i,
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "4px 0"
-      }
-    }, React.createElement("span", {
-      style: {
-        width: 20,
-        fontSize: 12,
-        fontWeight: 800,
-        color: g.ranks[i] === 1 ? t.gd : t.dm
-      }
-    }, g.ranks[i], "位"), React.createElement("span", {
-      style: {
-        flex: 1,
-        fontSize: 13,
-        color: t.tx,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      }
-    }, nm), React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: t.dm,
-        fontVariantNumeric: "tabular-nums"
-      }
-    }, g.scores[i].toLocaleString()), React.createElement("span", {
-      style: {
-        width: 52,
-        textAlign: "right",
-        fontSize: 13,
-        fontWeight: 800,
-        fontVariantNumeric: "tabular-nums",
-        color: g.pts[i] > 0 ? t.gn : g.pts[i] < 0 ? t.rd : t.tx
-      }
-    }, g.pts[i] > 0 ? "+" : "", g.pts[i]))), React.createElement("button", {
+    }, "第", lg.games.length - gi, "戦 ・ ", g.date, g.matchType && ` ・ ${MATCH_LABEL(g.matchType)}`), g.players.map((_, i) => i).sort((a, b) => (g.ranks[a] || 9) - (g.ranks[b] || 9)).map(i => {
+      const nm = g.players[i];
+      return React.createElement("div", {
+        key: i,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "4px 0"
+        }
+      }, React.createElement("span", {
+        style: {
+          width: 20,
+          fontSize: 12,
+          fontWeight: 800,
+          color: g.ranks[i] === 1 ? t.gd : t.dm
+        }
+      }, g.ranks[i], "位"), React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 13,
+          color: t.tx,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, nm), React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: t.dm,
+          fontVariantNumeric: "tabular-nums"
+        }
+      }, g.scores[i].toLocaleString()), React.createElement("span", {
+        style: {
+          width: 52,
+          textAlign: "right",
+          fontSize: 13,
+          fontWeight: 800,
+          fontVariantNumeric: "tabular-nums",
+          color: g.pts[i] > 0 ? t.gn : g.pts[i] < 0 ? t.rd : t.tx
+        }
+      }, g.pts[i] > 0 ? "+" : "", g.pts[i]));
+    }), React.createElement("button", {
       onClick: () => {
         if (!window.confirm("この対局の記録を削除しますか？")) return;
         const idx = lg.games.length - 1 - gi;
@@ -14433,7 +14436,8 @@ input, select { padding: 10px 14px; }
         fontSize: 10,
         cursor: "pointer",
         textDecoration: "underline",
-        marginTop: 6
+        marginTop: 2,
+        padding: "10px 6px 8px 0"
       }
     }, "この記録を削除")))), leagueTab === "info" && React.createElement("div", {
       style: {

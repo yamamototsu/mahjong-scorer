@@ -7349,7 +7349,10 @@ input, select { padding: 10px 14px; }
                   第{lg.games.length - gi}戦 ・ {g.date}
                   {g.matchType && ` ・ ${MATCH_LABEL(g.matchType)}`}
                 </div>
-                {g.players.map((nm, i) => (
+                {/* 席順ではなく順位順（1位→）で表示する */}
+                {g.players.map((_, i) => i)
+                  .sort((a, b) => (g.ranks[a] || 9) - (g.ranks[b] || 9))
+                  .map((i) => { const nm = g.players[i]; return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
                     <span style={{
                       width: 20, fontSize: 12, fontWeight: 800,
@@ -7362,7 +7365,7 @@ input, select { padding: 10px 14px; }
                       color: g.pts[i] > 0 ? t.gn : g.pts[i] < 0 ? t.rd : t.tx,
                     }}>{g.pts[i] > 0 ? "+" : ""}{g.pts[i]}</span>
                   </div>
-                ))}
+                ); })}
                 <button onClick={() => {
                   if (!window.confirm("この対局の記録を削除しますか？")) return;
                   const idx = lg.games.length - 1 - gi;
@@ -7370,7 +7373,8 @@ input, select { padding: 10px 14px; }
                     ? { ...l, games: l.games.filter((_, k) => k !== idx) } : l));
                 }} style={{
                   background: "none", border: "none", color: t.dm, fontSize: 10,
-                  cursor: "pointer", textDecoration: "underline", marginTop: 6,
+                  cursor: "pointer", textDecoration: "underline", marginTop: 2,
+                  padding: "10px 6px 8px 0",   // タップ領域を32px以上にする
                 }}>この記録を削除</button>
               </div>
             ))}
