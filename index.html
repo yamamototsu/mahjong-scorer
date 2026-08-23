@@ -19943,16 +19943,6 @@ input, select { padding: 10px 14px; }
     }
   }, React.createElement("button", {
     style: {
-      ...actionBtn("p"),
-      marginBottom: 0,
-      flex: 1,
-      fontSize: 14,
-      padding: "14px 6px",
-      whiteSpace: "nowrap"
-    },
-    onClick: applyRound
-  }, correctingIdx !== null ? "修正を反映" : "スコアに反映"), React.createElement("button", {
-    style: {
       ...actionBtn(),
       marginBottom: 0,
       flex: 1,
@@ -19961,7 +19951,17 @@ input, select { padding: 10px 14px; }
       whiteSpace: "nowrap"
     },
     onClick: resetGW
-  }, correctingIdx !== null ? "キャンセル" : "最初から計算")))))), showDrawWiz && React.createElement("div", {
+  }, correctingIdx !== null ? "キャンセル" : "最初から計算"), React.createElement("button", {
+    style: {
+      ...actionBtn("p"),
+      marginBottom: 0,
+      flex: 1,
+      fontSize: 14,
+      padding: "14px 6px",
+      whiteSpace: "nowrap"
+    },
+    onClick: applyRound
+  }, correctingIdx !== null ? "修正を反映" : "スコアに反映")))))), showDrawWiz && React.createElement("div", {
     style: {
       position: "fixed",
       top: 0,

@@ -10401,10 +10401,10 @@ input, select { padding: 10px 14px; }
                   padding: "10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px)",
                 }}>
                   <div style={{ display: "flex", gap: 8, maxWidth: 400, margin: "0 auto" }}>
-                    <button style={{ ...actionBtn("p"), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
-                      onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
                     <button style={{ ...actionBtn(), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
                       onClick={resetGW}>{correctingIdx !== null ? "キャンセル" : "最初から計算"}</button>
+                    <button style={{ ...actionBtn("p"), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
+                      onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
                   </div>
                 </div>
               </>
