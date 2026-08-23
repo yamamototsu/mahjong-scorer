@@ -5654,6 +5654,37 @@ input, select { padding: 10px 14px; }
     return { flows, pool, total };
   };
 
+  // 点数・本場・リーチ棒を分けて見せる内訳。分けるものが無ければ出さない
+  const PayBreakdown = () => {
+    if (gWinner === null || !gResult) return null;
+    const { pool, total } = payInfo();
+    const payers = PC - 1;
+    const hb = honba * HU();
+    // ツモは本場を人数で割って払うので、端数を切った実際の受け取り額で示す
+    const honbaTotal = gTsumo ? Math.floor(hb / payers) * payers : (gLoser !== null ? hb : 0);
+    const base = total - pool - honbaTotal;
+    if (honbaTotal <= 0 && pool <= 0) return null;
+    const parts = [
+      { lb: "点数", amt: base, c: t.tx },
+      ...(honbaTotal > 0 ? [{ lb: `本場 ${honba}本`, amt: honbaTotal, c: t.gd }] : []),
+      ...(pool > 0 ? [{ lb: `リーチ棒 ${pool / 1000}本`, amt: pool, c: t.ac }] : []),
+    ];
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
+        {parts.map((p, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <span style={{ color: t.dm, fontSize: 11, fontWeight: 700 }}>＋</span>}
+            <span style={{
+              fontSize: 11, fontWeight: 700, color: p.c, whiteSpace: "nowrap",
+              background: "rgba(0,0,0,0.35)", border: `1px solid ${t.bd}`,
+              borderRadius: 8, padding: "4px 7px",
+            }}>{p.lb} {p.amt.toLocaleString()}</span>
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
+
   // 受け渡しの卓（座席パネル＋矢印）。boxW は幅の指定で、文字の大きさの基準にもなるので
   // % ではなく vw/px で渡す
   const PayTableBox = ({ boxW }) => {
@@ -5697,10 +5728,10 @@ input, select { padding: 10px 14px; }
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
             <defs>
               {/* markerUnits=userSpaceOnUse: 線の太さで矢じりの大きさが変わらないようにする */}
-              {/* 細長い三角にして先を尖らせる */}
+              {/* 細長い矢じり。後ろに深い切り込みを入れて先端を鋭く見せる */}
               <marker id="payArrow" markerUnits="userSpaceOnUse"
-                markerWidth="9.6" markerHeight="6" refX="9.3" refY="3" orient="auto">
-                <path d="M0.3,0.35 L9.3,3 L0.3,5.65 L2.1,3 z" fill={t.gd} />
+                markerWidth="13" markerHeight="6" refX="12.6" refY="3" orient="auto">
+                <path d="M0.4,0.5 L12.6,3 L0.4,5.5 L3.6,3 z" fill={t.gd} />
               </marker>
             </defs>
             {flows.map((f, k) => {
@@ -5808,6 +5839,7 @@ input, select { padding: 10px 14px; }
 
         <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
           <PayTableBox boxW={boxW} />
+          <PayBreakdown />
         </div>
 
         <button onClick={() => setShowPayView(false)} style={{
@@ -10055,6 +10087,7 @@ input, select { padding: 10px 14px; }
                 {/* 点数の受け渡し（開かなくても最初から見えるように埋め込む。タップで大きく表示） */}
                 <div onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
                   <PayTableBox boxW="min(100vw - 32px, 400px)" />
+                  <PayBreakdown />
                   <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
                     卓をタップすると大きく表示します（卓の中央に置く用）
                   </div>
