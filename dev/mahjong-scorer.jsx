@@ -10458,7 +10458,9 @@ input, select { padding: 10px 14px; }
               id: Date.now(),
               date: gameConfig?.date || "",
               matchType: gameConfig?.matchType || "",
-              players: [...players],
+              // 三麻では players に使っていない4人目の名前が残っているため、対局人数で切る
+              // （finalScores は3人分しか無く、そのまま保存すると履歴画面が開けなくなる）
+              players: players.slice(0, PC),
               finalScores: [...scores],
               okaResults: sorted.map(s => ({ name: s.name, finalPt: s.finalPt })),
               rounds: [...rounds],
@@ -10473,7 +10475,7 @@ input, select { padding: 10px 14px; }
             const entry = {
               date: gameConfig?.date || "",
               matchType: gameConfig?.matchType || "hanchan",
-              players: [...players],
+              players: players.slice(0, PC),
               scores: [...scores],
               pts: res.map(r => r.pt),
               ranks: res.map(r => r.rank),
@@ -10691,7 +10693,8 @@ input, select { padding: 10px 14px; }
             </div>
           ) : (
             [...gameHistory].reverse().map((g, idx) => {
-              const sorted = g.players.map((p, i) => ({ name: p, score: g.finalScores[i] })).sort((a, b) => b.score - a.score);
+              // 保存済みの古い三麻記録は players が4人のことがあるので、点数がある人数で切る
+              const sorted = g.players.slice(0, g.finalScores.length).map((p, i) => ({ name: p, score: g.finalScores[i] })).sort((a, b) => b.score - a.score);
               return (
                 <button
                   key={g.id}
@@ -10737,7 +10740,7 @@ input, select { padding: 10px 14px; }
             {/* Final scores ranked */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8 }}>最終スコア</div>
-              {historyDetail.players
+              {historyDetail.players.slice(0, historyDetail.finalScores.length)
                 .map((p, i) => ({ name: p, score: historyDetail.finalScores[i], idx: i }))
                 .sort((a, b) => b.score - a.score)
                 .map((s, rank) => (
