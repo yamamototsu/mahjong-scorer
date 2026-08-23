@@ -11211,7 +11211,17 @@ input, select { padding: 10px 14px; }
         letterSpacing: "0.06em",
         textShadow: "0 2px 20px rgba(0,0,0,0.6)"
       }
-    }, sp.round.wind, sp.round.dealer + 1, "局"), React.createElement("div", {
+    }, sp.round.wind, sp.round.dealer + 1, "局"), sp.matchType && sp.round.wind === LAST_WIND(sp.matchType) && sp.round.dealer === PC - 1 && React.createElement("div", {
+      style: {
+        fontSize: 22,
+        fontWeight: 900,
+        marginTop: 6,
+        letterSpacing: "0.3em",
+        textIndent: "0.3em",
+        color: t.gd,
+        textShadow: "0 0 18px rgba(234,179,8,0.45), 0 2px 12px rgba(0,0,0,0.6)"
+      }
+    }, "オーラス"), React.createElement("div", {
       style: {
         fontSize: 20,
         fontWeight: 800,

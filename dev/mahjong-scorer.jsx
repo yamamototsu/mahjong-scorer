@@ -5772,12 +5772,18 @@ input, select { padding: 10px 14px; }
                 margin: "18px auto", width: "78%", animation: "splashLine 0.7s 0.2s ease-out both",
               }} />
               {sp.round ? (
-                /* 局や本場が変わったとき。名前のかわりに局と本場を出す */
+                /* 局や本場が変わったとき。名前のかわりに局と本場を出す。最終局は「オーラス」も添える */
                 <div style={{ animation: "splashRow 0.45s 0.3s ease-out both" }}>
                   <div style={{
                     fontSize: 40, fontWeight: 900, color: "#fff", lineHeight: 1.2,
                     letterSpacing: "0.06em", textShadow: "0 2px 20px rgba(0,0,0,0.6)",
                   }}>{sp.round.wind}{sp.round.dealer + 1}局</div>
+                  {sp.matchType && sp.round.wind === LAST_WIND(sp.matchType) && sp.round.dealer === PC - 1 && (
+                    <div style={{
+                      fontSize: 22, fontWeight: 900, marginTop: 6, letterSpacing: "0.3em", textIndent: "0.3em",
+                      color: t.gd, textShadow: "0 0 18px rgba(234,179,8,0.45), 0 2px 12px rgba(0,0,0,0.6)",
+                    }}>オーラス</div>
+                  )}
                   <div style={{
                     fontSize: 20, fontWeight: 800, marginTop: 8, letterSpacing: "0.08em",
                     color: sp.round.honba > 0 ? t.gd : "rgba(255,255,255,0.65)",
