@@ -11319,11 +11319,11 @@ input, select { padding: 10px 14px; }
     const base = total - pool - honbaTotal;
     if (honbaTotal <= 0 && pool <= 0) return null;
     const parts = [{
-      lb: "点数",
+      lb: "和了点",
       amt: base,
       c: t.tx
     }, ...(honbaTotal > 0 ? [{
-      lb: `本場 ${honba}本`,
+      lb: `積み棒 ${honba}本`,
       amt: honbaTotal,
       c: t.gd
     }] : []), ...(pool > 0 ? [{
@@ -11482,8 +11482,25 @@ input, select { padding: 10px 14px; }
       const hb2 = honba * HU();
       const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;
       const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : gLoser !== null ? hb2 : 0;
-      const amt = isWin ? total - pool - hbGet : f ? -(f.amt - hbPay) : 0;
-      const subs = isWin ? hbGet > 0 && pool > 0 ? [`場${hbGet}`, `棒${pool}`] : hbGet > 0 ? [`本場 +${hbGet.toLocaleString()}`] : pool > 0 ? [`リーチ棒 +${pool.toLocaleString()}`] : [] : f && hbPay > 0 ? [`本場 −${hbPay.toLocaleString()}`] : [];
+      const decl = !!(declaredRiichi[i] || gRiichi[i]);
+      const stick = (isWin ? pool : 0) - (decl ? 1000 : 0);
+      const rows = [];
+      if (isWin) rows.push({
+        lb: "和了点",
+        v: total - pool - hbGet
+      });else if (f) rows.push({
+        lb: "和了点",
+        v: -(f.amt - hbPay)
+      });
+      if (stick !== 0) rows.push({
+        lb: "リーチ棒",
+        v: stick
+      });
+      if (isWin ? hbGet > 0 : f && hbPay > 0) rows.push({
+        lb: "積み棒",
+        v: isWin ? hbGet : -hbPay
+      });
+      const net = rows.reduce((a, r) => a + r.v, 0);
       return React.createElement("div", {
         key: i,
         style: {
@@ -11491,11 +11508,10 @@ input, select { padding: 10px 14px; }
           top: `${pos.y}%`,
           left: `${pos.x}%`,
           transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
-          textAlign: "center",
-          padding: `${fs(5)} ${fs(6)}`,
+          padding: `${fs(4)} ${fs(7)}`,
           borderRadius: 12,
           background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
-          border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
+          border: `2px solid ${isWin ? t.gd : net < 0 ? t.rd : t.bd}`,
           width: "38%",
           height: "26%",
           boxSizing: "border-box",
@@ -11515,10 +11531,10 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("span", {
         style: {
-          fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
+          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
           fontWeight: 800,
           color: "#fff",
-          lineHeight: 1.15,
+          lineHeight: 1.2,
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -11528,30 +11544,38 @@ input, select { padding: 10px 14px; }
         style: {
           fontSize: fs(10),
           color: t.gd,
-          lineHeight: 1.15,
+          lineHeight: 1.2,
           flexShrink: 0
         }
-      }, "親")), React.createElement("div", {
+      }, "親")), (rows.length ? rows : [{
+        lb: "和了点",
+        v: 0
+      }]).map((r2, k2) => React.createElement("div", {
+        key: k2,
         style: {
-          fontSize: fs(19),
-          fontWeight: 900,
-          fontVariantNumeric: "tabular-nums",
-          lineHeight: 1.1,
-          color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)"
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          width: "100%",
+          gap: 4,
+          lineHeight: 1.3
         }
-      }, amt > 0 ? "+" : "", amt.toLocaleString()), React.createElement("div", {
+      }, React.createElement("span", {
         style: {
           fontSize: fs(10),
           fontWeight: 700,
-          lineHeight: 1.25,
-          whiteSpace: "nowrap",
-          maxWidth: "100%",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          letterSpacing: "-0.3px",
-          color: isWin ? t.gd : "#ff8a8a"
+          color: "rgba(255,255,255,0.75)",
+          whiteSpace: "nowrap"
         }
-      }, subs.length ? subs.join("・") : "　"));
+      }, r2.lb), React.createElement("span", {
+        style: {
+          fontSize: fs(12),
+          fontWeight: 900,
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)"
+        }
+      }, r2.v > 0 ? "+" : "", r2.v.toLocaleString()))));
     }));
   };
   const PayTableView = () => {

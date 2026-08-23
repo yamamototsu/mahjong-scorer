@@ -5859,8 +5859,8 @@ input, select { padding: 10px 14px; }
     const base = total - pool - honbaTotal;
     if (honbaTotal <= 0 && pool <= 0) return null;
     const parts = [
-      { lb: "点数", amt: base, c: t.tx },
-      ...(honbaTotal > 0 ? [{ lb: `本場 ${honba}本`, amt: honbaTotal, c: t.gd }] : []),
+      { lb: "和了点", amt: base, c: t.tx },
+      ...(honbaTotal > 0 ? [{ lb: `積み棒 ${honba}本`, amt: honbaTotal, c: t.gd }] : []),
       ...(pool > 0 ? [{ lb: `リーチ棒 ${pool / 1000}本`, amt: pool, c: t.ac }] : []),
     ];
     return (
@@ -5946,61 +5946,61 @@ input, select { padding: 10px 14px; }
           </svg>
 
 
-          {/* 各席のパネル。点数は基本点数を大きく出し、本場・リーチ棒は下に分けて示す */}
+          {/* 各席のパネル。和了点・リーチ棒・積み棒を行で分けて示す */}
           {Array.from({ length: PC }, (_, i) => i).map(i => {
             const pos = posOf(i);
             const isWin = i === gWinner;
             const f = flows.find(x => x.from === i);
             const hb2 = honba * HU();
-            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の本場ぶん
-            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る本場ぶん
-            const amt = isWin ? total - pool - hbGet : (f ? -(f.amt - hbPay) : 0);
-            // 内訳は1行に収める。両方あるときは「場・棒」の短い表記にする
-            const subs = isWin
-              ? (hbGet > 0 && pool > 0
-                  ? [`場${hbGet}`, `棒${pool}`]
-                  : hbGet > 0 ? [`本場 +${hbGet.toLocaleString()}`]
-                  : pool > 0 ? [`リーチ棒 +${pool.toLocaleString()}`] : [])
-              : (f && hbPay > 0 ? [`本場 −${hbPay.toLocaleString()}`] : []);
+            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の積み棒ぶん
+            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る積み棒ぶん
+            // この局にリーチ棒を出した人（卓上の宣言・ウィザード入力のどちらでも）
+            const decl = !!(declaredRiichi[i] || gRiichi[i]);
+            // リーチ棒: アガった人は供託を受け取り、出した人は1,000を失う（両方なら差し引き）
+            const stick = (isWin ? pool : 0) - (decl ? 1000 : 0);
+            const rows = [];
+            if (isWin) rows.push({ lb: "和了点", v: total - pool - hbGet });
+            else if (f) rows.push({ lb: "和了点", v: -(f.amt - hbPay) });
+            if (stick !== 0) rows.push({ lb: "リーチ棒", v: stick });
+            if (isWin ? hbGet > 0 : (f && hbPay > 0)) rows.push({ lb: "積み棒", v: isWin ? hbGet : -hbPay });
+            const net = rows.reduce((a, r) => a + r.v, 0);
             return (
               <div key={i} style={{
                 position: "absolute", top: `${pos.y}%`, left: `${pos.x}%`,
                 transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
                 // 余白を%にすると卓全体の幅が基準になり、枠に対して大きくなりすぎて
                 // 名前が入らなくなる。卓の大きさに比例する fs() で指定する
-                textAlign: "center", padding: `${fs(5)} ${fs(6)}`, borderRadius: 12,
+                padding: `${fs(4)} ${fs(7)}`, borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
-                border: `2px solid ${isWin ? t.gd : amt < 0 ? t.rd : t.bd}`,
+                border: `2px solid ${isWin ? t.gd : net < 0 ? t.rd : t.bd}`,
                 width: "38%", height: "26%", boxSizing: "border-box",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               }}>
-                {/* 名前と「親」を並べても枠の幅を超えないようにする。
-                    「親」が付く席はそのぶん名前を小さくし、それでも入らない長い名前は末尾を省略する */}
+                {/* 名前と「親」を並べても枠の幅を超えないようにする */}
                 <div style={{
                   display: "flex", alignItems: "baseline", justifyContent: "center",
                   gap: 3, width: "100%", maxWidth: "100%",
                 }}>
                   <span style={{
-                    // 「親」のぶんを見込んで少しだけ縮める。はみ出しは末尾の省略で受けるので
-                    // 縮めすぎない（0.6にすると6文字の親名で10px未満になる）
-                    fontSize: fs(Math.max(10, Math.min(15, Math.floor(15 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
-                    fontWeight: 800, color: "#fff", lineHeight: 1.15,
+                    fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
+                    fontWeight: 800, color: "#fff", lineHeight: 1.2,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
                   }}>{players[i]}</span>
-                  {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.15, flexShrink: 0 }}>親</span>}
+                  {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.2, flexShrink: 0 }}>親</span>}
                 </div>
-                <div style={{
-                  fontSize: fs(19), fontWeight: 900, fontVariantNumeric: "tabular-nums", lineHeight: 1.1,
-                  color: amt > 0 ? t.gd : amt < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
-                }}>
-                  {amt > 0 ? "+" : ""}{amt.toLocaleString()}
-                </div>
-                {/* 本場・リーチ棒の内訳。無い席は空白1文字で高さを揃える */}
-                <div style={{
-                  fontSize: fs(10), fontWeight: 700, lineHeight: 1.25, whiteSpace: "nowrap",
-                  maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: "-0.3px",
-                  color: isWin ? t.gd : "#ff8a8a",
-                }}>{subs.length ? subs.join("・") : "　"}</div>
+                {/* 内訳の行（ラベル左・金額右）。動きの無い席は 0 を1行だけ出す */}
+                {(rows.length ? rows : [{ lb: "和了点", v: 0 }]).map((r2, k2) => (
+                  <div key={k2} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                    width: "100%", gap: 4, lineHeight: 1.3,
+                  }}>
+                    <span style={{ fontSize: fs(10), fontWeight: 700, color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap" }}>{r2.lb}</span>
+                    <span style={{
+                      fontSize: fs(12), fontWeight: 900, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+                      color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
+                    }}>{r2.v > 0 ? "+" : ""}{r2.v.toLocaleString()}</span>
+                  </div>
+                ))}
               </div>
             );
           })}
