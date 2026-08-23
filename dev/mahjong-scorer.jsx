@@ -6000,9 +6000,9 @@ input, select { padding: 10px 14px; }
                     display: "flex", justifyContent: "space-between", alignItems: "baseline",
                     width: "100%", gap: 4, lineHeight: 1.3,
                   }}>
-                    <span style={{ fontSize: fs(10), fontWeight: 700, color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap" }}>{r2.lb}</span>
+                    <span style={{ fontSize: fs(10.5), fontWeight: 700, color: "rgba(255,255,255,0.78)", whiteSpace: "nowrap" }}>{r2.lb}</span>
                     <span style={{
-                      fontSize: fs(12), fontWeight: 900, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
+                      fontSize: fs(15), fontWeight: 900, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
                       color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
                     }}>{r2.v > 0 ? "+" : ""}{r2.v.toLocaleString()}</span>
                   </div>
