@@ -14161,7 +14161,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginTop: 4
       }
-    }, lg.members.length, "人 ・ ", pr.played, "回消化", lg.mode === "count" ? ` / 全${lg.targetCount}回` : ` ・ ${lg.startDate}〜${lg.endDate}`, " ・ ウマ ", UMA_PRESETS.find(u => u.key === lg.umaKey)?.label || "10-20")), lg.mode === "count" && React.createElement("div", {
+    }, lg.members.length, "人 ・ ", pr.played, "回消化", lg.mode === "count" ? ` / 全${lg.targetCount}回` : ` ・ ${lg.startDate}〜${lg.endDate}`, " ・ ウマ ", ((lg.playerCount || 4) === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === lg.umaKey)?.label || (lg.uma || []).slice(0, lg.playerCount || 4).map(u => (u > 0 ? "+" : "") + u).join(" / ") || "なし")), lg.mode === "count" && React.createElement("div", {
       style: {
         height: 6,
         borderRadius: 3,
@@ -14439,7 +14439,7 @@ input, select { padding: 10px 14px; }
       style: {
         color: t.dm
       }
-    }, "オカ: "), (lg.rules.returnPoints - lg.rules.startPoints) * 4 / 1000, "pt がトップへ"), React.createElement("div", null, React.createElement("span", {
+    }, "オカ: "), (lg.rules.returnPoints - lg.rules.startPoints) * (lg.playerCount || 4) / 1000, "pt がトップへ"), React.createElement("div", null, React.createElement("span", {
       style: {
         color: t.dm
       }
@@ -16454,8 +16454,12 @@ input, select { padding: 10px 14px; }
       whiteSpace: "nowrap"
     }
   }, sub)))), (() => {
-    const hasLast = !!lastRules;
-    const base = lastRules || defaultRules;
+    const wantLen = playerCount === 3 ? 3 : 4;
+    const hasLast = !!lastRules && (lastRules.uma || []).length === wantLen;
+    const base = hasLast ? lastRules : playerCount === 3 ? {
+      ...defaultRules,
+      ...SANMA_DEFAULT_RULES
+    } : defaultRules;
     const same = JSON.stringify(rules) === JSON.stringify(base);
     const ok = hasLast && same;
     const sum = [base.agariRenchan ? "あがり連荘" : base.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘", base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ", base.kuitan ? "食いタンあり" : "食いタンなし", base.doubleYakuman ? "ダブル役満あり" : null, `持ち点${(base.startPoints || 0).toLocaleString()}`].filter(Boolean).join(" ・ ");
@@ -17537,7 +17541,7 @@ input, select { padding: 10px 14px; }
         }, "🔴 リーチ済み"));
       })()) : tmWinStep === "winner" ? ((() => {
         const picked = ronPick.includes(i);
-        const maxRon = 3;
+        const maxRon = PC - 1;
         return React.createElement("button", {
           onClick: () => {
             setRonPick(prev => prev.includes(i) ? prev.filter(x => x !== i) : prev.length >= maxRon ? prev : [...prev, i]);
@@ -19403,7 +19407,7 @@ input, select { padding: 10px 14px; }
         borderTop: `1px solid ${t.bd}`,
         paddingTop: 6
       }
-    }, honba > 0 && `本場 +${(honba * 300).toLocaleString()}`, honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / ", (riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`))
+    }, honba > 0 && `本場 +${(honba * HU()).toLocaleString()}`, honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / ", (riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`))
   }), React.createElement("button", {
     style: {
       ...actionBtn(),
@@ -20219,7 +20223,7 @@ input, select { padding: 10px 14px; }
             id: Date.now(),
             date: gameConfig?.date || "",
             matchType: gameConfig?.matchType || "",
-            players: [...players],
+            players: players.slice(0, PC),
             finalScores: [...scores],
             okaResults: sorted.map(s => ({
               name: s.name,
@@ -20236,7 +20240,7 @@ input, select { padding: 10px 14px; }
           const entry = {
             date: gameConfig?.date || "",
             matchType: gameConfig?.matchType || "hanchan",
-            players: [...players],
+            players: players.slice(0, PC),
             scores: [...scores],
             pts: res.map(r => r.pt),
             ranks: res.map(r => r.rank)
@@ -20377,12 +20381,12 @@ input, select { padding: 10px 14px; }
         fontSize: 11,
         color: t.dm
       }
-    }, "4人の合計"), React.createElement("span", {
+    }, PC, "人の合計"), React.createElement("span", {
       style: {
         fontSize: 14,
         fontWeight: 800,
         fontVariantNumeric: "tabular-nums",
-        color: scores.reduce((a2, b2) => a2 + b2, 0) === (ruleSet.startPoints ?? 25000) * 4 ? t.gn : t.rd
+        color: scores.reduce((a2, b2) => a2 + b2, 0) === (ruleSet.startPoints ?? 25000) * PC ? t.gn : t.rd
       }
     }, scores.reduce((a2, b2) => a2 + b2, 0).toLocaleString(), React.createElement("span", {
       style: {
@@ -20390,14 +20394,14 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         fontWeight: 400
       }
-    }, " / ", ((ruleSet.startPoints ?? 25000) * 4).toLocaleString()))), scores.reduce((a2, b2) => a2 + b2, 0) !== (ruleSet.startPoints ?? 25000) * 4 && React.createElement("div", {
+    }, " / ", ((ruleSet.startPoints ?? 25000) * PC).toLocaleString()))), scores.reduce((a2, b2) => a2 + b2, 0) !== (ruleSet.startPoints ?? 25000) * PC && React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.rd,
         marginTop: 6,
         lineHeight: 1.7
       }
-    }, "合計が持ち点×4と一致していません。誰かの点数を調整してください。"))));
+    }, "合計が持ち点×", PC, "と一致していません。誰かの点数を調整してください。"))));
   };
   const renderGame = () => {
     if (gameFinished) return renderGameFinished();
@@ -20607,7 +20611,7 @@ input, select { padding: 10px 14px; }
       marginTop: 4
     }
   }, "対局を終了すると自動的に保存されます")) : [...gameHistory].reverse().map((g, idx) => {
-    const sorted = g.players.map((p, i) => ({
+    const sorted = g.players.slice(0, g.finalScores.length).map((p, i) => ({
       name: p,
       score: g.finalScores[i]
     })).sort((a, b) => b.score - a.score);
@@ -20705,7 +20709,7 @@ input, select { padding: 10px 14px; }
       color: t.dm,
       marginBottom: 8
     }
-  }, "最終スコア"), historyDetail.players.map((p, i) => ({
+  }, "最終スコア"), historyDetail.players.slice(0, historyDetail.finalScores.length).map((p, i) => ({
     name: p,
     score: historyDetail.finalScores[i],
     idx: i
