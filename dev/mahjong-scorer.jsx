@@ -3657,7 +3657,7 @@ input, select { padding: 10px 14px; }
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: on ? 12 : 0 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>レート計算</div>
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>点数を{U}に換算して精算します</div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>点数を違うレート単位で表示します。</div>
           </div>
           <button onClick={() => onChange(on ? 0 : 0.1)} style={{
             width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
