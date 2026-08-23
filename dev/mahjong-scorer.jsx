@@ -4896,7 +4896,7 @@ input, select { padding: 10px 14px; }
       clack(tt + 0.11, 0.32, 850);
     } catch {}
   };
-  const [wallBlink, setWallBlink] = useState(false); // 山を割る人の点滅（10秒）
+  const [wallBlink, setWallBlink] = useState(false); // 山を割る人の点滅（サイコロの表示時間と同期して消える）
   const wallBlinkTimer = React.useRef(null);
   const [diceSettled, setDiceSettled] = useState(false);
   const [diceRoundKey, setDiceRoundKey] = useState(null); // サイコロを振った局（局が変わると案内を再表示）
@@ -4993,7 +4993,6 @@ input, select { padding: 10px 14px; }
     setDiceSpin(v => v + 1);
     setWallBlink(true);
     if (wallBlinkTimer.current) clearTimeout(wallBlinkTimer.current);
-    wallBlinkTimer.current = setTimeout(() => setWallBlink(false), 10000);
     setDiceRoundKey(`${roundWind}${dealerIdx}-${honba}-${rounds.length}`);
     if (diceClearTimer.current) clearTimeout(diceClearTimer.current);
     setDiceRolling(true);
@@ -5008,10 +5007,13 @@ input, select { padding: 10px 14px; }
         setDiceVals(final);
         setDiceRolling(false);
         setDiceSettled(true);
-        // 設定した秒数後に自動でクリア（0=ずっと表示）
+        // 設定した秒数後に自動でクリア（0=ずっと表示）。
+        // 「この山を割る」の点滅もサイコロと同じ秒数で一緒に消す
         if (diceClearTimer.current) clearTimeout(diceClearTimer.current);
+        if (wallBlinkTimer.current) clearTimeout(wallBlinkTimer.current);
         if (diceHoldSec > 0) {
           diceClearTimer.current = setTimeout(() => setDiceSettled(false), diceHoldSec * 1000);
+          wallBlinkTimer.current = setTimeout(() => setWallBlink(false), diceHoldSec * 1000);
         }
       }
     }, 70);
@@ -6542,7 +6544,8 @@ input, select { padding: 10px 14px; }
                 ))}
               </div>
               <div style={{ fontSize: 10, color: t.dm, marginTop: 8 }}>
-                振った後、自動で消えるまでの時間です。効果音は「音の設定」にあります
+                振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。
+                効果音は「音の設定」にあります
               </div>
             </div>
             </>)}
