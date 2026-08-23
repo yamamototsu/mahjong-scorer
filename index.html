@@ -778,6 +778,22 @@ function MahjongScorer() {
   const saveVoiceTsumo = saveVoicePref("mj_voice_tsumo", setVoiceTsumoOn);
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const voiceOnFor = text => text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
+  const TSUMO_READINGS = ["ツモ", "ツモッ", "つも", "自摸"];
+  const [tsumoReading, setTsumoReading] = useState(() => {
+    try {
+      const v = localStorage.getItem("mj_voice_tsumo_text");
+      return TSUMO_READINGS.includes(v) ? v : "ツモッ";
+    } catch {
+      return "ツモッ";
+    }
+  });
+  const saveTsumoReading = v => {
+    setTsumoReading(v);
+    try {
+      localStorage.setItem("mj_voice_tsumo_text", v);
+    } catch {}
+  };
+  const readingFor = text => text === "ツモ" ? tsumoReading : text;
   const playTileSlap = () => {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -817,7 +833,7 @@ function MahjongScorer() {
       osc.stop(t0 + 0.16);
     } catch {}
   };
-  const playVoice = (text, done, force) => {
+  const playVoice = (text, done, force, spoken) => {
     let called = false;
     const finish = () => {
       if (called) return;
@@ -838,7 +854,7 @@ function MahjongScorer() {
           return;
         }
         syn.cancel();
-        const u = new SpeechSynthesisUtterance(text + "！");
+        const u = new SpeechSynthesisUtterance((spoken || readingFor(text)) + "！");
         u.lang = "ja-JP";
         u.rate = 1.15;
         u.pitch = 0.95;
@@ -12861,7 +12877,8 @@ input, select { padding: 10px 14px; }
       desc: "ツモを選んだときに「ツモ！」",
       on: voiceTsumoOn,
       save: saveVoiceTsumo,
-      preview: () => playVoice("ツモ", null, true)
+      preview: () => playVoice("ツモ", null, true),
+      readings: true
     }].map((row, i) => React.createElement("div", {
       key: i,
       style: {
@@ -12937,7 +12954,42 @@ input, select { padding: 10px 14px; }
         background: "#fff",
         transition: "left 0.15s"
       }
-    }))))), React.createElement("div", {
+    }))), row.readings && React.createElement("div", {
+      style: {
+        flexBasis: "100%",
+        marginTop: 2
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6
+      }
+    }, TSUMO_READINGS.map(r => React.createElement("button", {
+      key: r,
+      onClick: () => {
+        saveTsumoReading(r);
+        playVoice("ツモ", null, true, r);
+      },
+      style: {
+        flex: 1,
+        padding: "9px 2px",
+        borderRadius: 9,
+        cursor: "pointer",
+        border: `2px solid ${tsumoReading === r ? t.ac : t.bd}`,
+        background: tsumoReading === r ? t.acS : "transparent",
+        color: tsumoReading === r ? t.ac : t.tx,
+        fontSize: 12,
+        fontWeight: 700,
+        whiteSpace: "nowrap"
+      }
+    }, r))), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        marginTop: 6,
+        lineHeight: 1.6
+      }
+    }, "イントネーションが合わないときは、読み方を変えると聞こえ方が変わります。 押すとその読み方で試聴できます")))), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,

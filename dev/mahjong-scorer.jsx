@@ -572,6 +572,19 @@ export default function MahjongScorer() {
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const voiceOnFor = (text) =>
     text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
+  // ツモの読ませ方。音声合成は抑揚を直接指定できないので、表記を変えて調整する
+  const TSUMO_READINGS = ["ツモ", "ツモッ", "つも", "自摸"];
+  const [tsumoReading, setTsumoReading] = useState(() => {
+    try {
+      const v = localStorage.getItem("mj_voice_tsumo_text");
+      return TSUMO_READINGS.includes(v) ? v : "ツモッ";
+    } catch { return "ツモッ"; }
+  });
+  const saveTsumoReading = (v) => {
+    setTsumoReading(v);
+    try { localStorage.setItem("mj_voice_tsumo_text", v); } catch {}
+  };
+  const readingFor = (text) => (text === "ツモ" ? tsumoReading : text);
   // done を渡すと、読み上げが終わってから実行する（読み上げの途中で画面が変わらないように）。
   // 読み上げなし・音声が使えない端末では、待たずにその場で実行する
   // 牌を倒す「パシッ」（Web Audioでその場で合成。音声ファイルは持たない）。
@@ -610,7 +623,8 @@ export default function MahjongScorer() {
   };
 
   // force は設定画面の試聴用（オフでも鳴らす）
-  const playVoice = (text, done, force) => {
+  // spoken を渡すと、その表記で読み上げる（読み方チップの試聴用。保存前でも選んだ音で鳴らせる）
+  const playVoice = (text, done, force, spoken) => {
     let called = false;
     const finish = () => { if (called) return; called = true; if (done) done(); };
     if (!force && !voiceOnFor(text)) { finish(); return; }
@@ -623,7 +637,7 @@ export default function MahjongScorer() {
         if (!syn) { finish(); return; }
         syn.cancel();   // 続けて押されたときに重ならないようにする
         // 「！」を付けると端末によっては強めに読んでくれる
-        const u = new SpeechSynthesisUtterance(text + "！");
+        const u = new SpeechSynthesisUtterance((spoken || readingFor(text)) + "！");
         u.lang = "ja-JP";
         u.rate = 1.15;    // 読み上げよりは、卓での掛け声に近い速さ
         u.pitch = 0.95;
@@ -6563,7 +6577,8 @@ input, select { padding: 10px 14px; }
                 { label: "🔴 リーチの声", desc: "リーチを宣言したときに「リーチ！」",
                   on: voiceRiichiOn, save: saveVoiceRiichi, preview: () => playVoice("リーチ", null, true) },
                 { label: "✋ ツモの声", desc: "ツモを選んだときに「ツモ！」",
-                  on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true) },
+                  on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true),
+                  readings: true },
               ].map((row, i) => (
                 <div key={i} style={{
                   // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
@@ -6588,6 +6603,26 @@ input, select { padding: 10px 14px; }
                       <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
                     </button>
                   </div>
+                  {row.readings && (
+                    // 読み方の選択。音声合成は抑揚を直接指定できないので、表記を変えて近づける
+                    <div style={{ flexBasis: "100%", marginTop: 2 }}>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {TSUMO_READINGS.map(r => (
+                          <button key={r} onClick={() => { saveTsumoReading(r); playVoice("ツモ", null, true, r); }} style={{
+                            flex: 1, padding: "9px 2px", borderRadius: 9, cursor: "pointer",
+                            border: `2px solid ${tsumoReading === r ? t.ac : t.bd}`,
+                            background: tsumoReading === r ? t.acS : "transparent",
+                            color: tsumoReading === r ? t.ac : t.tx,
+                            fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                          }}>{r}</button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.6 }}>
+                        イントネーションが合わないときは、読み方を変えると聞こえ方が変わります。
+                        押すとその読み方で試聴できます
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
