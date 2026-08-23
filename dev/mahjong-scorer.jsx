@@ -11100,26 +11100,8 @@ input, select { padding: 10px 14px; }
   const [histSel, setHistSel] = useState([]);     // 選択した対局のid
   const [histAgg, setHistAgg] = useState(null);   // 集計結果 { rows, count, unit, hasRate }
 
-  // 1対局ぶんの精算pt（ウマ・オカ込み）。古い記録に okaResults が無ければルールから導出
-  const gamePts = (g) => {
-    const n = g.finalScores.length;
-    const names = g.players.slice(0, n);
-    if (g.okaResults && g.okaResults.length) {
-      const m = {};
-      g.okaResults.forEach(o => { m[o.name] = o.finalPt; });
-      if (names.every(nm => m[nm] !== undefined)) return names.map(nm => m[nm]);
-    }
-    const rs = g.rules || {};
-    const sp = rs.startPoints ?? 25000, rp = rs.returnPoints ?? 30000;
-    const uma = (rs.uma && rs.uma.length === n) ? rs.uma : Array(n).fill(0);
-    const okaPool = (rp - sp) * n;
-    const gosha = (v) => { const sg = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return sg * (a - f > 0.5 ? f + 1 : f); };
-    const ranked = g.finalScores.map((v, i) => ({ i, v })).sort((a, b) => (b.v - a.v) || (a.i - b.i));
-    const pts = Array(n).fill(0);
-    ranked.forEach((r, rank) => { pts[r.i] = gosha((r.v - rp + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0); });
-    return pts;
-  };
-
+  // 対局ごとに素点（返し点との差）・ウマ・オカを点数で出して、名前ごとに合算する。
+  // 合計＝素点＋ウマ＋オカ、レート換算＝合計×レート
   const aggregateGames = (ids) => {
     const games = gameHistory.filter(g => ids.includes(g.id));
     const by = {};   // 名前ごとに合算（同じ名前は同一人物として扱う）
@@ -11127,23 +11109,27 @@ input, select { padding: 10px 14px; }
     games.forEach(g => {
       const n = g.finalScores.length;
       const names = g.players.slice(0, n);
-      const pts = gamePts(g);
-      const rate = (g.rules && g.rules.rate) || 0;
-      if (rate > 0 && !unit) unit = (g.rules.rateUnit || "G");
-      let topIdx = 0;
-      for (let i = 1; i < n; i++) {
-        if (pts[i] > pts[topIdx] || (pts[i] === pts[topIdx] && g.finalScores[i] > g.finalScores[topIdx])) topIdx = i;
-      }
-      names.forEach((nm, i) => {
-        if (!by[nm]) by[nm] = { name: nm, pt: 0, score: 0, gold: 0, n: 0, top: 0 };
-        by[nm].pt += pts[i];
-        by[nm].score += g.finalScores[i];
-        if (rate > 0) by[nm].gold += GOLD(pts[i], rate);
-        by[nm].n += 1;
-        if (i === topIdx) by[nm].top += 1;
+      const rs = g.rules || {};
+      const sp = rs.startPoints ?? 25000, rp = rs.returnPoints ?? 30000;
+      const uma = (rs.uma && rs.uma.length === n) ? rs.uma : Array(n).fill(0);
+      const rate = rs.rate || 0;
+      if (rate > 0 && !unit) unit = rs.rateUnit || "G";
+      const ranked = g.finalScores.map((v, i) => ({ i, v })).sort((a, b) => (b.v - a.v) || (a.i - b.i));
+      ranked.forEach((r, rank) => {
+        const nm = names[r.i];
+        if (!by[nm]) by[nm] = { name: nm, soten: 0, uma: 0, oka: 0, total: 0, gold: 0, n: 0, top: 0 };
+        const so = r.v - rp;                                 // 素点（返し点との差）
+        const um = (uma[rank] || 0) * 1000;                  // ウマ（ptを点数に）
+        const ok = rank === 0 ? (rp - sp) * n : 0;           // オカ（トップ総取り）
+        const tt = so + um + ok;
+        const e = by[nm];
+        e.soten += so; e.uma += um; e.oka += ok; e.total += tt;
+        if (rate > 0) e.gold += tt * rate;
+        e.n += 1;
+        if (rank === 0) e.top += 1;
       });
     });
-    const rows = Object.values(by).sort((a, b) => (b.pt - a.pt) || (b.score - a.score));
+    const rows = Object.values(by).sort((a, b) => (b.total - a.total) || (b.soten - a.soten));
     return { rows, count: games.length, unit, hasRate: games.some(g => (g.rules?.rate || 0) > 0) };
   };
 
@@ -11357,15 +11343,17 @@ input, select { padding: 10px 14px; }
                       onClick={() => setHistAgg(null)}>✕</button>
                   </div>
                   <div style={{ fontSize: 10, color: t.dm, marginBottom: 12, lineHeight: 1.7 }}>
-                    順位はウマ・オカ込みのpt合計で決めています。同じ名前は同一人物として合算します
+                    順位は合計（素点＋ウマ＋オカ）で決めています。同じ名前は同一人物として合算します
                   </div>
-                  {histAgg.rows.map((r, rank) => (
+                  {histAgg.rows.map((r, rank) => {
+                    const pm = (v) => (v > 0 ? "+" : "") + v.toLocaleString();
+                    return (
                     <div key={r.name} style={{
-                      display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
+                      display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0",
                       borderBottom: rank < histAgg.rows.length - 1 ? `1px solid ${t.bd}33` : "none",
                     }}>
                       <span style={{
-                        width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                        width: 30, height: 30, borderRadius: "50%", flexShrink: 0, marginTop: 2,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 13, fontWeight: 900,
                         background: rank === 0 ? t.gdS : t.sf,
@@ -11380,17 +11368,26 @@ input, select { padding: 10px 14px; }
                           }}>{rank === 0 ? "🏆 " : ""}{r.name}</span>
                           <span style={{
                             fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums", flexShrink: 0,
-                            color: r.pt > 0 ? t.gn : r.pt < 0 ? t.rd : t.tx,
-                          }}>{r.pt > 0 ? "+" : ""}{r.pt.toLocaleString()}pt</span>
+                            color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx,
+                          }}>{pm(r.total)}点</span>
                         </div>
-                        <div style={{ fontSize: 10.5, color: t.dm, marginTop: 3, lineHeight: 1.6 }}>
-                          素点合計 {r.score.toLocaleString()}
-                          {histAgg.hasRate && ` ・ レート ${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)}${histAgg.unit || "G"}`}
-                          {` ・ ${r.n}戦 トップ${r.top}回`}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 10.5, color: t.dm, marginTop: 4, lineHeight: 1.6, fontVariantNumeric: "tabular-nums" }}>
+                          <span style={{ whiteSpace: "nowrap" }}>素点 {pm(r.soten)}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>ウマ {pm(r.uma)}</span>
+                          <span style={{ whiteSpace: "nowrap" }}>オカ {pm(r.oka)}</span>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 10.5, color: t.dm, marginTop: 2, lineHeight: 1.6, fontVariantNumeric: "tabular-nums" }}>
+                          {histAgg.hasRate && (
+                            <span style={{ whiteSpace: "nowrap", color: r.gold > 0 ? t.gn : r.gold < 0 ? t.rd : t.dm }}>
+                              レート換算 {r.gold > 0 ? "+" : ""}{GOLD_LABEL(r.gold)}{histAgg.unit || "G"}
+                            </span>
+                          )}
+                          <span style={{ whiteSpace: "nowrap" }}>トップ {r.top}回（{r.n}戦）</span>
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   <button style={{ ...actionBtn(), marginTop: 14, marginBottom: 0 }} onClick={() => setHistAgg(null)}>閉じる</button>
                 </div>
               </div>
