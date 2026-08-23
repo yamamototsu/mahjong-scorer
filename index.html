@@ -166,7 +166,18 @@ function validFuOptions(han, isTsumo) {
 const DEFAULT_PRESET_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 function MahjongScorer() {
   const [view, setView] = useState("title");
-  const [gameHistory, setGameHistory] = useState([]);
+  const [gameHistory, setGameHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("mj_history") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("mj_history", JSON.stringify(gameHistory));
+    } catch {}
+  }, [gameHistory]);
   const [suspendedGame, setSuspendedGame] = useState(null);
   const [setupStep, setSetupStep] = useState(0);
   const [gameDate, setGameDate] = useState(() => {
@@ -21064,6 +21075,78 @@ input, select { padding: 10px 14px; }
     return renderSetup();
   };
   const [historyDetail, setHistoryDetail] = useState(null);
+  const [histSelMode, setHistSelMode] = useState(false);
+  const [histSel, setHistSel] = useState([]);
+  const [histAgg, setHistAgg] = useState(null);
+  const gamePts = g => {
+    const n = g.finalScores.length;
+    const names = g.players.slice(0, n);
+    if (g.okaResults && g.okaResults.length) {
+      const m = {};
+      g.okaResults.forEach(o => {
+        m[o.name] = o.finalPt;
+      });
+      if (names.every(nm => m[nm] !== undefined)) return names.map(nm => m[nm]);
+    }
+    const rs = g.rules || {};
+    const sp = rs.startPoints ?? 25000,
+      rp = rs.returnPoints ?? 30000;
+    const uma = rs.uma && rs.uma.length === n ? rs.uma : Array(n).fill(0);
+    const okaPool = (rp - sp) * n;
+    const gosha = v => {
+      const sg = v < 0 ? -1 : 1,
+        a = Math.abs(v),
+        f = Math.floor(a);
+      return sg * (a - f > 0.5 ? f + 1 : f);
+    };
+    const ranked = g.finalScores.map((v, i) => ({
+      i,
+      v
+    })).sort((a, b) => b.v - a.v || a.i - b.i);
+    const pts = Array(n).fill(0);
+    ranked.forEach((r, rank) => {
+      pts[r.i] = gosha((r.v - rp + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0);
+    });
+    return pts;
+  };
+  const aggregateGames = ids => {
+    const games = gameHistory.filter(g => ids.includes(g.id));
+    const by = {};
+    let unit = "";
+    games.forEach(g => {
+      const n = g.finalScores.length;
+      const names = g.players.slice(0, n);
+      const pts = gamePts(g);
+      const rate = g.rules && g.rules.rate || 0;
+      if (rate > 0 && !unit) unit = g.rules.rateUnit || "G";
+      let topIdx = 0;
+      for (let i = 1; i < n; i++) {
+        if (pts[i] > pts[topIdx] || pts[i] === pts[topIdx] && g.finalScores[i] > g.finalScores[topIdx]) topIdx = i;
+      }
+      names.forEach((nm, i) => {
+        if (!by[nm]) by[nm] = {
+          name: nm,
+          pt: 0,
+          score: 0,
+          gold: 0,
+          n: 0,
+          top: 0
+        };
+        by[nm].pt += pts[i];
+        by[nm].score += g.finalScores[i];
+        if (rate > 0) by[nm].gold += GOLD(pts[i], rate);
+        by[nm].n += 1;
+        if (i === topIdx) by[nm].top += 1;
+      });
+    });
+    const rows = Object.values(by).sort((a, b) => b.pt - a.pt || b.score - a.score);
+    return {
+      rows,
+      count: games.length,
+      unit,
+      hasRate: games.some(g => (g.rules?.rate || 0) > 0)
+    };
+  };
   const [restoreMsg, setRestoreMsg] = useState(null);
   const exportBackup = async () => {
     const data = {
@@ -21240,7 +21323,33 @@ input, select { padding: 10px 14px; }
       color: restoreMsg.ok ? t.gn : t.rd,
       textAlign: "center"
     }
-  }, restoreMsg.ok ? "✓ " : "✕ ", restoreMsg.text)), gameHistory.length === 0 ? React.createElement("div", {
+  }, restoreMsg.ok ? "✓ " : "✕ ", restoreMsg.text)), gameHistory.length >= 2 && !histSelMode && React.createElement("button", {
+    onClick: () => {
+      setHistSelMode(true);
+      setHistSel([]);
+    },
+    style: {
+      width: "100%",
+      padding: "13px 10px",
+      borderRadius: 12,
+      cursor: "pointer",
+      marginBottom: 14,
+      border: `1px solid ${t.ac}`,
+      background: "transparent",
+      color: t.ac,
+      fontSize: 14,
+      fontWeight: 700
+    }
+  }, "☑ 対局を選んで集計する"), histSelMode && React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: t.ac,
+      fontWeight: 700,
+      textAlign: "center",
+      marginBottom: 10,
+      lineHeight: 1.7
+    }
+  }, "集計したい対局をタップで選んでください（", histSel.length, "件選択中）"), gameHistory.length === 0 ? React.createElement("div", {
     style: {
       ...card,
       textAlign: "center",
@@ -21267,16 +21376,23 @@ input, select { padding: 10px 14px; }
       name: p,
       score: g.finalScores[i]
     })).sort((a, b) => b.score - a.score);
+    const sel = histSelMode && histSel.includes(g.id);
     return React.createElement("button", {
       key: g.id,
-      onClick: () => setHistoryDetail(g),
+      onClick: () => {
+        if (histSelMode) setHistSel(prev => prev.includes(g.id) ? prev.filter(x => x !== g.id) : [...prev, g.id]);else setHistoryDetail(g);
+      },
       style: {
         ...card,
         width: "100%",
         textAlign: "left",
         cursor: "pointer",
         padding: 16,
-        transition: "all 0.12s"
+        transition: "all 0.12s",
+        ...(sel ? {
+          border: `2px solid ${t.ac}`,
+          background: t.acS
+        } : {})
       }
     }, React.createElement("div", {
       style: {
@@ -21288,9 +21404,28 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 14,
-        fontWeight: 700
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        gap: 8
       }
-    }, g.date), React.createElement("span", {
+    }, histSelMode && React.createElement("span", {
+      style: {
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        flexShrink: 0,
+        border: `2px solid ${sel ? t.ac : t.bd}`,
+        background: sel ? t.ac : "transparent",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: 900,
+        lineHeight: 1
+      }
+    }, sel ? "✓" : ""), g.date), React.createElement("span", {
       style: {
         fontSize: 12,
         color: t.dm,
@@ -21322,7 +21457,176 @@ input, select { padding: 10px 14px; }
         marginTop: 6
       }
     }, g.rounds.length, "局"));
-  })) : React.createElement(React.Fragment, null, React.createElement("button", {
+  }), histSelMode && React.createElement("div", {
+    style: {
+      height: "calc(env(safe-area-inset-bottom, 0px) + 78px)"
+    }
+  }), histSelMode && React.createElement("div", {
+    style: {
+      position: "fixed",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 20,
+      background: "#0b0f15",
+      borderTop: `1px solid ${t.bd}66`,
+      padding: "10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      maxWidth: 400,
+      margin: "0 auto"
+    }
+  }, React.createElement("button", {
+    disabled: histSel.length === 0,
+    onClick: () => setHistAgg(aggregateGames(histSel)),
+    style: {
+      ...actionBtn("p"),
+      marginBottom: 0,
+      flex: 1.3,
+      fontSize: 14,
+      padding: "14px 6px",
+      whiteSpace: "nowrap",
+      opacity: histSel.length === 0 ? 0.45 : 1
+    }
+  }, histSel.length, "件を集計する"), React.createElement("button", {
+    onClick: () => {
+      setHistSelMode(false);
+      setHistSel([]);
+    },
+    style: {
+      ...actionBtn(),
+      marginBottom: 0,
+      flex: 1,
+      fontSize: 14,
+      padding: "14px 6px",
+      whiteSpace: "nowrap"
+    }
+  }, "やめる"))), histAgg && React.createElement("div", {
+    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.9)",
+      zIndex: 150,
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "center",
+      padding: "20px 16px",
+      paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
+      overflowY: "auto",
+      WebkitOverflowScrolling: "touch"
+    }
+  }, React.createElement("div", {
+    style: {
+      width: "100%",
+      maxWidth: 400
+    }
+  }, React.createElement("div", {
+    style: card
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 4
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 800,
+      whiteSpace: "nowrap"
+    }
+  }, "🧮 ", histAgg.count, "対局の集計"), React.createElement("button", {
+    style: {
+      background: "none",
+      border: "none",
+      color: t.dm,
+      fontSize: 20,
+      cursor: "pointer"
+    },
+    onClick: () => setHistAgg(null)
+  }, "✕")), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginBottom: 12,
+      lineHeight: 1.7
+    }
+  }, "順位はウマ・オカ込みのpt合計で決めています。同じ名前は同一人物として合算します"), histAgg.rows.map((r, rank) => React.createElement("div", {
+    key: r.name,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "10px 0",
+      borderBottom: rank < histAgg.rows.length - 1 ? `1px solid ${t.bd}33` : "none"
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: "50%",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 13,
+      fontWeight: 900,
+      background: rank === 0 ? t.gdS : t.sf,
+      color: rank === 0 ? t.gd : t.dm,
+      border: `1px solid ${rank === 0 ? t.gd : t.bd}`
+    }
+  }, rank + 1), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      gap: 8
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: rank === 0 ? t.gd : t.tx,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      minWidth: 0
+    }
+  }, rank === 0 ? "🏆 " : "", r.name), React.createElement("span", {
+    style: {
+      fontSize: 17,
+      fontWeight: 900,
+      fontVariantNumeric: "tabular-nums",
+      flexShrink: 0,
+      color: r.pt > 0 ? t.gn : r.pt < 0 ? t.rd : t.tx
+    }
+  }, r.pt > 0 ? "+" : "", r.pt.toLocaleString(), "pt")), React.createElement("div", {
+    style: {
+      fontSize: 10.5,
+      color: t.dm,
+      marginTop: 3,
+      lineHeight: 1.6
+    }
+  }, "素点合計 ", r.score.toLocaleString(), histAgg.hasRate && ` ・ レート ${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)}${histAgg.unit || "G"}`, ` ・ ${r.n}戦 トップ${r.top}回`)))), React.createElement("button", {
+    style: {
+      ...actionBtn(),
+      marginTop: 14,
+      marginBottom: 0
+    },
+    onClick: () => setHistAgg(null)
+  }, "閉じる"))))) : React.createElement(React.Fragment, null, React.createElement("button", {
     style: backBtn,
     onClick: () => setHistoryDetail(null)
   }, "← 一覧に戻る"), React.createElement("div", {

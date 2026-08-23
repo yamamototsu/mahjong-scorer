@@ -101,7 +101,13 @@ const DEFAULT_PRESET_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"
 
 export default function MahjongScorer() {
   const [view, setView] = useState("title");
-  const [gameHistory, setGameHistory] = useState([]); // completed games
+  // 対局履歴。端末に保存する（これまでメモリ上だけで、閉じると消えていた）
+  const [gameHistory, setGameHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("mj_history") || "[]"); } catch { return []; }
+  });
+  React.useEffect(() => {
+    try { localStorage.setItem("mj_history", JSON.stringify(gameHistory)); } catch {}
+  }, [gameHistory]);
   const [suspendedGame, setSuspendedGame] = useState(null); // paused game
 
   // ── Game Setup Wizard ──
@@ -10987,6 +10993,59 @@ input, select { padding: 10px 14px; }
   // ══════════════════════════════════
   const [historyDetail, setHistoryDetail] = useState(null);
 
+  // ── 履歴の選択集計 ──
+  // 対局を選んで、素点合計・ウマオカ込みpt合計・レート換算・参加数・トップ数を出す
+  const [histSelMode, setHistSelMode] = useState(false);
+  const [histSel, setHistSel] = useState([]);     // 選択した対局のid
+  const [histAgg, setHistAgg] = useState(null);   // 集計結果 { rows, count, unit, hasRate }
+
+  // 1対局ぶんの精算pt（ウマ・オカ込み）。古い記録に okaResults が無ければルールから導出
+  const gamePts = (g) => {
+    const n = g.finalScores.length;
+    const names = g.players.slice(0, n);
+    if (g.okaResults && g.okaResults.length) {
+      const m = {};
+      g.okaResults.forEach(o => { m[o.name] = o.finalPt; });
+      if (names.every(nm => m[nm] !== undefined)) return names.map(nm => m[nm]);
+    }
+    const rs = g.rules || {};
+    const sp = rs.startPoints ?? 25000, rp = rs.returnPoints ?? 30000;
+    const uma = (rs.uma && rs.uma.length === n) ? rs.uma : Array(n).fill(0);
+    const okaPool = (rp - sp) * n;
+    const gosha = (v) => { const sg = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return sg * (a - f > 0.5 ? f + 1 : f); };
+    const ranked = g.finalScores.map((v, i) => ({ i, v })).sort((a, b) => (b.v - a.v) || (a.i - b.i));
+    const pts = Array(n).fill(0);
+    ranked.forEach((r, rank) => { pts[r.i] = gosha((r.v - rp + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0); });
+    return pts;
+  };
+
+  const aggregateGames = (ids) => {
+    const games = gameHistory.filter(g => ids.includes(g.id));
+    const by = {};   // 名前ごとに合算（同じ名前は同一人物として扱う）
+    let unit = "";
+    games.forEach(g => {
+      const n = g.finalScores.length;
+      const names = g.players.slice(0, n);
+      const pts = gamePts(g);
+      const rate = (g.rules && g.rules.rate) || 0;
+      if (rate > 0 && !unit) unit = (g.rules.rateUnit || "G");
+      let topIdx = 0;
+      for (let i = 1; i < n; i++) {
+        if (pts[i] > pts[topIdx] || (pts[i] === pts[topIdx] && g.finalScores[i] > g.finalScores[topIdx])) topIdx = i;
+      }
+      names.forEach((nm, i) => {
+        if (!by[nm]) by[nm] = { name: nm, pt: 0, score: 0, gold: 0, n: 0, top: 0 };
+        by[nm].pt += pts[i];
+        by[nm].score += g.finalScores[i];
+        if (rate > 0) by[nm].gold += GOLD(pts[i], rate);
+        by[nm].n += 1;
+        if (i === topIdx) by[nm].top += 1;
+      });
+    });
+    const rows = Object.values(by).sort((a, b) => (b.pt - a.pt) || (b.score - a.score));
+    return { rows, count: games.length, unit, hasRate: games.some(g => (g.rules?.rate || 0) > 0) };
+  };
+
   // ── Backup / Restore ──
   const [restoreMsg, setRestoreMsg] = useState(null);
 
@@ -11090,6 +11149,19 @@ input, select { padding: 10px 14px; }
             )}
           </div>
 
+          {/* 対局を選んで集計 */}
+          {gameHistory.length >= 2 && !histSelMode && (
+            <button onClick={() => { setHistSelMode(true); setHistSel([]); }} style={{
+              width: "100%", padding: "13px 10px", borderRadius: 12, cursor: "pointer", marginBottom: 14,
+              border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 14, fontWeight: 700,
+            }}>☑ 対局を選んで集計する</button>
+          )}
+          {histSelMode && (
+            <div style={{ fontSize: 12, color: t.ac, fontWeight: 700, textAlign: "center", marginBottom: 10, lineHeight: 1.7 }}>
+              集計したい対局をタップで選んでください（{histSel.length}件選択中）
+            </div>
+          )}
+
           {gameHistory.length === 0 ? (
             <div style={{ ...card, textAlign: "center", padding: 32 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
@@ -11100,14 +11172,31 @@ input, select { padding: 10px 14px; }
             [...gameHistory].reverse().map((g, idx) => {
               // 保存済みの古い三麻記録は players が4人のことがあるので、点数がある人数で切る
               const sorted = g.players.slice(0, g.finalScores.length).map((p, i) => ({ name: p, score: g.finalScores[i] })).sort((a, b) => b.score - a.score);
+              const sel = histSelMode && histSel.includes(g.id);
               return (
                 <button
                   key={g.id}
-                  onClick={() => setHistoryDetail(g)}
-                  style={{ ...card, width: "100%", textAlign: "left", cursor: "pointer", padding: 16, transition: "all 0.12s" }}
+                  onClick={() => {
+                    if (histSelMode) setHistSel(prev => prev.includes(g.id) ? prev.filter(x => x !== g.id) : [...prev, g.id]);
+                    else setHistoryDetail(g);
+                  }}
+                  style={{
+                    ...card, width: "100%", textAlign: "left", cursor: "pointer", padding: 16, transition: "all 0.12s",
+                    ...(sel ? { border: `2px solid ${t.ac}`, background: t.acS } : {}),
+                  }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700 }}>{g.date}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                      {histSelMode && (
+                        <span style={{
+                          width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                          border: `2px solid ${sel ? t.ac : t.bd}`, background: sel ? t.ac : "transparent",
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1,
+                        }}>{sel ? "✓" : ""}</span>
+                      )}
+                      {g.date}
+                    </span>
                     <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
                       {MATCH_LABEL_SHORT(g.matchType)}
                     </span>
@@ -11129,6 +11218,77 @@ input, select { padding: 10px 14px; }
                 </button>
               );
             })
+          )}
+
+          {/* 下の固定バーに隠れないぶんの余白 */}
+          {histSelMode && <div style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 78px)" }} />}
+          {histSelMode && (
+            <div style={{
+              position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 20,
+              background: "#0b0f15", borderTop: `1px solid ${t.bd}66`,
+              padding: "10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px)",
+            }}>
+              <div style={{ display: "flex", gap: 8, maxWidth: 400, margin: "0 auto" }}>
+                <button disabled={histSel.length === 0}
+                  onClick={() => setHistAgg(aggregateGames(histSel))}
+                  style={{ ...actionBtn("p"), marginBottom: 0, flex: 1.3, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap", opacity: histSel.length === 0 ? 0.45 : 1 }}>
+                  {histSel.length}件を集計する
+                </button>
+                <button onClick={() => { setHistSelMode(false); setHistSel([]); }}
+                  style={{ ...actionBtn(), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}>やめる</button>
+              </div>
+            </div>
+          )}
+
+          {/* 集計結果 */}
+          {histAgg && (
+            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+              <div style={{ width: "100%", maxWidth: 400 }}>
+                <div style={card}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, whiteSpace: "nowrap" }}>🧮 {histAgg.count}対局の集計</span>
+                    <button style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
+                      onClick={() => setHistAgg(null)}>✕</button>
+                  </div>
+                  <div style={{ fontSize: 10, color: t.dm, marginBottom: 12, lineHeight: 1.7 }}>
+                    順位はウマ・オカ込みのpt合計で決めています。同じ名前は同一人物として合算します
+                  </div>
+                  {histAgg.rows.map((r, rank) => (
+                    <div key={r.name} style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "10px 0",
+                      borderBottom: rank < histAgg.rows.length - 1 ? `1px solid ${t.bd}33` : "none",
+                    }}>
+                      <span style={{
+                        width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 900,
+                        background: rank === 0 ? t.gdS : t.sf,
+                        color: rank === 0 ? t.gd : t.dm,
+                        border: `1px solid ${rank === 0 ? t.gd : t.bd}`,
+                      }}>{rank + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                          <span style={{
+                            fontSize: 14, fontWeight: 700, color: rank === 0 ? t.gd : t.tx,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+                          }}>{rank === 0 ? "🏆 " : ""}{r.name}</span>
+                          <span style={{
+                            fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums", flexShrink: 0,
+                            color: r.pt > 0 ? t.gn : r.pt < 0 ? t.rd : t.tx,
+                          }}>{r.pt > 0 ? "+" : ""}{r.pt.toLocaleString()}pt</span>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: t.dm, marginTop: 3, lineHeight: 1.6 }}>
+                          素点合計 {r.score.toLocaleString()}
+                          {histAgg.hasRate && ` ・ レート ${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)}${histAgg.unit || "G"}`}
+                          {` ・ ${r.n}戦 トップ${r.top}回`}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <button style={{ ...actionBtn(), marginTop: 14, marginBottom: 0 }} onClick={() => setHistAgg(null)}>閉じる</button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       ) : (
