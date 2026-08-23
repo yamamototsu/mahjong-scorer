@@ -294,12 +294,8 @@ export default function MahjongScorer() {
 
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
   // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
-  // 起動画面は3秒でメニューへ。待たずに始めたければタップでも進める
+  // 起動画面は「TAP TO START」のタップ待ち（自動では進まない）
   const [booting, setBooting] = useState(true);
-  React.useEffect(() => {
-    const tm = setTimeout(() => setBooting(false), 3000);
-    return () => clearTimeout(tm);
-  }, []);
   // メニューが出そろったあとの目印。タイトルへ戻るたびに出現アニメーションが
   // 再生されないよう、これが立ったら演出は一切かけない
   const [introDone, setIntroDone] = useState(false);
@@ -2700,6 +2696,14 @@ input, select { padding: 10px 14px; }
 @keyframes bootSub {
   0%   { opacity: 0; transform: translateY(10px); letter-spacing: 0.5em; }
   100% { opacity: 0.9; transform: translateY(0); letter-spacing: 0.22em; }
+}
+@keyframes tapIn {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 0.95; transform: translateY(0); }
+}
+@keyframes tapBlink {
+  0%, 100% { opacity: 0.95; }
+  50%      { opacity: 0.15; }
 }
 @keyframes bootGlow {
   0%, 100% { text-shadow: 0 0 18px rgba(234,179,8,0.35), 0 3px 14px rgba(0,0,0,0.7); }
@@ -6146,6 +6150,19 @@ input, select { padding: 10px 14px; }
           <div onClick={() => setBooting(false)} style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 3, cursor: "pointer",
           }} />
+        )}
+
+        {/* タップで始められる合図。ふわっと出たあと点滅し続ける */}
+        {intro && (
+          <div style={{
+            position: "fixed", left: 0, right: 0,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 7%)",
+            textAlign: "center", zIndex: 2, pointerEvents: "none",
+            fontSize: 13, fontWeight: 800, letterSpacing: "0.42em", textIndent: "0.42em",
+            color: "rgba(255,255,255,0.95)",
+            textShadow: "0 0 14px rgba(234,179,8,0.4), 0 2px 10px rgba(0,0,0,0.85)",
+            animation: "tapIn 0.6s 1.8s ease-out both, tapBlink 1.7s 2.6s ease-in-out infinite",
+          }}>TAP TO START</div>
         )}
 
         {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
