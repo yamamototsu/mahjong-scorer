@@ -9077,7 +9077,9 @@ input, select { padding: 10px 14px; }
             /* 和了者を選ぶ（ダブロン可のときは複数選択） */
             (() => {
               const picked = ronPick.includes(i);
-              const maxRon = 3;   // 選択自体は常に3人まで（ルールとの差異は下に警告）
+              // 選択できるのは放銃者が1人残る人数まで（四麻3人・三麻2人）。
+              // ルール設定(頭ハネ等)との差異は確定時に警告を出す
+              const maxRon = PC - 1;
               return (
                 <button onClick={() => {
                   setRonPick(prev => prev.includes(i)
