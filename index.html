@@ -11283,6 +11283,7 @@ input, select { padding: 10px 14px; }
     if (gWinner === null || !gResult) return null;
     const {
       flows,
+      pool,
       total
     } = payInfo();
     const slotOf = i => (i - seatRot + PC) % PC;
@@ -11394,7 +11395,11 @@ input, select { padding: 10px 14px; }
       const pos = posOf(i);
       const isWin = i === gWinner;
       const f = flows.find(x => x.from === i);
-      const amt = isWin ? total : f ? -f.amt : 0;
+      const hb2 = honba * HU();
+      const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;
+      const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : gLoser !== null ? hb2 : 0;
+      const amt = isWin ? total - pool - hbGet : f ? -(f.amt - hbPay) : 0;
+      const subs = isWin ? hbGet > 0 && pool > 0 ? [`場${hbGet}`, `棒${pool}`] : hbGet > 0 ? [`本場 +${hbGet.toLocaleString()}`] : pool > 0 ? [`リーチ棒 +${pool.toLocaleString()}`] : [] : f && hbPay > 0 ? [`本場 −${hbPay.toLocaleString()}`] : [];
       return React.createElement("div", {
         key: i,
         style: {
@@ -11453,11 +11458,15 @@ input, select { padding: 10px 14px; }
       }, amt > 0 ? "+" : "", amt.toLocaleString()), React.createElement("div", {
         style: {
           fontSize: fs(10),
-          color: t.gd,
           fontWeight: 700,
-          lineHeight: 1.25
+          lineHeight: 1.25,
+          whiteSpace: "nowrap",
+          maxWidth: "100%",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          color: isWin ? t.gd : "#ff8a8a"
         }
-      }, isWin ? "アガリ" : " "));
+      }, subs.length ? subs.join("・") : "　"));
     }));
   };
   const PayTableView = () => {

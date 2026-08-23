@@ -5823,7 +5823,7 @@ input, select { padding: 10px 14px; }
   // % ではなく vw/px で渡す
   const PayTableBox = ({ boxW }) => {
     if (gWinner === null || !gResult) return null;
-    const { flows, total } = payInfo();
+    const { flows, pool, total } = payInfo();
 
     // 席の配置（卓上モードと同じ: 手前/右/(向かい)/左）
     const slotOf = (i) => (i - seatRot + PC) % PC;
@@ -5886,12 +5886,22 @@ input, select { padding: 10px 14px; }
           </svg>
 
 
-          {/* 各席のパネル */}
+          {/* 各席のパネル。点数は基本点数を大きく出し、本場・リーチ棒は下に分けて示す */}
           {Array.from({ length: PC }, (_, i) => i).map(i => {
             const pos = posOf(i);
             const isWin = i === gWinner;
             const f = flows.find(x => x.from === i);
-            const amt = isWin ? total : (f ? -f.amt : 0);
+            const hb2 = honba * HU();
+            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の本場ぶん
+            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る本場ぶん
+            const amt = isWin ? total - pool - hbGet : (f ? -(f.amt - hbPay) : 0);
+            // 内訳は1行に収める。両方あるときは「場・棒」の短い表記にする
+            const subs = isWin
+              ? (hbGet > 0 && pool > 0
+                  ? [`場${hbGet}`, `棒${pool}`]
+                  : hbGet > 0 ? [`本場 +${hbGet.toLocaleString()}`]
+                  : pool > 0 ? [`リーチ棒 +${pool.toLocaleString()}`] : [])
+              : (f && hbPay > 0 ? [`本場 −${hbPay.toLocaleString()}`] : []);
             return (
               <div key={i} style={{
                 position: "absolute", top: `${pos.y}%`, left: `${pos.x}%`,
@@ -5925,9 +5935,12 @@ input, select { padding: 10px 14px; }
                 }}>
                   {amt > 0 ? "+" : ""}{amt.toLocaleString()}
                 </div>
-                {/* あがった人だけ「アガリ」。高さを固定すると文字があふれて点数と重なるので
-                    行の高さで確保し、他の席は空白1文字を置いて4枠の高さを揃える */}
-                <div style={{ fontSize: fs(10), color: t.gd, fontWeight: 700, lineHeight: 1.25 }}>{isWin ? "アガリ" : " "}</div>
+                {/* 本場・リーチ棒の内訳。無い席は空白1文字で高さを揃える */}
+                <div style={{
+                  fontSize: fs(10), fontWeight: 700, lineHeight: 1.25, whiteSpace: "nowrap",
+                  maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis",
+                  color: isWin ? t.gd : "#ff8a8a",
+                }}>{subs.length ? subs.join("・") : "　"}</div>
               </div>
             );
           })}
