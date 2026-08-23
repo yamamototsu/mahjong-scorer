@@ -7236,7 +7236,9 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 11, color: t.dm, marginTop: 4 }}>
             {lg.members.length}人 ・ {pr.played}回消化
             {lg.mode === "count" ? ` / 全${lg.targetCount}回` : ` ・ ${lg.startDate}〜${lg.endDate}`}
-            {" ・ ウマ "}{UMA_PRESETS.find(u => u.key === lg.umaKey)?.label || "10-20"}
+            {/* 三麻リーグは三人用プリセットから引く。どちらにも無ければ実際のウマ値を出す */}
+            {" ・ ウマ "}{((lg.playerCount || 4) === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === lg.umaKey)?.label
+              || (lg.uma || []).slice(0, lg.playerCount || 4).map(u => (u > 0 ? "+" : "") + u).join(" / ") || "なし"}
           </div>
         </div>
 
@@ -7365,7 +7367,7 @@ input, select { padding: 10px 14px; }
               <div><span style={{ color: t.dm }}>持ち点 / 返し点: </span>
                 {lg.rules.startPoints.toLocaleString()} / {lg.rules.returnPoints.toLocaleString()}</div>
               <div><span style={{ color: t.dm }}>オカ: </span>
-                {((lg.rules.returnPoints - lg.rules.startPoints) * 4 / 1000)}pt がトップへ</div>
+                {((lg.rules.returnPoints - lg.rules.startPoints) * (lg.playerCount || 4) / 1000)}pt がトップへ</div>
               <div><span style={{ color: t.dm }}>流局したときの親: </span>
                 {lg.rules.agariRenchan ? "あがり連荘" : lg.rules.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘"}</div>
               <div><span style={{ color: t.dm }}>複数人が同時にロン: </span>
