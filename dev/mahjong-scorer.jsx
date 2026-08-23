@@ -10059,18 +10059,22 @@ input, select { padding: 10px 14px; }
                     卓をタップすると大きく表示します（卓の中央に置く用）
                   </div>
                 </div>
-                {/* 決定とやり直しは画面の下に固定して、スクロールしなくても押せるようにする */}
+                {/* 下の固定バーに隠れないぶんの余白 */}
+                <div style={{ height: "calc(env(safe-area-inset-bottom, 0px) + 78px)" }} />
+                {/* 決定とやり直しは画面のいちばん下に固定（1行・不透明。stickyはiOSで
+                    位置がずれて下が透けたため fixed にする） */}
                 <div style={{
-                  position: "sticky", bottom: 0, zIndex: 5,
-                  margin: "10px -5px 0",
-                  padding: "10px 5px calc(env(safe-area-inset-bottom, 0px) + 8px)",
-                  background: "rgba(9, 13, 18, 0.97)",
-                  borderTop: `1px solid ${t.bd}55`,
+                  position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 20,
+                  background: "#0b0f15",
+                  borderTop: `1px solid ${t.bd}66`,
+                  padding: "10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px)",
                 }}>
-                  <button style={actionBtn("p")} onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
-                  <button style={{ ...actionBtn(), marginBottom: 0 }} onClick={resetGW}>
-                    {correctingIdx !== null ? "キャンセル" : "最初から計算"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, maxWidth: 400, margin: "0 auto" }}>
+                    <button style={{ ...actionBtn("p"), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
+                      onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
+                    <button style={{ ...actionBtn(), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
+                      onClick={resetGW}>{correctingIdx !== null ? "キャンセル" : "最初から計算"}</button>
+                  </div>
                 </div>
               </>
             )}

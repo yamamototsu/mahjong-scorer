@@ -19466,24 +19466,47 @@ input, select { padding: 10px 14px; }
     }
   }, "卓をタップすると大きく表示します（卓の中央に置く用）")), React.createElement("div", {
     style: {
-      position: "sticky",
+      height: "calc(env(safe-area-inset-bottom, 0px) + 78px)"
+    }
+  }), React.createElement("div", {
+    style: {
+      position: "fixed",
+      left: 0,
+      right: 0,
       bottom: 0,
-      zIndex: 5,
-      margin: "10px -5px 0",
-      padding: "10px 5px calc(env(safe-area-inset-bottom, 0px) + 8px)",
-      background: "rgba(9, 13, 18, 0.97)",
-      borderTop: `1px solid ${t.bd}55`
+      zIndex: 20,
+      background: "#0b0f15",
+      borderTop: `1px solid ${t.bd}66`,
+      padding: "10px 16px calc(env(safe-area-inset-bottom, 0px) + 10px)"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      maxWidth: 400,
+      margin: "0 auto"
     }
   }, React.createElement("button", {
-    style: actionBtn("p"),
+    style: {
+      ...actionBtn("p"),
+      marginBottom: 0,
+      flex: 1,
+      fontSize: 14,
+      padding: "14px 6px",
+      whiteSpace: "nowrap"
+    },
     onClick: applyRound
   }, correctingIdx !== null ? "修正を反映" : "スコアに反映"), React.createElement("button", {
     style: {
       ...actionBtn(),
-      marginBottom: 0
+      marginBottom: 0,
+      flex: 1,
+      fontSize: 14,
+      padding: "14px 6px",
+      whiteSpace: "nowrap"
     },
     onClick: resetGW
-  }, correctingIdx !== null ? "キャンセル" : "最初から計算"))))), showDrawWiz && React.createElement("div", {
+  }, correctingIdx !== null ? "キャンセル" : "最初から計算")))))), showDrawWiz && React.createElement("div", {
     style: {
       position: "fixed",
       top: 0,
