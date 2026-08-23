@@ -594,15 +594,16 @@ function MahjongScorer() {
     return s * (a - f > 0.5 ? f + 1 : f);
   };
   const calcGamePts = (scores4, seatOrder, lg) => {
+    const pcN = scores4.length;
     const startPt = lg.rules?.startPoints ?? 25000;
-    const returnPt = lg.rules?.returnPoints ?? 30000;
-    const uma = lg.uma || [20, 10, -10, -20];
+    const returnPt = Math.max(startPt, lg.rules?.returnPoints ?? 30000);
+    const umaSrc = lg.uma || [20, 10, -10, -20];
+    const uma = umaSrc.length === pcN ? umaSrc : Array(pcN).fill(0);
     const ranked = scores4.map((s, i) => ({
       i,
       s,
       seat: seatOrder ? seatOrder[i] : i
     })).sort((a, b) => b.s - a.s || a.seat - b.seat);
-    const pcN = scores4.length;
     const okaPool = (returnPt - startPt) * pcN;
     const out = new Array(pcN);
     ranked.forEach((r, rank) => {
@@ -732,7 +733,9 @@ function MahjongScorer() {
   const [defaultRules, setDefaultRules] = useState(loadDefaultRules);
   const [lastRules, setLastRules] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("mj_last_rules") || "null");
+      const v = JSON.parse(localStorage.getItem("mj_last_rules") || "null");
+      if (v && v.returnPoints != null && v.returnPoints < (v.startPoints ?? 0)) v.returnPoints = v.startPoints;
+      return v;
     } catch {
       return null;
     }
@@ -1732,11 +1735,15 @@ function MahjongScorer() {
   }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, correctingDrawIdx, rounds, declaredRiichi]);
   const startGame = useCallback(() => {
     const sp = rules.startPoints || 25000;
+    const useRules = {
+      ...rules
+    };
+    if ((useRules.returnPoints ?? sp) < sp) useRules.returnPoints = sp;
     try {
-      localStorage.setItem("mj_last_rules", JSON.stringify(rules));
+      localStorage.setItem("mj_last_rules", JSON.stringify(useRules));
     } catch {}
     setLastRules({
-      ...rules
+      ...useRules
     });
     const activeLg = activeLeagueId ? leagues.find(l => l.id === activeLeagueId) : null;
     const pcNow = activeLg ? activeLg.playerCount || 4 : playerCount;
@@ -1746,7 +1753,7 @@ function MahjongScorer() {
       playerCount: pcNow,
       players: players.slice(0, pcNow),
       rules: {
-        ...rules
+        ...useRules
       },
       startedAt: Date.now()
     };
@@ -11240,7 +11247,15 @@ input, select { padding: 10px 14px; }
         setRuleEditMode(false);
         setRcSet(null);
       }
-    }, "✕")), !ruleEditMode ? React.createElement(React.Fragment, null, row("人数", PC === 3 ? "三人麻雀" : "四人麻雀"), row("形式", MATCH_LABEL(gameConfig?.matchType)), row("持ち点 / 返し点", `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`, `オカ ${((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * PC / 1000}pt がトップへ`), row("ウマ（順位点）", umaLabel), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし", rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり"), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), row("本場", `1本 = ${HU().toLocaleString()}点`, `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`), row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います"), row("チョンボ", rs.chomboCalc !== false ? "罰符あり" : "記録のみ", rs.chomboCalc !== false ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し` : "点数は動かさず記録だけ残します。局はやり直し"), row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし", rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)) : (() => {
+    }, "✕")), !ruleEditMode ? React.createElement(React.Fragment, null, row("人数", PC === 3 ? "三人麻雀" : "四人麻雀"), row("形式", MATCH_LABEL(gameConfig?.matchType)), row("持ち点 / 返し点", (() => {
+      const spV = rs.startPoints ?? 25000;
+      const rpV = Math.max(spV, rs.returnPoints ?? 30000);
+      return `${spV.toLocaleString()} / ${rpV.toLocaleString()}`;
+    })(), (() => {
+      const spV = rs.startPoints ?? 25000;
+      const okaPt = (Math.max(spV, rs.returnPoints ?? 30000) - spV) * PC / 1000;
+      return okaPt > 0 ? `オカ ${okaPt}pt がトップへ` : "オカなし";
+    })()), row("ウマ（順位点）", umaLabel), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし", rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり"), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), row("本場", `1本 = ${HU().toLocaleString()}点`, `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`), row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います"), row("チョンボ", rs.chomboCalc !== false ? "罰符あり" : "記録のみ", rs.chomboCalc !== false ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し` : "点数は動かさず記録だけ残します。局はやり直し"), row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし", rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)) : (() => {
       const seg = (opts, cur, onPick) => React.createElement("div", {
         style: {
           display: "flex",
@@ -12055,7 +12070,7 @@ input, select { padding: 10px 14px; }
     let ptOf = null;
     if (rate > 0) {
       const sp = rs.startPoints ?? 25000,
-        rp = rs.returnPoints ?? 30000;
+        rp = Math.max(sp, rs.returnPoints ?? 30000);
       const uma = rs.uma && rs.uma.length === PC ? rs.uma : Array(PC).fill(0);
       const okaPool = (rp - sp) * PC;
       const gosha = v => {
@@ -13962,22 +13977,35 @@ input, select { padding: 10px 14px; }
       key: n,
       onClick: () => {
         if (n === lgPC) return;
-        if (n === 3) set({
-          playerCount: 3,
-          rules: {
-            ...d.rules,
-            ...SANMA_DEFAULT_RULES
-          },
-          umaKey: "none3",
-          uma: [0, 0, 0]
-        });else set({
-          playerCount: 4,
-          rules: {
-            ...defaultRules
-          },
-          umaKey: "none",
-          uma: [0, 0, 0, 0]
-        });
+        if (n === 3) {
+          const {
+            uma: _u,
+            umaKey: _k,
+            ...sanmaRules
+          } = SANMA_DEFAULT_RULES;
+          set({
+            playerCount: 3,
+            rules: {
+              ...d.rules,
+              ...sanmaRules,
+              uma: [0, 0, 0],
+              umaKey: "none3"
+            },
+            umaKey: "none3",
+            uma: [0, 0, 0]
+          });
+        } else {
+          set({
+            playerCount: 4,
+            rules: {
+              ...defaultRules,
+              uma: [0, 0, 0, 0],
+              umaKey: "none"
+            },
+            umaKey: "none",
+            uma: [0, 0, 0, 0]
+          });
+        }
       },
       style: {
         flex: 1,
@@ -15209,7 +15237,13 @@ input, select { padding: 10px 14px; }
         setPlayerCount(lgPC);
         setRules({
           ...defaultRules,
-          ...lg.rules
+          ...lg.rules,
+          ...(lg.uma ? {
+            uma: [...lg.uma]
+          } : {}),
+          ...(lg.umaKey ? {
+            umaKey: lg.umaKey
+          } : {})
         });
         setMatchType(lgMatchType);
         setActiveLeagueId(lg.id);
@@ -17324,10 +17358,14 @@ input, select { padding: 10px 14px; }
   }, sub)))), (() => {
     const wantLen = playerCount === 3 ? 3 : 4;
     const hasLast = !!lastRules && (lastRules.uma || []).length === wantLen;
-    const base = hasLast ? lastRules : playerCount === 3 ? {
+    const rawBase = hasLast ? lastRules : playerCount === 3 ? {
       ...defaultRules,
       ...SANMA_DEFAULT_RULES
     } : defaultRules;
+    const base = {
+      ...rawBase
+    };
+    if (base.returnPoints != null && base.returnPoints < (base.startPoints ?? 0)) base.returnPoints = base.startPoints;
     const same = JSON.stringify(rules) === JSON.stringify(base);
     const ok = hasLast && same;
     const sum = [base.agariRenchan ? "あがり連荘" : base.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘", base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ", base.kuitan ? "食いタンあり" : "食いタンなし", base.doubleYakuman ? "ダブル役満あり" : null, `持ち点${(base.startPoints || 0).toLocaleString()}`].filter(Boolean).join(" ・ ");
@@ -21015,8 +21053,8 @@ input, select { padding: 10px 14px; }
   }, "⏸ 対局保留"));
   const renderGameFinished = () => {
     const ruleSet = gameConfig?.rules || {};
-    const returnPt = ruleSet.returnPoints || 30000;
     const startPt = ruleSet.startPoints || 25000;
+    const returnPt = Math.max(startPt, ruleSet.returnPoints || 30000);
     const okaPool = (returnPt - startPt) * PC;
     const adjusted = players.slice(0, PC).map((p, i) => {
       const diff = scores[i] - returnPt;
@@ -21239,7 +21277,7 @@ input, select { padding: 10px 14px; }
         fontVariantNumeric: "tabular-nums",
         color: s.rawScore < 0 ? t.rd : t.dm
       }
-    }, "素点 ", s.rawScore.toLocaleString()))))), (ruleSet.uma || []).some(u => u !== 0) && (() => {
+    }, "素点 ", s.rawScore.toLocaleString()))))), (ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (() => {
       const uma = ruleSet.uma;
       const gosha = v => {
         const s = v < 0 ? -1 : 1,
@@ -21734,8 +21772,8 @@ input, select { padding: 10px 14px; }
       const n = g.finalScores.length;
       const names = g.players.slice(0, n);
       const rs = g.rules || {};
-      const sp = rs.startPoints ?? 25000,
-        rp = rs.returnPoints ?? 30000;
+      const sp = rs.startPoints ?? 25000;
+      const rp = Math.max(sp, rs.returnPoints ?? 30000);
       const uma = rs.uma && rs.uma.length === n ? rs.uma : Array(n).fill(0);
       const rate = rs.rate || 0;
       if (rate > 0 && !unit) unit = rs.rateUnit || "G";
@@ -21764,7 +21802,7 @@ input, select { padding: 10px 14px; }
         e.uma += um;
         e.oka += ok;
         e.total += tt;
-        if (rate > 0) e.gold += tt * rate;
+        if (rate > 0) e.gold += (goshaRokunyu((so + ok) / 1000) + (uma[rank] || 0)) * 1000 * rate;
         e.n += 1;
         if (rank === 0) e.top += 1;
       });

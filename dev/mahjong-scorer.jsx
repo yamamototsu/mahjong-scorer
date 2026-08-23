@@ -413,14 +413,17 @@ export default function MahjongScorer() {
 
   // 1回ぶんの精算（素点 → pt）
   const calcGamePts = (scores4, seatOrder, lg) => {
+    const pcN = scores4.length;
     const startPt = lg.rules?.startPoints ?? 25000;
-    const returnPt = lg.rules?.returnPoints ?? 30000;
-    const uma = lg.uma || [20, 10, -10, -20];
+    // 「返し点<持ち点」はオカが負になるため、返し＝持ち点（オカなし）として扱う
+    const returnPt = Math.max(startPt, lg.rules?.returnPoints ?? 30000);
+    // ウマの要素数が人数と違うときは適用しない（三人用のウマのまま四人で打った等、合計が崩れるため）
+    const umaSrc = lg.uma || [20, 10, -10, -20];
+    const uma = umaSrc.length === pcN ? umaSrc : Array(pcN).fill(0);
     // 同点は起家に近い席（配列の先頭に近い）を上位とする
     const ranked = scores4
       .map((s, i) => ({ i, s, seat: seatOrder ? seatOrder[i] : i }))
       .sort((a, b) => (b.s - a.s) || (a.seat - b.seat));
-    const pcN = scores4.length;
     const okaPool = (returnPt - startPt) * pcN;
     const out = new Array(pcN);
     ranked.forEach((r, rank) => {
@@ -527,7 +530,12 @@ export default function MahjongScorer() {
   const [defaultRules, setDefaultRules] = useState(loadDefaultRules);
   // 前回の対局で実際に使ったルール
   const [lastRules, setLastRules] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("mj_last_rules") || "null"); } catch { return null; }
+    try {
+      const v = JSON.parse(localStorage.getItem("mj_last_rules") || "null");
+      // 古い保存データの「返し点<持ち点」はオカが負になるため、読み込み時に直す
+      if (v && v.returnPoints != null && v.returnPoints < (v.startPoints ?? 0)) v.returnPoints = v.startPoints;
+      return v;
+    } catch { return null; }
   });
   const saveDefaultRules = (r) => {
     setDefaultRules(r);
@@ -1332,12 +1340,17 @@ export default function MahjongScorer() {
 
   const startGame = useCallback(() => {
     const sp = rules.startPoints || 25000;
+    // 返し点が持ち点を下回るルールは現在のUIでは作れないが、古い保存データ
+    // （mj_last_rules 経由など）から紛れ込むとオカが負になる。
+    // その場合は「返し＝持ち点」（オカなし）に直してから対局・保存に使う
+    const useRules = { ...rules };
+    if ((useRules.returnPoints ?? sp) < sp) useRules.returnPoints = sp;
     // 次回「前回と同じ」で始められるよう控えておく
-    try { localStorage.setItem("mj_last_rules", JSON.stringify(rules)); } catch {}
-    setLastRules({ ...rules });
+    try { localStorage.setItem("mj_last_rules", JSON.stringify(useRules)); } catch {}
+    setLastRules({ ...useRules });
     const activeLg = activeLeagueId ? leagues.find(l => l.id === activeLeagueId) : null;
     const pcNow = activeLg ? (activeLg.playerCount || 4) : playerCount;
-    const cfg = { date: gameDate, matchType, playerCount: pcNow, players: players.slice(0, pcNow), rules: { ...rules }, startedAt: Date.now() };
+    const cfg = { date: gameDate, matchType, playerCount: pcNow, players: players.slice(0, pcNow), rules: { ...useRules }, startedAt: Date.now() };
     setGameConfig(cfg);
     setScores(Array(pcNow).fill(sp));
     setDealerIdx(0);
@@ -5758,8 +5771,16 @@ input, select { padding: 10px 14px; }
               {row("人数", PC === 3 ? "三人麻雀" : "四人麻雀")}
               {row("形式", MATCH_LABEL(gameConfig?.matchType))}
               {row("持ち点 / 返し点",
-                `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`,
-                `オカ ${(((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * PC / 1000)}pt がトップへ`)}
+                (() => {
+                  const spV = rs.startPoints ?? 25000;
+                  const rpV = Math.max(spV, rs.returnPoints ?? 30000);
+                  return `${spV.toLocaleString()} / ${rpV.toLocaleString()}`;
+                })(),
+                (() => {
+                  const spV = rs.startPoints ?? 25000;
+                  const okaPt = (Math.max(spV, rs.returnPoints ?? 30000) - spV) * PC / 1000;
+                  return okaPt > 0 ? `オカ ${okaPt}pt がトップへ` : "オカなし";
+                })())}
               {row("ウマ（順位点）", umaLabel)}
               {row("流局したときの親", renchan, renchanHint)}
               {row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし",
@@ -6267,7 +6288,7 @@ input, select { padding: 10px 14px; }
     const rs = gameConfig?.rules || {};
     let ptOf = null;
     if (rate > 0) {
-      const sp = rs.startPoints ?? 25000, rp = rs.returnPoints ?? 30000;
+      const sp = rs.startPoints ?? 25000, rp = Math.max(sp, rs.returnPoints ?? 30000);
       const uma = (rs.uma && rs.uma.length === PC) ? rs.uma : Array(PC).fill(0);
       const okaPool = (rp - sp) * PC;
       const gosha = (v) => { const sg = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return sg * (a - f > 0.5 ? f + 1 : f); };
@@ -7301,8 +7322,13 @@ input, select { padding: 10px 14px; }
               <button key={n} onClick={() => {
                 if (n === lgPC) return;
                 // 人数の既定ルール・ウマに切り替える
-                if (n === 3) set({ playerCount: 3, rules: { ...d.rules, ...SANMA_DEFAULT_RULES }, umaKey: "none3", uma: [0, 0, 0] });
-                else set({ playerCount: 4, rules: { ...defaultRules }, umaKey: "none", uma: [0, 0, 0, 0] });
+                // （SANMA_DEFAULT_RULES の連盟ウマは rules に混ぜない。リーグのウマは上のウマ設定が正）
+                if (n === 3) {
+                  const { uma: _u, umaKey: _k, ...sanmaRules } = SANMA_DEFAULT_RULES;
+                  set({ playerCount: 3, rules: { ...d.rules, ...sanmaRules, uma: [0, 0, 0], umaKey: "none3" }, umaKey: "none3", uma: [0, 0, 0] });
+                } else {
+                  set({ playerCount: 4, rules: { ...defaultRules, uma: [0, 0, 0, 0], umaKey: "none" }, umaKey: "none", uma: [0, 0, 0, 0] });
+                }
               }} style={{
                 flex: 1, padding: "13px 6px", borderRadius: 11, cursor: "pointer",
                 border: `2px solid ${lgPC === n ? t.ac : t.bd}`,
@@ -7905,7 +7931,13 @@ input, select { padding: 10px 14px; }
             setGameDate(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`);
             setPlayers([...lgPick]);
             setPlayerCount(lgPC);
-            setRules({ ...defaultRules, ...lg.rules });
+            // ウマはリーグ本体（lg.uma）が正。lg.rules 側の古いウマが混ざると
+            // 結果画面のポイントとリーグ成績のptが食い違うため、ここで揃える
+            setRules({
+              ...defaultRules, ...lg.rules,
+              ...(lg.uma ? { uma: [...lg.uma] } : {}),
+              ...(lg.umaKey ? { umaKey: lg.umaKey } : {}),
+            });
             setMatchType(lgMatchType);
             setActiveLeagueId(lg.id);
             resetSeatDraw();
@@ -9023,8 +9055,11 @@ input, select { padding: 10px 14px; }
             // その場合は人数に合った既定ルールへ落とす（三麻は連盟ルールが既定）
             const wantLen = playerCount === 3 ? 3 : 4;
             const hasLast = !!lastRules && (lastRules.uma || []).length === wantLen;
-            const base = hasLast ? lastRules
+            const rawBase = hasLast ? lastRules
               : playerCount === 3 ? { ...defaultRules, ...SANMA_DEFAULT_RULES } : defaultRules;
+            // 古い保存データの「返し点<持ち点」はオカが負になるため、返し＝持ち点に直す
+            const base = { ...rawBase };
+            if (base.returnPoints != null && base.returnPoints < (base.startPoints ?? 0)) base.returnPoints = base.startPoints;
             const same = JSON.stringify(rules) === JSON.stringify(base);
             const ok = hasLast && same;   // 前回と同じときだけ緑で「✓」を出す
             const sum = [
@@ -10965,8 +11000,9 @@ input, select { padding: 10px 14px; }
   // ══════════════════════════════════
   const renderGameFinished = () => {
     const ruleSet = gameConfig?.rules || {};
-    const returnPt = ruleSet.returnPoints || 30000;
     const startPt = ruleSet.startPoints || 25000;
+    // 古い記録の「返し点<持ち点」はオカが負になるため、返し＝持ち点（オカなし）として精算する
+    const returnPt = Math.max(startPt, ruleSet.returnPoints || 30000);
     // Oka: (returnPt - startPt) * 4 goes to 1st place, everyone's score is relative to returnPt
     const okaPool = (returnPt - startPt) * PC;
     const adjusted = players.slice(0, PC).map((p, i) => {
@@ -11100,8 +11136,8 @@ input, select { padding: 10px 14px; }
           ))}
         </div>
 
-        {/* ウマ込みのポイント */}
-        {(ruleSet.uma || []).some(u => u !== 0) && (() => {
+        {/* ウマ込みのポイント（要素数が人数と違うウマは合計が崩れるため適用しない） */}
+        {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (() => {
           const uma = ruleSet.uma;
           const gosha = (v) => { const s = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return s * (a - f > 0.5 ? f + 1 : f); };
           const rk = scores.map((s, i) => ({ i, s })).sort((a3, b3) => (b3.s - a3.s) || (a3.i - b3.i));
@@ -11378,7 +11414,9 @@ input, select { padding: 10px 14px; }
       const n = g.finalScores.length;
       const names = g.players.slice(0, n);
       const rs = g.rules || {};
-      const sp = rs.startPoints ?? 25000, rp = rs.returnPoints ?? 30000;
+      const sp = rs.startPoints ?? 25000;
+      // 「返し点<持ち点」の古い記録はオカが負になるため、返し＝持ち点（オカなし）として扱う
+      const rp = Math.max(sp, rs.returnPoints ?? 30000);
       const uma = (rs.uma && rs.uma.length === n) ? rs.uma : Array(n).fill(0);
       const rate = rs.rate || 0;
       if (rate > 0 && !unit) unit = rs.rateUnit || "G";
@@ -11392,7 +11430,8 @@ input, select { padding: 10px 14px; }
         const tt = so + um + ok;
         const e = by[nm];
         e.soten += so; e.uma += um; e.oka += ok; e.total += tt;
-        if (rate > 0) e.gold += tt * rate;
+        // レート換算は結果画面と同じく「五捨六入したpt」に対して行う（生点×レートだと丸め分ズレる）
+        if (rate > 0) e.gold += (goshaRokunyu((so + ok) / 1000) + (uma[rank] || 0)) * 1000 * rate;
         e.n += 1;
         if (rank === 0) e.top += 1;
       });
