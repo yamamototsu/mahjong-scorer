@@ -5598,6 +5598,13 @@ input, select { padding: 10px 14px; }
                   }}>{sp.round.honba}本場</div>
                 </div>
               ) : (
+              <>
+              {/* 対局は必ず東1局から始まる（局替わりの演出と表記を揃える） */}
+              <div style={{
+                fontSize: 24, fontWeight: 900, color: "#fff", letterSpacing: "0.1em",
+                marginBottom: 14, textShadow: "0 2px 20px rgba(0,0,0,0.6)",
+                animation: "splashRow 0.45s 0.25s ease-out both",
+              }}>東1局</div>
               <div style={{ display: "inline-block", textAlign: "left" }}>
                 {sp.seats.map((x, k) => (
                   <div key={k} style={{
@@ -5615,6 +5622,7 @@ input, select { padding: 10px 14px; }
                   </div>
                 ))}
               </div>
+              </>
               )}
             </>
           )}

@@ -10999,7 +10999,17 @@ input, select { padding: 10px 14px; }
         letterSpacing: "0.08em",
         color: sp.round.honba > 0 ? t.gd : "rgba(255,255,255,0.65)"
       }
-    }, sp.round.honba, "本場")) : React.createElement("div", {
+    }, sp.round.honba, "本場")) : React.createElement(React.Fragment, null, React.createElement("div", {
+      style: {
+        fontSize: 24,
+        fontWeight: 900,
+        color: "#fff",
+        letterSpacing: "0.1em",
+        marginBottom: 14,
+        textShadow: "0 2px 20px rgba(0,0,0,0.6)",
+        animation: "splashRow 0.45s 0.25s ease-out both"
+      }
+    }, "東1局"), React.createElement("div", {
       style: {
         display: "inline-block",
         textAlign: "left"
@@ -11032,7 +11042,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 800,
         color: "#fff"
       }
-    }, x.name)))))));
+    }, x.name))))))));
   };
   const payInfo = () => {
     const payers = PC - 1;
