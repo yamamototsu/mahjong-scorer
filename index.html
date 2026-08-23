@@ -8751,16 +8751,9 @@ input, select { padding: 10px 14px; }
         }
       }, "削除")));
     })), React.createElement("button", {
-      style: {
-        ...actionBtn(),
-        fontSize: 12,
-        color: t.dm
-      },
-      onClick: () => savePresetNames(DEFAULT_PRESET_NAMES)
-    }, "初期の名前に戻す"), React.createElement("button", {
       style: actionBtn(),
-      onClick: () => setView("home")
-    }, "メニューに戻る"));
+      onClick: () => setView(namesBackTo)
+    }, namesBackTo === "leagueform" ? "← リーグ設定に戻る" : namesBackTo === "game" ? "← メンバー決定に戻る" : "メニューに戻る"));
   };
   const renderStartGuide = () => {
     const s = GUIDE_STEPS[guideStep];
@@ -9798,6 +9791,7 @@ input, select { padding: 10px 14px; }
   };
   const [newNameInput, setNewNameInput] = useState("");
   const [editNameIdx, setEditNameIdx] = useState(null);
+  const [namesBackTo, setNamesBackTo] = useState("home");
   const [groups, setGroups] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("mj_groups") || "[]");
@@ -12167,6 +12161,7 @@ input, select { padding: 10px 14px; }
       setSqMode(null);
       setSqQ(null);
     }), menuItem("📊", "点数早見表", "符×翻のマトリックス表", () => setView("table"))), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`), setOpen === "players" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
+      setNamesBackTo("home");
       setView("names");
       setNewNameInput("");
       setEditNameIdx(null);
@@ -12428,6 +12423,7 @@ input, select { padding: 10px 14px; }
         setGEditId(null);
         setGEditName("");
         setGEditMembers([]);
+        setNamesBackTo("home");
         setView("names");
         setNewNameInput("");
         setEditNameIdx(null);
@@ -13388,6 +13384,7 @@ input, select { padding: 10px 14px; }
       }, on ? "✓ " : "", nm);
     })), React.createElement("button", {
       onClick: () => {
+        setNamesBackTo("leagueform");
         setView("names");
         setNewNameInput("");
         setEditNameIdx(null);
@@ -16759,6 +16756,7 @@ input, select { padding: 10px 14px; }
     }
   }, React.createElement("button", {
     onClick: () => {
+      setNamesBackTo("game");
       setView("names");
       setNewNameInput("");
       setEditNameIdx(null);
