@@ -11034,8 +11034,7 @@ input, select { padding: 10px 14px; }
       }
     }, x.name)))))));
   };
-  const PayTableView = () => {
-    if (!showPayView || gWinner === null || !gResult) return null;
+  const payInfo = () => {
     const payers = PC - 1;
     const hb = honba * HU();
     const pool = (riichiBets + gRiichi.filter(Boolean).length) * 1000;
@@ -11057,6 +11056,20 @@ input, select { padding: 10px 14px; }
       });
     }
     const total = flows.reduce((a, f) => a + f.amt, 0) + pool;
+    return {
+      flows,
+      pool,
+      total
+    };
+  };
+  const PayTableBox = ({
+    boxW
+  }) => {
+    if (gWinner === null || !gResult) return null;
+    const {
+      flows,
+      total
+    } = payInfo();
     const slotOf = i => (i - seatRot + PC) % PC;
     const POS4 = [{
       x: 50,
@@ -11090,8 +11103,7 @@ input, select { padding: 10px 14px; }
     }];
     const posOf = i => (PC === 3 ? POS3 : POS4)[slotOf(i)];
     const win = posOf(gWinner);
-    const boxW = "min(94vw, 58vh, 560px)";
-    const fs = px => `calc(${boxW} * ${(px / 366).toFixed(5)})`;
+    const fs = px => `max(${Math.min(px, 10)}px, calc(${boxW} * ${(px / 366).toFixed(5)}))`;
     const extOf = i => Math.abs(posOf(i).rot) % 180 === 90 ? {
       hw: 11,
       hh: 15
@@ -11109,66 +11121,6 @@ input, select { padding: 10px 14px; }
       };
     };
     return React.createElement("div", {
-      onClick: () => setShowPayView(false),
-      style: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.93)",
-        zIndex: 200,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 12,
-        overflowY: "auto"
-      }
-    }, React.createElement("div", {
-      onClick: e => e.stopPropagation(),
-      style: {
-        width: boxW,
-        marginBottom: 10,
-        padding: "10px 14px",
-        borderRadius: 14,
-        background: "rgba(0,0,0,0.55)",
-        border: `1px solid ${t.bd}`,
-        boxSizing: "border-box",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-        flexWrap: "wrap",
-        textAlign: "center"
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 14,
-        color: "rgba(255,255,255,0.75)",
-        fontWeight: 700
-      }
-    }, roundWind, dealerIdx + 1, "局", honba > 0 ? ` ${honba}本場` : ""), React.createElement("span", {
-      style: {
-        fontSize: 14,
-        color: "rgba(255,255,255,0.75)",
-        fontWeight: 700
-      }
-    }, gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`, " / ", gTsumo ? "ツモ" : "ロン"), React.createElement("span", {
-      style: {
-        fontSize: 26,
-        fontWeight: 900,
-        color: t.gd,
-        fontVariantNumeric: "tabular-nums"
-      }
-    }, "+", total.toLocaleString()), pool > 0 && React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: t.ac,
-        fontWeight: 700
-      }
-    }, "リーチ棒", pool / 1000, "本 +", pool.toLocaleString(), "含む")), React.createElement("div", {
-      onClick: e => e.stopPropagation(),
       style: {
         position: "relative",
         width: boxW,
@@ -11291,6 +11243,81 @@ input, select { padding: 10px 14px; }
           lineHeight: 1.25
         }
       }, isWin ? "アガリ" : " "));
+    }));
+  };
+  const PayTableView = () => {
+    if (!showPayView || gWinner === null || !gResult) return null;
+    const {
+      pool,
+      total
+    } = payInfo();
+    const boxW = "min(94vw, 58vh, 560px)";
+    return React.createElement("div", {
+      onClick: () => setShowPayView(false),
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.93)",
+        zIndex: 200,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 12,
+        overflowY: "auto"
+      }
+    }, React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: {
+        width: boxW,
+        marginBottom: 10,
+        padding: "10px 14px",
+        borderRadius: 14,
+        background: "rgba(0,0,0,0.55)",
+        border: `1px solid ${t.bd}`,
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+        flexWrap: "wrap",
+        textAlign: "center"
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 14,
+        color: "rgba(255,255,255,0.75)",
+        fontWeight: 700
+      }
+    }, roundWind, dealerIdx + 1, "局", honba > 0 ? ` ${honba}本場` : ""), React.createElement("span", {
+      style: {
+        fontSize: 14,
+        color: "rgba(255,255,255,0.75)",
+        fontWeight: 700
+      }
+    }, gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`, " / ", gTsumo ? "ツモ" : "ロン"), React.createElement("span", {
+      style: {
+        fontSize: 26,
+        fontWeight: 900,
+        color: t.gd,
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, "+", total.toLocaleString()), pool > 0 && React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        fontWeight: 700
+      }
+    }, "リーチ棒", pool / 1000, "本 +", pool.toLocaleString(), "含む")), React.createElement("div", {
+      onClick: e => e.stopPropagation(),
+      style: {
+        flexShrink: 0
+      }
+    }, React.createElement(PayTableBox, {
+      boxW: boxW
     })), React.createElement("button", {
       onClick: () => setShowPayView(false),
       style: {
@@ -19408,20 +19435,41 @@ input, select { padding: 10px 14px; }
         paddingTop: 6
       }
     }, honba > 0 && `本場 +${(honba * HU()).toLocaleString()}`, honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / ", (riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`))
-  }), React.createElement("button", {
+  }), React.createElement("div", {
+    onClick: () => setShowPayView(true),
     style: {
-      ...actionBtn(),
-      color: t.gd,
-      border: `1px solid ${t.gd}55`
-    },
-    onClick: () => setShowPayView(true)
-  }, "🀄 卓上表示（点数の受け渡し）"), React.createElement("button", {
+      cursor: "pointer",
+      marginBottom: 4
+    }
+  }, React.createElement(PayTableBox, {
+    boxW: "min(100vw - 32px, 400px)"
+  }), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      textAlign: "center",
+      marginTop: 6
+    }
+  }, "卓をタップすると大きく表示します（卓の中央に置く用）")), React.createElement("div", {
+    style: {
+      position: "sticky",
+      bottom: 0,
+      zIndex: 5,
+      margin: "10px -5px 0",
+      padding: "10px 5px calc(env(safe-area-inset-bottom, 0px) + 8px)",
+      background: "rgba(9, 13, 18, 0.97)",
+      borderTop: `1px solid ${t.bd}55`
+    }
+  }, React.createElement("button", {
     style: actionBtn("p"),
     onClick: applyRound
   }, correctingIdx !== null ? "修正を反映" : "スコアに反映"), React.createElement("button", {
-    style: actionBtn(),
+    style: {
+      ...actionBtn(),
+      marginBottom: 0
+    },
     onClick: resetGW
-  }, "キャンセル")))), showDrawWiz && React.createElement("div", {
+  }, correctingIdx !== null ? "キャンセル" : "最初から計算"))))), showDrawWiz && React.createElement("div", {
     style: {
       position: "fixed",
       top: 0,

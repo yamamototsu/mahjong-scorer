@@ -5624,8 +5624,8 @@ input, select { padding: 10px 14px; }
   };
 
   // 卓上表示: 誰から誰へいくら動くかを、卓の配置＋矢印で見せる
-  const PayTableView = () => {
-    if (!showPayView || gWinner === null || !gResult) return null;
+  // 受け渡しの内訳（矢印の元データ）。埋め込み表示と全画面表示で共用
+  const payInfo = () => {
     const payers = PC - 1;
     const hb = honba * HU();
     const pool = (riichiBets + gRiichi.filter(Boolean).length) * 1000;
@@ -5643,6 +5643,14 @@ input, select { padding: 10px 14px; }
       flows.push({ from: gLoser, amt: gResult.total + hb });
     }
     const total = flows.reduce((a, f) => a + f.amt, 0) + pool;
+    return { flows, pool, total };
+  };
+
+  // 受け渡しの卓（座席パネル＋矢印）。boxW は幅の指定で、文字の大きさの基準にもなるので
+  // % ではなく vw/px で渡す
+  const PayTableBox = ({ boxW }) => {
+    if (gWinner === null || !gResult) return null;
+    const { flows, total } = payInfo();
 
     // 席の配置（卓上モードと同じ: 手前/右/(向かい)/左）
     const slotOf = (i) => (i - seatRot + PC) % PC;
@@ -5656,10 +5664,10 @@ input, select { padding: 10px 14px; }
     const posOf = (i) => (PC === 3 ? POS3 : POS4)[slotOf(i)];
     const win = posOf(gWinner);
 
-    // 上段（局・アガリ内容）と「← 戻る」のぶんを引いて卓の大きさを決める
-    const boxW = "min(94vw, 58vh, 560px)";
-    // パネルの文字は卓の大きさに追従させる（横向きでも枠からはみ出さないように）
-    const fs = (px) => `calc(${boxW} * ${(px / 366).toFixed(5)})`;
+    // パネルの文字は卓の大きさに追従させる（横向きでも枠からはみ出さないように）。
+    // 小さい画面でも文字は10px未満にしない（名前は末尾の省略で受ける）。
+    // 余白などもとから10px未満の指定には下限をかけない（枠の内側が狭くなるため）
+    const fs = (px) => `max(${Math.min(px, 10)}px, calc(${boxW} * ${(px / 366).toFixed(5)}))`;
     // パネルの見た目の半径（幅30% × 高さ22%。左右の席は90度回転しているので入れ替わる）
     const extOf = (i) => (Math.abs(posOf(i).rot) % 180 === 90 ? { hw: 11, hh: 15 } : { hw: 15, hh: 11 });
     // 中心から (ux,uy) 方向へ進んで、パネルの枠を抜ける点
@@ -5671,41 +5679,12 @@ input, select { padding: 10px 14px; }
     };
 
     return (
-      <div onClick={() => setShowPayView(false)} style={{
-        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-        background: "rgba(0,0,0,0.93)", zIndex: 200,
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        padding: 12, overflowY: "auto",
+      <div style={{
+        position: "relative", width: boxW, aspectRatio: "1 / 1",
+        borderRadius: 18, backgroundImage: `url(${TABLE_IMG})`,
+        backgroundSize: "100% 100%", backgroundColor: "#14402b",
+        overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
       }}>
-        {/* 上段: 局とアガリ内容（卓の中央は矢印のために空けておく） */}
-        <div onClick={(e) => e.stopPropagation()} style={{
-          width: boxW, marginBottom: 10, padding: "10px 14px", borderRadius: 14,
-          background: "rgba(0,0,0,0.55)", border: `1px solid ${t.bd}`, boxSizing: "border-box",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          gap: 12, flexWrap: "wrap", textAlign: "center",
-        }}>
-          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
-            {roundWind}{dealerIdx + 1}局{honba > 0 ? ` ${honba}本場` : ""}
-          </span>
-          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
-            {gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`} / {gTsumo ? "ツモ" : "ロン"}
-          </span>
-          <span style={{ fontSize: 26, fontWeight: 900, color: t.gd, fontVariantNumeric: "tabular-nums" }}>
-            +{total.toLocaleString()}
-          </span>
-          {pool > 0 && (
-            <span style={{ fontSize: 12, color: t.ac, fontWeight: 700 }}>
-              リーチ棒{pool / 1000}本 +{pool.toLocaleString()}含む
-            </span>
-          )}
-        </div>
-
-        <div onClick={(e) => e.stopPropagation()} style={{
-          position: "relative", width: boxW, aspectRatio: "1 / 1",
-          borderRadius: 18, backgroundImage: `url(${TABLE_IMG})`,
-          backgroundSize: "100% 100%", backgroundColor: "#14402b",
-          overflow: "hidden", boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
-        }}>
           {/* 矢印 */}
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
             <defs>
@@ -5779,6 +5758,48 @@ input, select { padding: 10px 14px; }
               </div>
             );
           })}
+      </div>
+    );
+  };
+
+  // 全画面の受け渡し表示（卓の中央に置いて全員で見る用。確認画面の卓をタップで開く）
+  const PayTableView = () => {
+    if (!showPayView || gWinner === null || !gResult) return null;
+    const { pool, total } = payInfo();
+    // 上段（局・アガリ内容）と「← 戻る」のぶんを引いて卓の大きさを決める
+    const boxW = "min(94vw, 58vh, 560px)";
+    return (
+      <div onClick={() => setShowPayView(false)} style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+        background: "rgba(0,0,0,0.93)", zIndex: 200,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        padding: 12, overflowY: "auto",
+      }}>
+        {/* 上段: 局とアガリ内容（卓の中央は矢印のために空けておく） */}
+        <div onClick={(e) => e.stopPropagation()} style={{
+          width: boxW, marginBottom: 10, padding: "10px 14px", borderRadius: 14,
+          background: "rgba(0,0,0,0.55)", border: `1px solid ${t.bd}`, boxSizing: "border-box",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 12, flexWrap: "wrap", textAlign: "center",
+        }}>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
+            {roundWind}{dealerIdx + 1}局{honba > 0 ? ` ${honba}本場` : ""}
+          </span>
+          <span style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", fontWeight: 700 }}>
+            {gHan >= 13 ? getLimitName(gHan) : gHan >= 5 ? `${gHan}翻` : `${gHan}翻${gFu}符`} / {gTsumo ? "ツモ" : "ロン"}
+          </span>
+          <span style={{ fontSize: 26, fontWeight: 900, color: t.gd, fontVariantNumeric: "tabular-nums" }}>
+            +{total.toLocaleString()}
+          </span>
+          {pool > 0 && (
+            <span style={{ fontSize: 12, color: t.ac, fontWeight: 700 }}>
+              リーチ棒{pool / 1000}本 +{pool.toLocaleString()}含む
+            </span>
+          )}
+        </div>
+
+        <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+          <PayTableBox boxW={boxW} />
         </div>
 
         <button onClick={() => setShowPayView(false)} style={{
@@ -10019,10 +10040,26 @@ input, select { padding: 10px 14px; }
                     </>
                   }
                 />
-                <button style={{ ...actionBtn(), color: t.gd, border: `1px solid ${t.gd}55` }}
-                  onClick={() => setShowPayView(true)}>🀄 卓上表示（点数の受け渡し）</button>
-                <button style={actionBtn("p")} onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
-                <button style={actionBtn()} onClick={resetGW}>キャンセル</button>
+                {/* 点数の受け渡し（開かなくても最初から見えるように埋め込む。タップで大きく表示） */}
+                <div onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
+                  <PayTableBox boxW="min(100vw - 32px, 400px)" />
+                  <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
+                    卓をタップすると大きく表示します（卓の中央に置く用）
+                  </div>
+                </div>
+                {/* 決定とやり直しは画面の下に固定して、スクロールしなくても押せるようにする */}
+                <div style={{
+                  position: "sticky", bottom: 0, zIndex: 5,
+                  margin: "10px -5px 0",
+                  padding: "10px 5px calc(env(safe-area-inset-bottom, 0px) + 8px)",
+                  background: "rgba(9, 13, 18, 0.97)",
+                  borderTop: `1px solid ${t.bd}55`,
+                }}>
+                  <button style={actionBtn("p")} onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
+                  <button style={{ ...actionBtn(), marginBottom: 0 }} onClick={resetGW}>
+                    {correctingIdx !== null ? "キャンセル" : "最初から計算"}
+                  </button>
+                </div>
               </>
             )}
           </div>
