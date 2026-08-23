@@ -13117,26 +13117,27 @@ input, select { padding: 10px 14px; }
       }, label), React.createElement("div", {
         style: {
           display: "flex",
-          gap: 6
+          gap: 5
         }
-      }, [1000, 2000, 3000, 4000].map(v => React.createElement("button", {
+      }, [0, 1000, 2000, 3000, 4000].map(v => React.createElement("button", {
         key: v,
         onClick: () => editDraft({
           [key]: v
         }),
         style: {
           flex: 1,
-          padding: "10px 2px",
+          minWidth: 0,
+          padding: "10px 0",
           borderRadius: 9,
           cursor: "pointer",
           border: `2px solid ${cur === v ? t.ac : t.bd}`,
           background: cur === v ? t.acS : "transparent",
           color: cur === v ? t.ac : t.tx,
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: 700,
           whiteSpace: "nowrap"
         }
-      }, v.toLocaleString()))));
+      }, v === 0 ? "0" : String(v)))));
     }), React.createElement("div", {
       style: {
         fontSize: 10,
@@ -20118,24 +20119,25 @@ input, select { padding: 10px 14px; }
     }, label), React.createElement("div", {
       style: {
         display: "flex",
-        gap: 6
+        gap: 5
       }
-    }, [1000, 2000, 3000, 4000].map(v => React.createElement("button", {
+    }, [0, 1000, 2000, 3000, 4000].map(v => React.createElement("button", {
       key: v,
       onClick: () => setVal(v),
       style: {
         flex: 1,
-        padding: "11px 2px",
+        minWidth: 0,
+        padding: "11px 0",
         borderRadius: 10,
         cursor: "pointer",
         border: `2px solid ${val === v ? t.rd : t.bd}`,
         background: val === v ? "rgba(220,60,60,0.12)" : "transparent",
         color: val === v ? t.rd : t.tx,
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 700,
         whiteSpace: "nowrap"
       }
-    }, v.toLocaleString()))));
+    }, v === 0 ? "0" : String(v)))));
     const rec = {
       chombo: true,
       dealer: cd,

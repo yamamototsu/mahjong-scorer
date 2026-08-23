@@ -6801,14 +6801,14 @@ input, select { padding: 10px 14px; }
                     return (
                       <div key={key} style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 12, color: t.tx, marginBottom: 5 }}>{label}</div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {[1000, 2000, 3000, 4000].map(v => (
+                        <div style={{ display: "flex", gap: 5 }}>
+                          {[0, 1000, 2000, 3000, 4000].map(v => (
                             <button key={v} onClick={() => editDraft({ [key]: v })} style={{
-                              flex: 1, padding: "10px 2px", borderRadius: 9, cursor: "pointer",
+                              flex: 1, minWidth: 0, padding: "10px 0", borderRadius: 9, cursor: "pointer",
                               border: `2px solid ${cur === v ? t.ac : t.bd}`,
                               background: cur === v ? t.acS : "transparent",
-                              color: cur === v ? t.ac : t.tx, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-                            }}>{v.toLocaleString()}</button>
+                              color: cur === v ? t.ac : t.tx, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                            }}>{v === 0 ? "0" : String(v)}</button>
                           ))}
                         </div>
                       </div>
@@ -10470,14 +10470,14 @@ input, select { padding: 10px 14px; }
                 const amtRow = (label, val, setVal) => (
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 6 }}>{label}</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {[1000, 2000, 3000, 4000].map(v => (
+                    <div style={{ display: "flex", gap: 5 }}>
+                      {[0, 1000, 2000, 3000, 4000].map(v => (
                         <button key={v} onClick={() => setVal(v)} style={{
-                          flex: 1, padding: "11px 2px", borderRadius: 10, cursor: "pointer",
+                          flex: 1, minWidth: 0, padding: "11px 0", borderRadius: 10, cursor: "pointer",
                           border: `2px solid ${val === v ? t.rd : t.bd}`,
                           background: val === v ? "rgba(220,60,60,0.12)" : "transparent",
-                          color: val === v ? t.rd : t.tx, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-                        }}>{v.toLocaleString()}</button>
+                          color: val === v ? t.rd : t.tx, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                        }}>{v === 0 ? "0" : String(v)}</button>
                       ))}
                     </div>
                   </div>
