@@ -335,6 +335,7 @@ export default function MahjongScorer() {
   const [ronRuleWarn, setRonRuleWarn] = useState(false);     // 複数ロンがルールを超えたときの確認
   const [reviewing, setReviewing] = useState(false);         // 結果画面から修正に戻っている状態
   const [showScoreFix, setShowScoreFix] = useState(false);   // 点数の直接修正
+  const [rematchPick, setRematchPick] = useState(false);     // 結果画面の「再試合」形式選択
 
   const WIND_ORDER = SEATS_OF(PC);
   const resetSeatDraw = () => {
@@ -10772,6 +10773,60 @@ input, select { padding: 10px 14px; }
     });
     const sorted = [...finalResults].sort((a, b) => b.finalPt - a.finalPt);
 
+    // 履歴（リーグ対局なら成績表にも）への記録。「終了」と「再試合」で共通
+    const recordGame = () => {
+      if (rounds.length > 0) {
+        setGameHistory(prev => [...prev, {
+          id: Date.now(),
+          date: gameConfig?.date || "",
+          matchType: gameConfig?.matchType || "",
+          // 三麻では players に使っていない4人目の名前が残っているため、対局人数で切る
+          // （finalScores は3人分しか無く、そのまま保存すると履歴画面が開けなくなる）
+          players: players.slice(0, PC),
+          finalScores: [...scores],
+          okaResults: sorted.map(s => ({ name: s.name, finalPt: s.finalPt })),
+          rounds: [...rounds],
+          rules: gameConfig?.rules || {},
+          leagueId: activeLeagueId || null,
+          startedAt: gameConfig?.startedAt || null,
+          endedAt: Date.now(),
+        }]);
+      }
+      const lg = leagues.find(l => l.id === activeLeagueId);
+      if (lg && rounds.length > 0) {
+        const res = calcGamePts(scores, scores.map((_, i) => i), lg);
+        const entry = {
+          startedAt: gameConfig?.startedAt || null, endedAt: Date.now(),
+          date: gameConfig?.date || "",
+          matchType: gameConfig?.matchType || "hanchan",
+          players: players.slice(0, PC),
+          scores: [...scores],
+          pts: res.map(r => r.pt),
+          ranks: res.map(r => r.rank),
+        };
+        const nextGames = [...(lg.games || []), entry];
+        const reached = lg.mode === "count" && nextGames.length >= (lg.targetCount || 0);
+        saveLeagues(leagues.map(l => l.id === lg.id
+          ? { ...l, games: nextGames, status: reached ? "done" : l.status } : l));
+      }
+    };
+
+    // 記録してから、同じメンバー・同じルールで親決めからやり直す
+    const startRematch = (mt) => {
+      setRematchPick(false);
+      setReviewing(false);
+      setShowScoreFix(false);
+      recordGame();
+      setMatchType(mt);
+      setPlayerCount(PC);
+      setRules({ ...(gameConfig?.rules || {}) });
+      setActiveLeagueId(null);
+      setOyaDice(null);
+      setGameFinished(false);
+      setGameStarted(false);
+      setSetupStep(2);   // 親決めから
+    };
+
     return (
       <div style={body}>
         <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
@@ -10959,7 +11014,8 @@ input, select { padding: 10px 14px; }
           );
         })()}
 
-        <button style={actionBtn("p")} onClick={() => {
+        {/* 幅280pxでも1行で収まるよう、狭い画面だけ少し縮める */}
+        <button style={{ ...actionBtn("d"), fontSize: "min(15px, 4.8vw)" }} onClick={() => {
           const lgName = leagues.find(l => l.id === activeLeagueId)?.name;
           if (!window.confirm(
             lgName
@@ -10968,48 +11024,45 @@ input, select { padding: 10px 14px; }
           )) return;
           setReviewing(false);
           setShowScoreFix(false);
-          if (rounds.length > 0) {
-            setGameHistory(prev => [...prev, {
-              id: Date.now(),
-              date: gameConfig?.date || "",
-              matchType: gameConfig?.matchType || "",
-              // 三麻では players に使っていない4人目の名前が残っているため、対局人数で切る
-              // （finalScores は3人分しか無く、そのまま保存すると履歴画面が開けなくなる）
-              players: players.slice(0, PC),
-              finalScores: [...scores],
-              okaResults: sorted.map(s => ({ name: s.name, finalPt: s.finalPt })),
-              rounds: [...rounds],
-              rules: gameConfig?.rules || {},
-              leagueId: activeLeagueId || null,
-              startedAt: gameConfig?.startedAt || null,
-              endedAt: Date.now(),
-            }]);
-          }
-          // リーグ戦なら成績表にも記録する
-          const lg = leagues.find(l => l.id === activeLeagueId);
-          if (lg && rounds.length > 0) {
-            const res = calcGamePts(scores, scores.map((_, i) => i), lg);
-            const entry = {
-              startedAt: gameConfig?.startedAt || null, endedAt: Date.now(),
-              date: gameConfig?.date || "",
-              matchType: gameConfig?.matchType || "hanchan",
-              players: players.slice(0, PC),
-              scores: [...scores],
-              pts: res.map(r => r.pt),
-              ranks: res.map(r => r.rank),
-            };
-            const nextGames = [...(lg.games || []), entry];
-            const reached = lg.mode === "count" && nextGames.length >= (lg.targetCount || 0);
-            saveLeagues(leagues.map(l => l.id === lg.id
-              ? { ...l, games: nextGames, status: reached ? "done" : l.status } : l));
-          }
+          recordGame();
           const back = activeLeagueId;
           setActiveLeagueId(null);
           setGameStarted(false);
           setGameFinished(false);
           if (back) { setLeagueId(back); setLeagueTab("stand"); setView("leaguedetail"); }
           else setView("home");
-        }}>{activeLeagueId ? "✓ 対局終了・リーグに記録する" : "✓ 対局終了・履歴に記録する"}</button>
+        }}>{activeLeagueId ? "✓ 対局終了・リーグに記録する" : "✓ 対局終了・履歴に記録して終了"}</button>
+
+        {/* 再試合（リーグ対局はリーグ画面から次戦を始めるため通常対局のみ） */}
+        {!activeLeagueId && (
+          <button style={{ ...actionBtn("p"), fontSize: "min(15px, 4.8vw)" }} onClick={() => setRematchPick(true)}>
+            🔁 対局終了・履歴を残して再試合
+          </button>
+        )}
+
+        {rematchPick && (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+            <div style={{ width: "100%", maxWidth: 400 }}>
+              <div style={card}>
+                <div style={{ textAlign: "center", marginBottom: 14 }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>🔁</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>再試合</div>
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textAlign: "left" }}>
+                    この結果を履歴に記録してから、同じメンバー・同じルールで親決めからやり直します（記録後は変更できません）。試合形式を選んでください。
+                  </div>
+                </div>
+                {[["tonpu", "東風戦", "東場のみ"], ["hanchan", "半荘戦", "東場＋南場"], ["zenchan", "全荘戦", "東南西北場"]].map(([k, lb, sub]) => (
+                  <button key={k} onClick={() => startRematch(k)}
+                    style={{ ...actionBtn("p"), marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    <span>{lb}</span>
+                    <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.9 }}>（{sub}）</span>
+                  </button>
+                ))}
+                <button style={{ ...actionBtn(), marginBottom: 0 }} onClick={() => setRematchPick(false)}>キャンセル</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 修正 */}
         <div style={{ ...card, padding: 14, marginTop: 4 }}>
