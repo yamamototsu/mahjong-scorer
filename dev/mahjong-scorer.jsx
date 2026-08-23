@@ -3157,6 +3157,48 @@ input, select { padding: 10px 14px; }
   const [sqJudged, setSqJudged] = useState(null); // null | true | false
   const [sqScore, setSqScore] = useState({ ok: 0, total: 0 });
 
+  // ── フラッシュ記憶（問題→2秒後に答え→自動で次へ） ──
+  const [flashType, setFlashType] = useState("random");   // koron | kotsumo | oyaron | oyatsumo | random
+  const [flashOrder, setFlashOrder] = useState("seq");    // seq=順番 | random=ランダム
+  const [flashRun, setFlashRun] = useState(null);         // null=設定画面 | {list, idx, showAns, paused, done}
+  const FLASH_TYPES = [
+    ["koron", "子ロン"], ["kotsumo", "子ツモ"], ["oyaron", "親ロン"], ["oyatsumo", "親ツモ"], ["random", "ランダム"],
+  ];
+  const flashCombos = (type) => {
+    const kinds = type === "random"
+      ? [[false, false], [false, true], [true, false], [true, true]]   // 子ロン→子ツモ→親ロン→親ツモ
+      : [[type.startsWith("oya"), type.endsWith("tsumo")]];
+    const out = [];
+    for (const [isParent, isTsumo] of kinds)
+      for (const fu of SQ_FU) for (const han of SQ_HAN)
+        if (sqValid(fu, han, isTsumo)) out.push({ fu, han, isParent, isTsumo });
+    return out;
+  };
+  const startFlash = () => {
+    let list = flashCombos(flashType);
+    if (flashOrder === "random") {
+      list = [...list];
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
+    }
+    setFlashRun({ list, idx: 0, showAns: false, paused: false, done: false });
+  };
+  // 2秒ごとに 問題→答え→次の問題 と進める（画面を離れたら止まる）
+  React.useEffect(() => {
+    if (view !== "scorequiz" || sqMode !== "flash" || !flashRun || flashRun.paused || flashRun.done) return;
+    const t = setTimeout(() => {
+      setFlashRun(r => {
+        if (!r || r.paused || r.done) return r;
+        if (!r.showAns) return { ...r, showAns: true };
+        if (r.idx + 1 >= r.list.length) return { ...r, done: true };
+        return { ...r, idx: r.idx + 1, showAns: false };
+      });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [flashRun, sqMode, view]);
+
   const makeScoreQuestion = () => {
     // ありえる組み合わせの中からランダムに1問
     const all = [];
@@ -8027,6 +8069,124 @@ input, select { padding: 10px 14px; }
       );
     }
 
+    // フラッシュ記憶
+    if (sqMode === "flash") {
+      // 設定画面（あがりの種類と出題順を選ぶ）
+      if (!flashRun) {
+        return (
+          <div style={body}>
+            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>⚡ フラッシュ記憶</div>
+            <div style={{ fontSize: 12, color: t.dm, marginBottom: 16, lineHeight: 1.7 }}>
+              問題が出て、2秒後に答えが出て、自動で次に進みます。眺めるだけの丸暗記練習です
+            </div>
+
+            <div style={{ ...card, padding: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8 }}>あがりの種類</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {FLASH_TYPES.map(([k, lb]) => (
+                  <button key={k} onClick={() => setFlashType(k)} style={{
+                    flex: "1 1 30%", padding: "12px 4px", borderRadius: 10, cursor: "pointer",
+                    border: `2px solid ${flashType === k ? t.ac : t.bd}`,
+                    background: flashType === k ? t.acS : "transparent",
+                    color: flashType === k ? t.ac : t.tx, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                  }}>{lb}</button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, margin: "16px 0 8px" }}>出題の順序</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[["seq", "順番に表示", "符・翻の順"], ["random", "ランダムに表示", "シャッフル"]].map(([k, lb, sub]) => (
+                  <button key={k} onClick={() => setFlashOrder(k)} style={{
+                    flex: 1, padding: "12px 4px", borderRadius: 10, cursor: "pointer",
+                    border: `2px solid ${flashOrder === k ? t.ac : t.bd}`,
+                    background: flashOrder === k ? t.acS : "transparent",
+                    color: flashOrder === k ? t.ac : t.tx, fontSize: 13, fontWeight: 700,
+                  }}>
+                    {lb}
+                    <div style={{ fontSize: 10, fontWeight: 400, color: t.dm, marginTop: 2 }}>{sub}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 11, color: t.dm, marginTop: 14, lineHeight: 1.7 }}>
+                全{flashCombos(flashType).length}問（4翻以下・実戦にない組み合わせは出ません）
+              </div>
+            </div>
+
+            <button style={actionBtn("p")} onClick={startFlash}>▶ スタート</button>
+            <button style={actionBtn()} onClick={() => setSqMode(null)}>出題方式を選ぶ</button>
+          </div>
+        );
+      }
+
+      // 出題中
+      const fq = flashRun.list[flashRun.idx];
+      const fa = sqAnswer(fq.fu, fq.han, fq.isParent, fq.isTsumo);
+      const fWho = fq.isParent ? "親" : "子";
+      const fHow = fq.isTsumo ? "ツモ" : "ロン";
+      // 終了画面
+      if (flashRun.done) {
+        return (
+          <div style={body}>
+            <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
+              <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
+              <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>ひととおり終わりました</h2>
+              <p style={{ fontSize: 13, color: t.dm, margin: 0 }}>全{flashRun.list.length}問を表示しました</p>
+            </div>
+            <button style={actionBtn("p")} onClick={startFlash}>
+              🔁 もう一度{flashOrder === "random" ? "（順序を変えて）" : ""}
+            </button>
+            <button style={actionBtn()} onClick={() => setFlashRun(null)}>種類・順序を変える</button>
+            <button style={actionBtn()} onClick={() => setSqMode(null)}>出題方式を選ぶ</button>
+          </div>
+        );
+      }
+      return (
+        <div style={body}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+            <span style={{ fontSize: 12, color: t.dm }}>
+              ⚡ {FLASH_TYPES.find(([k]) => k === flashType)?.[1]} ・ {flashOrder === "seq" ? "順番" : "ランダム"}
+            </span>
+            <span style={{ fontSize: 12, color: t.dm, fontVariantNumeric: "tabular-nums" }}>
+              {flashRun.idx + 1} / {flashRun.list.length}
+            </span>
+          </div>
+
+          <div style={{ ...card, textAlign: "center", padding: "30px 16px", minHeight: 240, boxSizing: "border-box" }}>
+            <div style={{ fontSize: "min(21px, 6vw)", fontWeight: 800, lineHeight: 1.6, whiteSpace: "nowrap" }}>
+              {fWho}が{fHow}　{fq.han}翻　{fq.fu}符は
+            </div>
+            <div style={{ marginTop: 22, minHeight: 86 }}>
+              {flashRun.showAns ? (
+                <>
+                  <div style={{ fontSize: 36, fontWeight: 900, color: t.gd, fontVariantNumeric: "tabular-nums", lineHeight: 1.2 }}>
+                    {fa.text}
+                  </div>
+                  <div style={{ fontSize: 12, color: t.dm, marginTop: 8 }}>{fa.label}</div>
+                </>
+              ) : (
+                <div style={{ fontSize: 30, fontWeight: 900, color: t.dm, opacity: 0.5 }}>…</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={{ ...actionBtn(), flex: 1, marginBottom: 0 }}
+              onClick={() => setFlashRun(r => r ? { ...r, paused: !r.paused } : r)}>
+              {flashRun.paused ? "▶ 再開" : "⏸ 一時停止"}
+            </button>
+            <button style={{ ...actionBtn(), flex: 1, marginBottom: 0 }}
+              onClick={() => setFlashRun(null)}>⏹ 終了</button>
+          </div>
+          {flashRun.paused && (
+            <div style={{ fontSize: 11, color: t.gd, textAlign: "center", marginTop: 10 }}>
+              一時停止中 — 「▶ 再開」で続きから流れます
+            </div>
+          )}
+        </div>
+      );
+    }
+
     // モード選択
     if (!sqMode) {
       return (
@@ -8065,6 +8225,16 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 17, fontWeight: 800, color: t.gd }}>入力式</div>
             <div style={{ fontSize: 11, color: t.dm, marginTop: 3, lineHeight: 1.6 }}>
               点数を自分で入力します。実戦に近い練習
+            </div>
+          </button>
+
+          <button onClick={() => { setSqMode("flash"); setFlashRun(null); }} style={{
+            width: "100%", padding: "18px", marginBottom: 12, borderRadius: 13, cursor: "pointer",
+            border: `2px solid ${t.rd}`, background: t.rdS, textAlign: "left",
+          }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: t.rd }}>⚡ フラッシュ記憶</div>
+            <div style={{ fontSize: 11, color: t.dm, marginTop: 3, lineHeight: 1.6 }}>
+              問題→2秒後に答え→自動で次へ。眺めて丸暗記
             </div>
           </button>
 
