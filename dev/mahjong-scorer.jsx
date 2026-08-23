@@ -6280,7 +6280,7 @@ input, select { padding: 10px 14px; }
 
                   <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>グループ名</div>
                   <input type="text" value={gEditName} onChange={e => setGEditName(e.target.value)}
-                    placeholder="例: 金曜メンバー"
+                    placeholder="例: サークルメンバー"
                     style={{ ...inputStyle, fontSize: 15, marginBottom: 12 }} />
 
                   <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>人数</div>
@@ -8586,7 +8586,7 @@ input, select { padding: 10px 14px; }
                 <input
                   type="text" value={groupNameInput} autoFocus
                   onChange={e => setGroupNameInput(e.target.value)}
-                  placeholder="グループ名（例: 金曜メンバー）"
+                  placeholder="グループ名（例: サークルメンバー）"
                   style={{ ...inputStyle, fontSize: 14, flex: 1 }}
                 />
                 <button
