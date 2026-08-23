@@ -7022,35 +7022,40 @@ input, select { padding: 10px 14px; }
             </div>
             </>)}
 
-            {/* ルール類の保存（変更があるときだけ表示） */}
+            {/* ルール類の保存（変更があるときだけ表示）。横並び1行の小さめボタン */}
             {(rulesDirty || rulesSaved) && (
-              <div style={{ ...card, padding: 14, marginTop: 8 }}>
-                <button
-                  onClick={commitDraftRules}
-                  disabled={!rulesDirty}
-                  style={{
-                    width: "100%", padding: "14px 8px", borderRadius: 11, border: "none",
-                    background: rulesSaved ? t.gn : rulesDirty ? t.ac : t.bd,
-                    color: rulesDirty || rulesSaved ? "#fff" : t.dm,
-                    fontSize: 15, fontWeight: 800,
-                    cursor: rulesDirty ? "pointer" : "default",
-                    transition: "background 0.2s",
-                  }}
-                >{rulesSaved ? "✓ 保存しました" : rulesDirty ? "変更を確定して保存" : "変更はありません"}</button>
-                {rulesDirty && (
+              <div style={{ ...card, padding: 10, marginTop: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
                   <button
-                    onClick={() => { setDraftRules({ ...defaultRules }); setRulesSaved(false); }}
-                    style={{ ...actionBtn(), marginTop: 8, marginBottom: 0, fontSize: 12, color: t.dm }}
-                  >変更を取り消す</button>
-                )}
+                    onClick={commitDraftRules}
+                    disabled={!rulesDirty}
+                    style={{
+                      flex: 1.15, padding: "9px 4px", borderRadius: 10, border: "none",
+                      background: rulesSaved ? t.gn : rulesDirty ? t.ac : t.bd,
+                      color: rulesDirty || rulesSaved ? "#fff" : t.dm,
+                      fontSize: 11.5, fontWeight: 800, whiteSpace: "nowrap",
+                      cursor: rulesDirty ? "pointer" : "default",
+                      transition: "background 0.2s",
+                    }}
+                  >{rulesSaved ? "✓ 保存しました" : rulesDirty ? "変更を確定して保存" : "変更はありません"}</button>
+                  {rulesDirty && (
+                    <button
+                      onClick={() => { setDraftRules({ ...defaultRules }); setRulesSaved(false); }}
+                      style={{
+                        flex: 1, padding: "9px 4px", borderRadius: 10, cursor: "pointer",
+                        border: `1px solid ${t.bd}`, background: t.sf, color: t.dm,
+                        fontSize: 11.5, fontWeight: 700, whiteSpace: "nowrap",
+                      }}
+                    >変更を取り消す</button>
+                  )}
+                </div>
               </div>
             )}
-            <button style={{ ...actionBtn(), marginTop: 8, fontSize: 12, color: t.dm }}
-              onClick={() => { setDraftRules({ ...FACTORY_RULES }); setRulesSaved(false); }}>ルールを初期状態に戻す</button>
           </>
         )}
 
-        {/* 画面下に固定の戻り口（スクロール中もいつでも押せる） */}
+        {/* 画面下に固定の戻り口（スクロール中もいつでも押せる）。
+            設定では「初期状態に戻す」と横並びの小さめ2ボタンにする */}
         {homeCat && (
           <div style={{
             position: "sticky", bottom: 0, zIndex: 20,
@@ -7058,15 +7063,29 @@ input, select { padding: 10px 14px; }
             padding: "10px 8px calc(10px + env(safe-area-inset-bottom))",
             background: `linear-gradient(to top, ${t.bg} 65%, transparent)`,
           }}>
-            <button
-              onClick={() => { setHomeCat(null); setView("title"); try { window.scrollTo(0, 0); } catch {} }}
-              style={{
-                width: "100%", padding: "15px 8px", borderRadius: 12,
-                border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
-                fontSize: 15, fontWeight: 700, cursor: "pointer",
-                boxShadow: "0 -4px 16px rgba(0,0,0,0.35)",
-              }}
-            >← メニューに戻る</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              {homeCat === "settings" && (
+                <button
+                  onClick={() => { setDraftRules({ ...FACTORY_RULES }); setRulesSaved(false); }}
+                  style={{
+                    flex: 1, padding: "9px 4px", borderRadius: 10,
+                    border: `1px solid ${t.bd}`, background: t.card, color: t.dm,
+                    fontSize: 11.5, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                    boxShadow: "0 -4px 16px rgba(0,0,0,0.35)",
+                  }}
+                >初期状態に戻す</button>
+              )}
+              <button
+                onClick={() => { setHomeCat(null); setView("title"); try { window.scrollTo(0, 0); } catch {} }}
+                style={{
+                  flex: 1, padding: homeCat === "settings" ? "9px 4px" : "15px 8px",
+                  borderRadius: homeCat === "settings" ? 10 : 12,
+                  border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
+                  fontSize: homeCat === "settings" ? 11.5 : 15, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
+                  boxShadow: "0 -4px 16px rgba(0,0,0,0.35)",
+                }}
+              >← メニューに戻る</button>
+            </div>
           </div>
         )}
       </div>
