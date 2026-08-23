@@ -328,6 +328,7 @@ export default function MahjongScorer() {
   const [seatTurn, setSeatTurn] = useState(0);      // 今引く人（元の並び順のindex）
   const [seatDone, setSeatDone] = useState(false);
   const [showRuleCheck, setShowRuleCheck] = useState(false); // 対局中のルール確認
+  const [rcSet, setRcSet] = useState(null);   // ルール確認内で開いている設定（voice/dice/screen）
   const [ruleEditMode, setRuleEditMode] = useState(false);   // 対局中のルール変更モード
   // 対局中のルール変更（この対局の gameConfig にだけ反映。リーグの既定は変えない）
   const patchGameRules = (patch) => setGameConfig(g => g ? ({ ...g, rules: { ...(g.rules || {}), ...patch } }) : g);
@@ -5551,6 +5552,115 @@ input, select { padding: 10px 14px; }
     );
   };
 
+  // 音・サイコロ・画面の設定パネル（設定画面と対局中のルール確認で共用。即時保存）
+  const dicePanelCard = () => (
+        <div style={{ ...card, padding: 16, marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <span style={{
+          fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>🎲</span>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>サイコロ</div>
+          <div style={{ fontSize: 11, color: t.dm }}>結果を表示しておく時間</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {[3, 5, 8, 10].map(v => (
+          <button key={v} onClick={() => saveDiceHold(v)} style={{
+            flex: 1, padding: "12px 4px", borderRadius: 10, cursor: "pointer",
+            border: `2px solid ${diceHoldSec === v ? t.ac : t.bd}`,
+            background: diceHoldSec === v ? t.acS : "transparent",
+            color: diceHoldSec === v ? t.ac : t.tx, fontSize: 13, fontWeight: 700,
+          }}>{v}秒</button>
+        ))}
+      </div>
+      <div style={{ fontSize: 10, color: t.dm, marginTop: 8 }}>
+        振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。
+        効果音は「音の設定」にあります
+      </div>
+    </div>
+    
+  );
+  const voicePanelCard = () => (
+        <div style={{ ...card, padding: 16, marginTop: 4 }}>
+      {[
+        { label: "🎲 サイコロ音", desc: "振ったときにカラカラ…と鳴ります",
+          on: diceSoundOn, save: saveDiceSound, preview: () => playDiceSound(true) },
+        { label: "🀄 ロンの声", desc: "放銃した人を確定したときに「ロン！」",
+          on: voiceRonOn, save: saveVoiceRon, preview: () => playVoice("ロン", null, true) },
+        { label: "🔴 リーチの声", desc: "リーチを宣言したときに「リーチ！」",
+          on: voiceRiichiOn, save: saveVoiceRiichi, preview: () => playVoice("リーチ", null, true) },
+        { label: "✋ ツモの声", desc: "ツモを選んだときに「ツモ！」",
+          on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true) },
+        { label: "📢 局の読み上げ", desc: "局の変わり目に「東一局」と読み上げます",
+          on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
+      ].map((row, i) => (
+        <div key={i} style={{
+          // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          paddingTop: i === 0 ? 0 : 12, marginTop: i === 0 ? 0 : 12,
+          borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`,
+        }}>
+          <div style={{ flex: "1 1 150px", minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>{row.label}</div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.6 }}>{row.desc}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
+            <button onClick={row.preview} style={{
+              padding: "8px 12px", borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
+              fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+            }}>▶ 試聴</button>
+            <button onClick={() => row.save(!row.on)} style={{
+              width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
+              background: row.on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+            }}>
+              <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+            </button>
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
+        掛け声（リーチ・ロン・ツモ）と局の読み上げは収録した音声を再生します
+        （再生できない端末では端末の読み上げで代用）。音が出ないときは、本体の消音（マナーモード）が
+        入っていないか、音量が下がっていないかを確かめてください。
+      </div>
+    </div>
+    
+  );
+  const screenPanelCard = () => (
+        <div style={{ ...card, padding: 16, marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <span style={{
+          fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>💡</span>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>画面をスリープさせない</div>
+          <div style={{ fontSize: 11, color: t.dm }}>対局中に画面が暗くなるのを防ぎます</div>
+        </div>
+      </div>
+      {wakeSupported ? (
+        <>
+          {toggleRow("スリープ防止を有効にする", keepAwake, () => saveKeepAwake(!keepAwake))}
+          <div style={{ fontSize: 10, color: keepAwake && wakeActive ? t.gn : t.dm, marginTop: 8 }}>
+            {keepAwake
+              ? (wakeActive ? "● 動作中 — このアプリを開いている間は画面が消えません" : "他のアプリに切り替えると一時停止し、戻ると再開します")
+              : "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います"}
+          </div>
+        </>
+      ) : (
+        <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.7 }}>
+          お使いのブラウザはこの機能に対応していません（iOSはSafari 16.4以降で対応）。
+          <br />
+          本体の「設定 → 画面表示と明るさ → 自動ロック → なし」で切り替えてください。
+        </div>
+      )}
+    </div>
+    
+  );
+
   // 対局中のルール確認モーダル
   const RuleCheckModal = () => {
     if (!showRuleCheck) return null;
@@ -5586,7 +5696,7 @@ input, select { padding: 10px 14px; }
         paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
         paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
         overflowY: "auto",
-      }} onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); }}>
+      }} onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); setRcSet(null); }}>
         <div style={{
           ...card, maxWidth: 400, width: "100%", margin: 0,
           // 上側（対面向き）のボタンから開いたときは、向かいの人が読める向きにする
@@ -5598,7 +5708,7 @@ input, select { padding: 10px 14px; }
               {lg && <div style={{ fontSize: 11, color: t.gd, marginTop: 3 }}>🏆 {lg.name}</div>}
             </div>
             <button style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer", lineHeight: 1 }}
-              onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); }}>✕</button>
+              onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); setRcSet(null); }}>✕</button>
           </div>
 
           {!ruleEditMode ? (
@@ -5711,7 +5821,45 @@ input, select { padding: 10px 14px; }
             {ruleEditMode ? "✓ 変更を終える" : "✏️ ルールを変更する"}
           </button>
 
-          <button style={{ ...actionBtn("p"), marginTop: 14 }} onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); }}>閉じる</button>
+          {/* 音・サイコロ・画面の設定（変更はすぐ保存される） */}
+          {!ruleEditMode && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.bd}` }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, letterSpacing: "0.05em" }}>
+                音・サイコロ・画面の設定
+              </div>
+              {[
+                ["voice", "🔊", "音の設定",
+                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`],
+                ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`],
+                ["screen", "💡", "画面設定", "対局中のスリープ防止"],
+              ].map(([id, icon, title, sub]) => (
+                <React.Fragment key={id}>
+                  <button onClick={() => setRcSet(v => (v === id ? null : id))} style={{
+                    width: "100%", padding: "11px 12px", marginTop: 8, borderRadius: 11, boxSizing: "border-box",
+                    display: "flex", alignItems: "center", gap: 9, cursor: "pointer", textAlign: "left",
+                    background: t.sf, border: `1px solid ${rcSet === id ? t.ac : t.bd}`,
+                  }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: t.tx }}>{title}</span>
+                      <span style={{ display: "block", fontSize: 10.5, color: t.dm, marginTop: 1 }}>{sub}</span>
+                    </span>
+                    <span style={{
+                      color: rcSet === id ? t.ac : t.dm, fontSize: 12, flexShrink: 0,
+                      transform: rcSet === id ? "rotate(180deg)" : "none", transition: "transform 0.2s",
+                    }}>▼</span>
+                  </button>
+                  {rcSet === id && (
+                    <div style={{ marginTop: 8, marginBottom: -14 }}>
+                      {id === "voice" ? voicePanelCard() : id === "dice" ? dicePanelCard() : screenPanelCard()}
+                    </div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+
+          <button style={{ ...actionBtn("p"), marginTop: 14 }} onClick={() => { setShowRuleCheck(false); setRuleEditMode(false); setRcSet(null); }}>閉じる</button>
 
           {/* 途中終了 */}
           <div style={{ marginTop: 6, paddingTop: 14, borderTop: `1px solid ${t.bd}` }}>
@@ -6925,117 +7073,14 @@ input, select { padding: 10px 14px; }
             )}
 
             {secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間")}
-            {setOpen === "dice" && (<>
-            {/* サイコロ設定 */}
-            <div style={{ ...card, padding: 16, marginTop: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <span style={{
-                  fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>🎲</span>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>サイコロ</div>
-                  <div style={{ fontSize: 11, color: t.dm }}>結果を表示しておく時間</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 6 }}>
-                {[3, 5, 8, 10].map(v => (
-                  <button key={v} onClick={() => saveDiceHold(v)} style={{
-                    flex: 1, padding: "12px 4px", borderRadius: 10, cursor: "pointer",
-                    border: `2px solid ${diceHoldSec === v ? t.ac : t.bd}`,
-                    background: diceHoldSec === v ? t.acS : "transparent",
-                    color: diceHoldSec === v ? t.ac : t.tx, fontSize: 13, fontWeight: 700,
-                  }}>{v}秒</button>
-                ))}
-              </div>
-              <div style={{ fontSize: 10, color: t.dm, marginTop: 8 }}>
-                振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。
-                効果音は「音の設定」にあります
-              </div>
-            </div>
-            </>)}
+            {setOpen === "dice" && dicePanelCard()}
 
             {secHdr("voice", "🔊", "音の設定",
               `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`)}
-            {setOpen === "voice" && (<>
-            <div style={{ ...card, padding: 16, marginTop: 4 }}>
-              {[
-                { label: "🎲 サイコロ音", desc: "振ったときにカラカラ…と鳴ります",
-                  on: diceSoundOn, save: saveDiceSound, preview: () => playDiceSound(true) },
-                { label: "🀄 ロンの声", desc: "放銃した人を確定したときに「ロン！」",
-                  on: voiceRonOn, save: saveVoiceRon, preview: () => playVoice("ロン", null, true) },
-                { label: "🔴 リーチの声", desc: "リーチを宣言したときに「リーチ！」",
-                  on: voiceRiichiOn, save: saveVoiceRiichi, preview: () => playVoice("リーチ", null, true) },
-                { label: "✋ ツモの声", desc: "ツモを選んだときに「ツモ！」",
-                  on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true) },
-                { label: "📢 局の読み上げ", desc: "局の変わり目に「東一局」と読み上げます",
-                  on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
-              ].map((row, i) => (
-                <div key={i} style={{
-                  // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
-                  display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-                  paddingTop: i === 0 ? 0 : 12, marginTop: i === 0 ? 0 : 12,
-                  borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`,
-                }}>
-                  <div style={{ flex: "1 1 150px", minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>{row.label}</div>
-                    <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.6 }}>{row.desc}</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
-                    <button onClick={row.preview} style={{
-                      padding: "8px 12px", borderRadius: 9, cursor: "pointer",
-                      border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
-                      fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-                    }}>▶ 試聴</button>
-                    <button onClick={() => row.save(!row.on)} style={{
-                      width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-                      background: row.on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
-                    }}>
-                      <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
-                掛け声（リーチ・ロン・ツモ）と局の読み上げは収録した音声を再生します
-                （再生できない端末では端末の読み上げで代用）。音が出ないときは、本体の消音（マナーモード）が
-                入っていないか、音量が下がっていないかを確かめてください。
-              </div>
-            </div>
-            </>)}
+            {setOpen === "voice" && voicePanelCard()}
 
             {secHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
-            {setOpen === "screen" && (<>
-            {/* 画面スリープ防止 */}
-            <div style={{ ...card, padding: 16, marginTop: 4 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                <span style={{
-                  fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                }}>💡</span>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>画面をスリープさせない</div>
-                  <div style={{ fontSize: 11, color: t.dm }}>対局中に画面が暗くなるのを防ぎます</div>
-                </div>
-              </div>
-              {wakeSupported ? (
-                <>
-                  {toggleRow("スリープ防止を有効にする", keepAwake, () => saveKeepAwake(!keepAwake))}
-                  <div style={{ fontSize: 10, color: keepAwake && wakeActive ? t.gn : t.dm, marginTop: 8 }}>
-                    {keepAwake
-                      ? (wakeActive ? "● 動作中 — このアプリを開いている間は画面が消えません" : "他のアプリに切り替えると一時停止し、戻ると再開します")
-                      : "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います"}
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.7 }}>
-                  お使いのブラウザはこの機能に対応していません（iOSはSafari 16.4以降で対応）。
-                  <br />
-                  本体の「設定 → 画面表示と明るさ → 自動ロック → なし」で切り替えてください。
-                </div>
-              )}
-            </div>
-            </>)}
+            {setOpen === "screen" && screenPanelCard()}
 
             {/* ルール類の保存（変更があるときだけ表示）。横並び1行の小さめボタン */}
             {(rulesDirty || rulesSaved) && (
@@ -7150,7 +7195,6 @@ input, select { padding: 10px 14px; }
     };
     return (
       <div style={body}>
-        <button style={backBtn} onClick={() => setView("home")}>← 戻る</button>
         <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🏆 リーグ戦</div>
         <div style={{ fontSize: 12, color: t.dm, marginBottom: 16 }}>
           同じメンバーで何回か対局し、通算成績を記録します
@@ -7203,7 +7247,6 @@ input, select { padding: 10px 14px; }
 
     return (
       <div style={body}>
-        <button style={backBtn} onClick={() => setView("league")}>← 戻る</button>
         <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>
           {leagues.some(l => l.id === d.id) ? "リーグ戦の設定" : "新しいリーグ戦"}
         </div>
@@ -7578,7 +7621,7 @@ input, select { padding: 10px 14px; }
   // 詳細（成績表・対局一覧・設定）
   const renderLeagueDetail = () => {
     const lg = curLeague;
-    if (!lg) return <div style={body}><button style={backBtn} onClick={() => setView("league")}>← 戻る</button></div>;
+    if (!lg) return <div style={body} />;
     const st = leagueStandings(lg);
     const pr = leagueProgress(lg);
 
@@ -7773,7 +7816,6 @@ input, select { padding: 10px 14px; }
     const ready = lgPick.length === lgPC && !!lgMatchType;
     return (
       <div style={body}>
-        <button style={backBtn} onClick={() => setView("leaguedetail")}>← 戻る</button>
         <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>{lg.name}</div>
         <div style={{ fontSize: 12, color: t.dm, marginBottom: 16 }}>
           {lg.members.length === lgPC
@@ -7864,7 +7906,6 @@ input, select { padding: 10px 14px; }
 
       return (
         <div style={body}>
-          <button style={backBtn} onClick={() => setSqMode(null)}>← 戻る</button>
           <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📘 点数計算のしかた</div>
           <div style={{ fontSize: 12, color: t.dm, marginBottom: 16 }}>
             4翻以下の点数は、次の3ステップで求められます
@@ -7990,7 +8031,6 @@ input, select { padding: 10px 14px; }
     if (!sqMode) {
       return (
         <div style={body}>
-          <button style={backBtn} onClick={() => setView("home")}>← 戻る</button>
           <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🔢 点数問題集</div>
           <div style={{ fontSize: 12, color: t.dm, marginBottom: 18 }}>
             4翻以下の点数を、親子・ロンツモの組み合わせで出題します
@@ -8218,7 +8258,6 @@ input, select { padding: 10px 14px; }
       };
       return (
         <div style={body}>
-          <button style={backBtn} onClick={() => setView("home")}>← 戻る</button>
           <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📚 用語問題集</div>
           <div style={{ fontSize: 12, color: t.dm, marginBottom: 16 }}>
             役以外の麻雀用語を、漢字と読みのセットで覚えます
@@ -11558,9 +11597,19 @@ input, select { padding: 10px 14px; }
         <div style={{ padding: "12px 14px 10px", borderBottom: `1px solid ${t.bd}`, display: "flex", alignItems: "center", gap: 8 }}>
           {/* 結果画面は記録前なので、うっかり離脱しないよう戻るを出さない */}
           {view !== "home" && !(view === "game" && gameFinished)
-            && !(view === "game" && !gameStarted) ? (
+            && !(view === "game" && !gameStarted)
+            // 点数計算ウィザードの途中はカード内の「← 戻る」だけにする（二重表示を防ぐ）
+            && !(view === "calc" && calcStep > 0) ? (
             <button
-              onClick={() => setView(view === "names" ? namesBackTo : "home")}
+              onClick={() => {
+                // ページ側の「← 戻る」は置かず、ヘッダーの戻る1つで階層を戻す
+                if (view === "names") setView(namesBackTo);
+                else if (view === "leagueform") setView("league");
+                else if (view === "leaguedetail") setView("league");
+                else if (view === "leaguestart") setView("leaguedetail");
+                else if (view === "scorequiz" && sqMode) setSqMode(null);
+                else setView("home");
+              }}
               style={{
                 background: t.card, border: `1px solid ${t.bd}`, borderRadius: 10,
                 padding: "7px 12px", color: t.ac, fontSize: 13, fontWeight: 700,

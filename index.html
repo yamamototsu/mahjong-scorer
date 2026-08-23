@@ -482,6 +482,7 @@ function MahjongScorer() {
   const [seatTurn, setSeatTurn] = useState(0);
   const [seatDone, setSeatDone] = useState(false);
   const [showRuleCheck, setShowRuleCheck] = useState(false);
+  const [rcSet, setRcSet] = useState(null);
   const [ruleEditMode, setRuleEditMode] = useState(false);
   const patchGameRules = patch => setGameConfig(g => g ? {
     ...g,
@@ -10848,6 +10849,238 @@ input, select { padding: 10px 14px; }
       }
     }, "選び直す")));
   };
+  const dicePanelCard = () => React.createElement("div", {
+    style: {
+      ...card,
+      padding: 16,
+      marginTop: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 20,
+      width: 40,
+      height: 40,
+      borderRadius: 11,
+      background: t.acS,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, "🎲"), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: t.tx
+    }
+  }, "サイコロ"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: t.dm
+    }
+  }, "結果を表示しておく時間"))), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, [3, 5, 8, 10].map(v => React.createElement("button", {
+    key: v,
+    onClick: () => saveDiceHold(v),
+    style: {
+      flex: 1,
+      padding: "12px 4px",
+      borderRadius: 10,
+      cursor: "pointer",
+      border: `2px solid ${diceHoldSec === v ? t.ac : t.bd}`,
+      background: diceHoldSec === v ? t.acS : "transparent",
+      color: diceHoldSec === v ? t.ac : t.tx,
+      fontSize: 13,
+      fontWeight: 700
+    }
+  }, v, "秒"))), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginTop: 8
+    }
+  }, "振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。 効果音は「音の設定」にあります"));
+  const voicePanelCard = () => React.createElement("div", {
+    style: {
+      ...card,
+      padding: 16,
+      marginTop: 4
+    }
+  }, [{
+    label: "🎲 サイコロ音",
+    desc: "振ったときにカラカラ…と鳴ります",
+    on: diceSoundOn,
+    save: saveDiceSound,
+    preview: () => playDiceSound(true)
+  }, {
+    label: "🀄 ロンの声",
+    desc: "放銃した人を確定したときに「ロン！」",
+    on: voiceRonOn,
+    save: saveVoiceRon,
+    preview: () => playVoice("ロン", null, true)
+  }, {
+    label: "🔴 リーチの声",
+    desc: "リーチを宣言したときに「リーチ！」",
+    on: voiceRiichiOn,
+    save: saveVoiceRiichi,
+    preview: () => playVoice("リーチ", null, true)
+  }, {
+    label: "✋ ツモの声",
+    desc: "ツモを選んだときに「ツモ！」",
+    on: voiceTsumoOn,
+    save: saveVoiceTsumo,
+    preview: () => playVoice("ツモ", null, true)
+  }, {
+    label: "📢 局の読み上げ",
+    desc: "局の変わり目に「東一局」と読み上げます",
+    on: voiceRoundOn,
+    save: saveVoiceRound,
+    preview: () => playRoundVoice("東", 0, 1, true)
+  }].map((row, i) => React.createElement("div", {
+    key: i,
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      paddingTop: i === 0 ? 0 : 12,
+      marginTop: i === 0 ? 0 : 12,
+      borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: "1 1 150px",
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: t.tx
+    }
+  }, row.label), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginTop: 2,
+      lineHeight: 1.6
+    }
+  }, row.desc)), React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexShrink: 0,
+      marginLeft: "auto"
+    }
+  }, React.createElement("button", {
+    onClick: row.preview,
+    style: {
+      padding: "8px 12px",
+      borderRadius: 9,
+      cursor: "pointer",
+      border: `1px solid ${t.bd}`,
+      background: "transparent",
+      color: t.ac,
+      fontSize: 12,
+      fontWeight: 700,
+      whiteSpace: "nowrap"
+    }
+  }, "▶ 試聴"), React.createElement("button", {
+    onClick: () => row.save(!row.on),
+    style: {
+      width: 48,
+      height: 28,
+      borderRadius: 14,
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      background: row.on ? t.ac : t.bd,
+      position: "relative",
+      transition: "background 0.15s",
+      flexShrink: 0
+    }
+  }, React.createElement("span", {
+    style: {
+      position: "absolute",
+      top: 3,
+      left: row.on ? 23 : 3,
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: "#fff",
+      transition: "left 0.15s"
+    }
+  }))))), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: `1px solid ${t.bd}33`,
+      lineHeight: 1.8
+    }
+  }, "掛け声（リーチ・ロン・ツモ）と局の読み上げは収録した音声を再生します （再生できない端末では端末の読み上げで代用）。音が出ないときは、本体の消音（マナーモード）が 入っていないか、音量が下がっていないかを確かめてください。"));
+  const screenPanelCard = () => React.createElement("div", {
+    style: {
+      ...card,
+      padding: 16,
+      marginTop: 4
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginBottom: 8
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 20,
+      width: 40,
+      height: 40,
+      borderRadius: 11,
+      background: t.acS,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0
+    }
+  }, "💡"), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: t.tx
+    }
+  }, "画面をスリープさせない"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: t.dm
+    }
+  }, "対局中に画面が暗くなるのを防ぎます"))), wakeSupported ? React.createElement(React.Fragment, null, toggleRow("スリープ防止を有効にする", keepAwake, () => saveKeepAwake(!keepAwake)), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: keepAwake && wakeActive ? t.gn : t.dm,
+      marginTop: 8
+    }
+  }, keepAwake ? wakeActive ? "● 動作中 — このアプリを開いている間は画面が消えません" : "他のアプリに切り替えると一時停止し、戻ると再開します" : "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います")) : React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: t.dm,
+      lineHeight: 1.7
+    }
+  }, "お使いのブラウザはこの機能に対応していません（iOSはSafari 16.4以降で対応）。", React.createElement("br", null), "本体の「設定 → 画面表示と明るさ → 自動ロック → なし」で切り替えてください。"));
   const RuleCheckModal = () => {
     if (!showRuleCheck) return null;
     const rs = gameConfig?.rules || {};
@@ -10909,6 +11142,7 @@ input, select { padding: 10px 14px; }
       onClick: () => {
         setShowRuleCheck(false);
         setRuleEditMode(false);
+        setRcSet(null);
       }
     }, React.createElement("div", {
       style: {
@@ -10950,6 +11184,7 @@ input, select { padding: 10px 14px; }
       onClick: () => {
         setShowRuleCheck(false);
         setRuleEditMode(false);
+        setRcSet(null);
       }
     }, "✕")), !ruleEditMode ? React.createElement(React.Fragment, null, row("人数", PC === 3 ? "三人麻雀" : "四人麻雀"), row("形式", MATCH_LABEL(gameConfig?.matchType)), row("持ち点 / 返し点", `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`, `オカ ${((rs.returnPoints ?? 0) - (rs.startPoints ?? 0)) * PC / 1000}pt がトップへ`), row("ウマ（順位点）", umaLabel), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし", rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり"), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), row("本場", `1本 = ${HU().toLocaleString()}点`, `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`), row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います"), row("チョンボ", rs.chomboCalc !== false ? "罰符あり" : "記録のみ", rs.chomboCalc !== false ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し` : "点数は動かさず記録だけ残します。局はやり直し"), row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし", rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)) : (() => {
       const seg = (opts, cur, onPick) => React.createElement("div", {
@@ -11091,7 +11326,75 @@ input, select { padding: 10px 14px; }
         border: `1px solid ${ruleEditMode ? t.gn : t.ac}55`
       },
       onClick: () => setRuleEditMode(v => !v)
-    }, ruleEditMode ? "✓ 変更を終える" : "✏️ ルールを変更する"), React.createElement("button", {
+    }, ruleEditMode ? "✓ 変更を終える" : "✏️ ルールを変更する"), !ruleEditMode && React.createElement("div", {
+      style: {
+        marginTop: 14,
+        paddingTop: 12,
+        borderTop: `1px solid ${t.bd}`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.dm,
+        letterSpacing: "0.05em"
+      }
+    }, "音・サイコロ・画面の設定"), [["voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`], ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`], ["screen", "💡", "画面設定", "対局中のスリープ防止"]].map(([id, icon, title, sub]) => React.createElement(React.Fragment, {
+      key: id
+    }, React.createElement("button", {
+      onClick: () => setRcSet(v => v === id ? null : id),
+      style: {
+        width: "100%",
+        padding: "11px 12px",
+        marginTop: 8,
+        borderRadius: 11,
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
+        gap: 9,
+        cursor: "pointer",
+        textAlign: "left",
+        background: t.sf,
+        border: `1px solid ${rcSet === id ? t.ac : t.bd}`
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        flexShrink: 0
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 13.5,
+        fontWeight: 700,
+        color: t.tx
+      }
+    }, title), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 10.5,
+        color: t.dm,
+        marginTop: 1
+      }
+    }, sub)), React.createElement("span", {
+      style: {
+        color: rcSet === id ? t.ac : t.dm,
+        fontSize: 12,
+        flexShrink: 0,
+        transform: rcSet === id ? "rotate(180deg)" : "none",
+        transition: "transform 0.2s"
+      }
+    }, "▼")), rcSet === id && React.createElement("div", {
+      style: {
+        marginTop: 8,
+        marginBottom: -14
+      }
+    }, id === "voice" ? voicePanelCard() : id === "dice" ? dicePanelCard() : screenPanelCard())))), React.createElement("button", {
       style: {
         ...actionBtn("p"),
         marginTop: 14
@@ -11099,6 +11402,7 @@ input, select { padding: 10px 14px; }
       onClick: () => {
         setShowRuleCheck(false);
         setRuleEditMode(false);
+        setRcSet(null);
       }
     }, "閉じる"), React.createElement("div", {
       style: {
@@ -13318,236 +13622,7 @@ input, select { padding: 10px 14px; }
       onUnitChange: u => editDraft({
         rateUnit: u
       })
-    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && React.createElement(React.Fragment, null, React.createElement("div", {
-      style: {
-        ...card,
-        padding: 16,
-        marginTop: 4
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 12
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 20,
-        width: 40,
-        height: 40,
-        borderRadius: 11,
-        background: t.acS,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, "🎲"), React.createElement("div", null, React.createElement("div", {
-      style: {
-        fontSize: 15,
-        fontWeight: 700,
-        color: t.tx
-      }
-    }, "サイコロ"), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm
-      }
-    }, "結果を表示しておく時間"))), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6
-      }
-    }, [3, 5, 8, 10].map(v => React.createElement("button", {
-      key: v,
-      onClick: () => saveDiceHold(v),
-      style: {
-        flex: 1,
-        padding: "12px 4px",
-        borderRadius: 10,
-        cursor: "pointer",
-        border: `2px solid ${diceHoldSec === v ? t.ac : t.bd}`,
-        background: diceHoldSec === v ? t.acS : "transparent",
-        color: diceHoldSec === v ? t.ac : t.tx,
-        fontSize: 13,
-        fontWeight: 700
-      }
-    }, v, "秒"))), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 8
-      }
-    }, "振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。 効果音は「音の設定」にあります"))), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
-      style: {
-        ...card,
-        padding: 16,
-        marginTop: 4
-      }
-    }, [{
-      label: "🎲 サイコロ音",
-      desc: "振ったときにカラカラ…と鳴ります",
-      on: diceSoundOn,
-      save: saveDiceSound,
-      preview: () => playDiceSound(true)
-    }, {
-      label: "🀄 ロンの声",
-      desc: "放銃した人を確定したときに「ロン！」",
-      on: voiceRonOn,
-      save: saveVoiceRon,
-      preview: () => playVoice("ロン", null, true)
-    }, {
-      label: "🔴 リーチの声",
-      desc: "リーチを宣言したときに「リーチ！」",
-      on: voiceRiichiOn,
-      save: saveVoiceRiichi,
-      preview: () => playVoice("リーチ", null, true)
-    }, {
-      label: "✋ ツモの声",
-      desc: "ツモを選んだときに「ツモ！」",
-      on: voiceTsumoOn,
-      save: saveVoiceTsumo,
-      preview: () => playVoice("ツモ", null, true)
-    }, {
-      label: "📢 局の読み上げ",
-      desc: "局の変わり目に「東一局」と読み上げます",
-      on: voiceRoundOn,
-      save: saveVoiceRound,
-      preview: () => playRoundVoice("東", 0, 1, true)
-    }].map((row, i) => React.createElement("div", {
-      key: i,
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        flexWrap: "wrap",
-        paddingTop: i === 0 ? 0 : 12,
-        marginTop: i === 0 ? 0 : 12,
-        borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: "1 1 150px",
-        minWidth: 0
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 14,
-        fontWeight: 700,
-        color: t.tx
-      }
-    }, row.label), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 2,
-        lineHeight: 1.6
-      }
-    }, row.desc)), React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        flexShrink: 0,
-        marginLeft: "auto"
-      }
-    }, React.createElement("button", {
-      onClick: row.preview,
-      style: {
-        padding: "8px 12px",
-        borderRadius: 9,
-        cursor: "pointer",
-        border: `1px solid ${t.bd}`,
-        background: "transparent",
-        color: t.ac,
-        fontSize: 12,
-        fontWeight: 700,
-        whiteSpace: "nowrap"
-      }
-    }, "▶ 試聴"), React.createElement("button", {
-      onClick: () => row.save(!row.on),
-      style: {
-        width: 48,
-        height: 28,
-        borderRadius: 14,
-        border: "none",
-        padding: 0,
-        cursor: "pointer",
-        background: row.on ? t.ac : t.bd,
-        position: "relative",
-        transition: "background 0.15s",
-        flexShrink: 0
-      }
-    }, React.createElement("span", {
-      style: {
-        position: "absolute",
-        top: 3,
-        left: row.on ? 23 : 3,
-        width: 22,
-        height: 22,
-        borderRadius: "50%",
-        background: "#fff",
-        transition: "left 0.15s"
-      }
-    }))))), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 12,
-        paddingTop: 12,
-        borderTop: `1px solid ${t.bd}33`,
-        lineHeight: 1.8
-      }
-    }, "掛け声（リーチ・ロン・ツモ）と局の読み上げは収録した音声を再生します （再生できない端末では端末の読み上げで代用）。音が出ないときは、本体の消音（マナーモード）が 入っていないか、音量が下がっていないかを確かめてください。"))), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && React.createElement(React.Fragment, null, React.createElement("div", {
-      style: {
-        ...card,
-        padding: 16,
-        marginTop: 4
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 8
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 20,
-        width: 40,
-        height: 40,
-        borderRadius: 11,
-        background: t.acS,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, "💡"), React.createElement("div", null, React.createElement("div", {
-      style: {
-        fontSize: 15,
-        fontWeight: 700,
-        color: t.tx
-      }
-    }, "画面をスリープさせない"), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm
-      }
-    }, "対局中に画面が暗くなるのを防ぎます"))), wakeSupported ? React.createElement(React.Fragment, null, toggleRow("スリープ防止を有効にする", keepAwake, () => saveKeepAwake(!keepAwake)), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: keepAwake && wakeActive ? t.gn : t.dm,
-        marginTop: 8
-      }
-    }, keepAwake ? wakeActive ? "● 動作中 — このアプリを開いている間は画面が消えません" : "他のアプリに切り替えると一時停止し、戻ると再開します" : "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います")) : React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        lineHeight: 1.7
-      }
-    }, "お使いのブラウザはこの機能に対応していません（iOSはSafari 16.4以降で対応）。", React.createElement("br", null), "本体の「設定 → 画面表示と明るさ → 自動ロック → なし」で切り替えてください。"))), (rulesDirty || rulesSaved) && React.createElement("div", {
+    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && screenPanelCard(), (rulesDirty || rulesSaved) && React.createElement("div", {
       style: {
         ...card,
         padding: 10,
@@ -13717,10 +13792,7 @@ input, select { padding: 10px 14px; }
     };
     return React.createElement("div", {
       style: body
-    }, React.createElement("button", {
-      style: backBtn,
-      onClick: () => setView("home")
-    }, "← 戻る"), React.createElement("div", {
+    }, React.createElement("div", {
       style: {
         fontSize: 20,
         fontWeight: 800,
@@ -13804,10 +13876,7 @@ input, select { padding: 10px 14px; }
     const canSave = d.name.trim() && d.members.length >= lgPC;
     return React.createElement("div", {
       style: body
-    }, React.createElement("button", {
-      style: backBtn,
-      onClick: () => setView("league")
-    }, "← 戻る"), React.createElement("div", {
+    }, React.createElement("div", {
       style: {
         fontSize: 20,
         fontWeight: 800,
@@ -14629,10 +14698,7 @@ input, select { padding: 10px 14px; }
     const lg = curLeague;
     if (!lg) return React.createElement("div", {
       style: body
-    }, React.createElement("button", {
-      style: backBtn,
-      onClick: () => setView("league")
-    }, "← 戻る"));
+    });
     const st = leagueStandings(lg);
     const pr = leagueProgress(lg);
     return React.createElement("div", {
@@ -14996,10 +15062,7 @@ input, select { padding: 10px 14px; }
     const ready = lgPick.length === lgPC && !!lgMatchType;
     return React.createElement("div", {
       style: body
-    }, React.createElement("button", {
-      style: backBtn,
-      onClick: () => setView("leaguedetail")
-    }, "← 戻る"), React.createElement("div", {
+    }, React.createElement("div", {
       style: {
         fontSize: 20,
         fontWeight: 800,
@@ -15167,10 +15230,7 @@ input, select { padding: 10px 14px; }
       }, sub));
       return React.createElement("div", {
         style: body
-      }, React.createElement("button", {
-        style: backBtn,
-        onClick: () => setSqMode(null)
-      }, "← 戻る"), React.createElement("div", {
+      }, React.createElement("div", {
         style: {
           fontSize: 20,
           fontWeight: 800,
@@ -15399,10 +15459,7 @@ input, select { padding: 10px 14px; }
     if (!sqMode) {
       return React.createElement("div", {
         style: body
-      }, React.createElement("button", {
-        style: backBtn,
-        onClick: () => setView("home")
-      }, "← 戻る"), React.createElement("div", {
+      }, React.createElement("div", {
         style: {
           fontSize: 20,
           fontWeight: 800,
@@ -15838,10 +15895,7 @@ input, select { padding: 10px 14px; }
       };
       return React.createElement("div", {
         style: body
-      }, React.createElement("button", {
-        style: backBtn,
-        onClick: () => setView("home")
-      }, "← 戻る"), React.createElement("div", {
+      }, React.createElement("div", {
         style: {
           fontSize: 20,
           fontWeight: 800,
@@ -22118,8 +22172,10 @@ input, select { padding: 10px 14px; }
       alignItems: "center",
       gap: 8
     }
-  }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) ? React.createElement("button", {
-    onClick: () => setView(view === "names" ? namesBackTo : "home"),
+  }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) && !(view === "calc" && calcStep > 0) ? React.createElement("button", {
+    onClick: () => {
+      if (view === "names") setView(namesBackTo);else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "scorequiz" && sqMode) setSqMode(null);else setView("home");
+    },
     style: {
       background: t.card,
       border: `1px solid ${t.bd}`,
