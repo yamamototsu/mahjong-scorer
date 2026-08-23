@@ -10530,20 +10530,20 @@ input, select { padding: 10px 14px; }
                 display: "flex", justifyContent: "space-between", alignItems: "center",
                 marginTop: 10, paddingTop: 10, borderTop: `1px solid ${t.bd}`,
               }}>
-                <span style={{ fontSize: 11, color: t.dm }}>4人の合計</span>
+                <span style={{ fontSize: 11, color: t.dm }}>{PC}人の合計</span>
                 <span style={{
                   fontSize: 14, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                  color: scores.reduce((a2, b2) => a2 + b2, 0) === (ruleSet.startPoints ?? 25000) * 4 ? t.gn : t.rd,
+                  color: scores.reduce((a2, b2) => a2 + b2, 0) === (ruleSet.startPoints ?? 25000) * PC ? t.gn : t.rd,
                 }}>
                   {scores.reduce((a2, b2) => a2 + b2, 0).toLocaleString()}
                   <span style={{ fontSize: 10, color: t.dm, fontWeight: 400 }}>
-                    {" / "}{((ruleSet.startPoints ?? 25000) * 4).toLocaleString()}
+                    {" / "}{((ruleSet.startPoints ?? 25000) * PC).toLocaleString()}
                   </span>
                 </span>
               </div>
-              {scores.reduce((a2, b2) => a2 + b2, 0) !== (ruleSet.startPoints ?? 25000) * 4 && (
+              {scores.reduce((a2, b2) => a2 + b2, 0) !== (ruleSet.startPoints ?? 25000) * PC && (
                 <div style={{ fontSize: 10, color: t.rd, marginTop: 6, lineHeight: 1.7 }}>
-                  合計が持ち点×4と一致していません。誰かの点数を調整してください。
+                  合計が持ち点×{PC}と一致していません。誰かの点数を調整してください。
                 </div>
               )}
             </div>
