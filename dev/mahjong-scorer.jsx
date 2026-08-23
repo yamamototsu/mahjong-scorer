@@ -10001,7 +10001,8 @@ input, select { padding: 10px 14px; }
                       </div>
                       {(honba > 0 || riichiBets > 0 || gRiichi.some(Boolean)) && (
                         <div style={{ fontSize: 12, color: t.dm, marginTop: 6, borderTop: `1px solid ${t.bd}`, paddingTop: 6 }}>
-                          {honba > 0 && `本場 +${(honba * 300).toLocaleString()}`}
+                          {/* 1本場の点数はルールに従う（三麻連盟は600点）。実際の加算(HU)と表示を一致させる */}
+                          {honba > 0 && `本場 +${(honba * HU()).toLocaleString()}`}
                           {honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / "}
                           {(riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`}
                         </div>
