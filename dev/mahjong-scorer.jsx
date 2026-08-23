@@ -8450,8 +8450,13 @@ input, select { padding: 10px 14px; }
 
           {/* 前回と同じルールで始める（初回は前回が無いので、設定の初期値で始める） */}
           {(() => {
-            const hasLast = !!lastRules;
-            const base = lastRules || defaultRules;
+            // 前回のルールが選択中の人数用でないときは「前回」として扱わない。
+            // 四人用のウマ(4要素)を三麻に適用すると精算の合計がゼロにならないため、
+            // その場合は人数に合った既定ルールへ落とす（三麻は連盟ルールが既定）
+            const wantLen = playerCount === 3 ? 3 : 4;
+            const hasLast = !!lastRules && (lastRules.uma || []).length === wantLen;
+            const base = hasLast ? lastRules
+              : playerCount === 3 ? { ...defaultRules, ...SANMA_DEFAULT_RULES } : defaultRules;
             const same = JSON.stringify(rules) === JSON.stringify(base);
             const ok = hasLast && same;   // 前回と同じときだけ緑で「✓」を出す
             const sum = [
