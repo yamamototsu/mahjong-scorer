@@ -4962,7 +4962,14 @@ function MahjongScorer() {
       color: t.gd,
       lineHeight: 1
     }
-  }, result.each.toLocaleString()))) : React.createElement("div", {
+  }, result.each.toLocaleString(), React.createElement("span", {
+    style: {
+      fontSize: 15,
+      fontWeight: 800,
+      color: t.dm,
+      marginLeft: 5
+    }
+  }, "×", PC - 1)))) : React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column"
@@ -5014,7 +5021,14 @@ function MahjongScorer() {
       minWidth: 110,
       textAlign: "left"
     }
-  }, result.fromChild.toLocaleString())), React.createElement("div", {
+  }, result.fromChild.toLocaleString(), PC - 2 >= 2 && React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 800,
+      color: t.dm,
+      marginLeft: 5
+    }
+  }, "×", PC - 2))), React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "baseline",

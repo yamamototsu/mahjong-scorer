@@ -2809,7 +2809,10 @@ export default function MahjongScorer() {
             </div>
             <div style={{ padding: "12px 0", borderTop: `1px solid ${t.bd}`, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12 }}>
               <span style={{ fontSize: 18, color: t.gd, fontWeight: 800 }}>全員から</span>
-              <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1 }}>{result.each.toLocaleString()}</span>
+              <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1 }}>
+                {result.each.toLocaleString()}
+                <span style={{ fontSize: 15, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{PC - 1}</span>
+              </span>
             </div>
           </div>
         ) : (
@@ -2821,7 +2824,10 @@ export default function MahjongScorer() {
             </div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12, padding: "12px 0", borderTop: `1px solid ${t.bd}` }}>
               <span style={{ fontSize: 18, color: t.ac, fontWeight: 800, width: 70, textAlign: "right" }}>子から</span>
-              <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1, minWidth: 110, textAlign: "left" }}>{result.fromChild.toLocaleString()}</span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1, minWidth: 110, textAlign: "left" }}>
+                {result.fromChild.toLocaleString()}
+                {PC - 2 >= 2 && <span style={{ fontSize: 14, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{PC - 2}</span>}
+              </span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12, padding: "12px 0 0", borderTop: `1px solid ${t.bd}33` }}>
               <span style={{ fontSize: 18, color: t.gd, fontWeight: 800, width: 70, textAlign: "right" }}>親から</span>
