@@ -768,6 +768,7 @@ function MahjongScorer() {
   const [voiceRiichiOn, setVoiceRiichiOn] = useState(() => loadVoicePref("mj_voice_riichi"));
   const [voiceTsumoOn, setVoiceTsumoOn] = useState(() => loadVoicePref("mj_voice_tsumo"));
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
+  const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
   const saveVoicePref = (key, setter) => on => {
     setter(on);
     try {
@@ -777,23 +778,31 @@ function MahjongScorer() {
   const saveVoiceRiichi = saveVoicePref("mj_voice_riichi", setVoiceRiichiOn);
   const saveVoiceTsumo = saveVoicePref("mj_voice_tsumo", setVoiceTsumoOn);
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
+  const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
   const voiceOnFor = text => text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
-  const TSUMO_READINGS = ["ツモ", "ツモッ", "つも", "自摸"];
-  const [tsumoReading, setTsumoReading] = useState(() => {
-    try {
-      const v = localStorage.getItem("mj_voice_tsumo_text");
-      return TSUMO_READINGS.includes(v) ? v : "ツモッ";
-    } catch {
-      return "ツモッ";
-    }
-  });
-  const saveTsumoReading = v => {
-    setTsumoReading(v);
-    try {
-      localStorage.setItem("mj_voice_tsumo_text", v);
-    } catch {}
+  const VOICE_FILES = {
+    リーチ: "assets/voice/riichi.mp3",
+    ロン: "assets/voice/ron.mp3",
+    ツモ: "assets/voice/tsumo.mp3"
   };
-  const readingFor = text => text === "ツモ" ? tsumoReading : text;
+  const voiceAudioRef = React.useRef({});
+  const voiceAudioFor = text => {
+    const src = VOICE_FILES[text];
+    if (!src) return null;
+    try {
+      if (!voiceAudioRef.current[text]) {
+        const a = new Audio(src);
+        a.preload = "auto";
+        voiceAudioRef.current[text] = a;
+      }
+      return voiceAudioRef.current[text];
+    } catch {
+      return null;
+    }
+  };
+  React.useEffect(() => {
+    Object.keys(VOICE_FILES).forEach(voiceAudioFor);
+  }, []);
   const playTileSlap = () => {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -833,7 +842,7 @@ function MahjongScorer() {
       osc.stop(t0 + 0.16);
     } catch {}
   };
-  const playVoice = (text, done, force, spoken) => {
+  const playVoice = (text, done, force) => {
     let called = false;
     const finish = () => {
       if (called) return;
@@ -847,6 +856,7 @@ function MahjongScorer() {
     const withSlap = text === "ツモ" || text === "ロン";
     if (withSlap) playTileSlap();
     const speak = () => {
+      if (called) return;
       try {
         const syn = window.speechSynthesis;
         if (!syn) {
@@ -854,7 +864,7 @@ function MahjongScorer() {
           return;
         }
         syn.cancel();
-        const u = new SpeechSynthesisUtterance((spoken || readingFor(text)) + "！");
+        const u = new SpeechSynthesisUtterance((text === "ツモ" ? "ツモッ" : text) + "！");
         u.lang = "ja-JP";
         u.rate = 1.15;
         u.pitch = 0.95;
@@ -873,8 +883,57 @@ function MahjongScorer() {
         finish();
       }
     };
-    if (withSlap) setTimeout(speak, 130);else speak();
+    const play = () => {
+      const a = voiceAudioFor(text);
+      if (!a) {
+        speak();
+        return;
+      }
+      try {
+        a.currentTime = 0;
+        a.onended = finish;
+        a.onerror = speak;
+        const p = a.play();
+        if (p && p.catch) p.catch(speak);
+      } catch {
+        speak();
+      }
+    };
+    if (withSlap) setTimeout(play, 130);else play();
     if (done) setTimeout(finish, 1700);
+  };
+  const roundKana = (wind, dealer, honba2) => {
+    const W = {
+      東: "トン",
+      南: "ナン",
+      西: "シャー",
+      北: "ペー"
+    };
+    const K = ["イッ", "ニー", "サン", "スー"];
+    const H = ["", "イッポンバ", "ニホンバ", "サンボンバ", "ヨンホンバ", "ゴホンバ", "ロッポンバ", "ナナホンバ", "ハッポンバ", "キュウホンバ", "ジュッポンバ"];
+    const k = `${W[wind] || wind}${K[dealer] || dealer + 1}キョク`;
+    const h = honba2 > 0 ? H[honba2] || `${honba2}ホンバ` : "";
+    return h ? `${k}、${h}` : k;
+  };
+  const playRoundVoice = (wind, dealer, honba2, force) => {
+    if (!force && !voiceRoundOn) return;
+    try {
+      const syn = window.speechSynthesis;
+      if (!syn) return;
+      syn.cancel();
+      const u = new SpeechSynthesisUtterance(roundKana(wind, dealer, honba2));
+      u.lang = "ja-JP";
+      u.rate = 1.05;
+      u.volume = 1;
+      try {
+        const ja = (syn.getVoices() || []).filter(v => v && /^ja/i.test(v.lang || ""));
+        if (ja.length) {
+          const better = ja.find(v => /拡張|premium|enhanced|neural/i.test(v.name || ""));
+          u.voice = better || ja[0];
+        }
+      } catch {}
+      syn.speak(u);
+    } catch {}
   };
   const toggleDeclaredRiichi = i => {
     setDeclaredRiichi(prev => {
@@ -1514,6 +1573,7 @@ function MahjongScorer() {
     });
     if (splashTimer.current) clearTimeout(splashTimer.current);
     splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
+    playRoundVoice("東", 0, 0);
   }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
   const prevRoundKey = React.useRef(null);
   React.useEffect(() => {
@@ -1542,6 +1602,7 @@ function MahjongScorer() {
     });
     if (splashTimer.current) clearTimeout(splashTimer.current);
     splashTimer.current = setTimeout(() => setStartSplash(null), 2200);
+    playRoundVoice(roundWind, dealerIdx, honba);
   }, [roundWind, dealerIdx, honba, gameStarted, gameFinished]);
   const t = {
     bg: "#0c1117",
@@ -12848,7 +12909,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginTop: 8
       }
-    }, "振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。 効果音は「音の設定」にあります"))), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn].filter(Boolean).length}/4 がオン`), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }, "振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。 効果音は「音の設定」にあります"))), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -12877,8 +12938,13 @@ input, select { padding: 10px 14px; }
       desc: "ツモを選んだときに「ツモ！」",
       on: voiceTsumoOn,
       save: saveVoiceTsumo,
-      preview: () => playVoice("ツモ", null, true),
-      readings: true
+      preview: () => playVoice("ツモ", null, true)
+    }, {
+      label: "📢 局の読み上げ",
+      desc: "局の変わり目に「東一局」と読み上げます",
+      on: voiceRoundOn,
+      save: saveVoiceRound,
+      preview: () => playRoundVoice("東", 0, 1, true)
     }].map((row, i) => React.createElement("div", {
       key: i,
       style: {
@@ -12954,42 +13020,7 @@ input, select { padding: 10px 14px; }
         background: "#fff",
         transition: "left 0.15s"
       }
-    }))), row.readings && React.createElement("div", {
-      style: {
-        flexBasis: "100%",
-        marginTop: 2
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 6
-      }
-    }, TSUMO_READINGS.map(r => React.createElement("button", {
-      key: r,
-      onClick: () => {
-        saveTsumoReading(r);
-        playVoice("ツモ", null, true, r);
-      },
-      style: {
-        flex: 1,
-        padding: "9px 2px",
-        borderRadius: 9,
-        cursor: "pointer",
-        border: `2px solid ${tsumoReading === r ? t.ac : t.bd}`,
-        background: tsumoReading === r ? t.acS : "transparent",
-        color: tsumoReading === r ? t.ac : t.tx,
-        fontSize: 12,
-        fontWeight: 700,
-        whiteSpace: "nowrap"
-      }
-    }, r))), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 6,
-        lineHeight: 1.6
-      }
-    }, "イントネーションが合わないときは、読み方を変えると聞こえ方が変わります。 押すとその読み方で試聴できます")))), React.createElement("div", {
+    }))))), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -12998,7 +13029,7 @@ input, select { padding: 10px 14px; }
         borderTop: `1px solid ${t.bd}33`,
         lineHeight: 1.8
       }
-    }, "声は端末に入っている音声を使います。音が出ないときは、本体の消音（マナーモード）が 入っていないか、音量が下がっていないかを確かめてください。"))), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }, "リーチ・ロン・ツモは収録した掛け声を再生します（再生できない端末では読み上げで代用）。 局の読み上げは端末に入っている音声を使います。音が出ないときは、本体の消音（マナーモード）が 入っていないか、音量が下がっていないかを確かめてください。"))), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,

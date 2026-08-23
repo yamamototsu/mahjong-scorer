@@ -550,8 +550,8 @@ export default function MahjongScorer() {
   // 実況リーチ: 宣言した時点で1000点減算・供託に加算（この局で宣言済みの人）
   const [declaredRiichi, setDeclaredRiichi] = useState([false, false, false, false]);
 
-  // 発声の読み上げ（端末の音声合成を使う。音声ファイルは持たない）
-  // リーチ宣言・ツモ／ロンの確定で「リーチ」「ツモ」「ロン」と読み上げる。
+  // 掛け声（リーチ・ツモ・ロン）は収録した音声ファイルを再生する。
+  // 局の読み上げ（東一局 一本場 など）は端末の音声合成で読む。
   // 声ごとに個別のオンオフ。昔の一括キー mj_riichi_voice からは初期値を引き継ぐ
   const loadVoicePref = (key) => {
     try {
@@ -563,6 +563,7 @@ export default function MahjongScorer() {
   const [voiceRiichiOn, setVoiceRiichiOn] = useState(() => loadVoicePref("mj_voice_riichi"));
   const [voiceTsumoOn, setVoiceTsumoOn] = useState(() => loadVoicePref("mj_voice_tsumo"));
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
+  const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
   const saveVoicePref = (key, setter) => (on) => {
     setter(on);
     try { localStorage.setItem(key, on ? "1" : "0"); } catch {}
@@ -570,21 +571,26 @@ export default function MahjongScorer() {
   const saveVoiceRiichi = saveVoicePref("mj_voice_riichi", setVoiceRiichiOn);
   const saveVoiceTsumo = saveVoicePref("mj_voice_tsumo", setVoiceTsumoOn);
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
+  const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
   const voiceOnFor = (text) =>
     text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
-  // ツモの読ませ方。音声合成は抑揚を直接指定できないので、表記を変えて調整する
-  const TSUMO_READINGS = ["ツモ", "ツモッ", "つも", "自摸"];
-  const [tsumoReading, setTsumoReading] = useState(() => {
+  // 収録した掛け声。再生できない端末では音声合成にフォールバックする
+  const VOICE_FILES = { リーチ: "assets/voice/riichi.mp3", ロン: "assets/voice/ron.mp3", ツモ: "assets/voice/tsumo.mp3" };
+  const voiceAudioRef = React.useRef({});
+  const voiceAudioFor = (text) => {
+    const src = VOICE_FILES[text];
+    if (!src) return null;
     try {
-      const v = localStorage.getItem("mj_voice_tsumo_text");
-      return TSUMO_READINGS.includes(v) ? v : "ツモッ";
-    } catch { return "ツモッ"; }
-  });
-  const saveTsumoReading = (v) => {
-    setTsumoReading(v);
-    try { localStorage.setItem("mj_voice_tsumo_text", v); } catch {}
+      if (!voiceAudioRef.current[text]) {
+        const a = new Audio(src);
+        a.preload = "auto";
+        voiceAudioRef.current[text] = a;
+      }
+      return voiceAudioRef.current[text];
+    } catch { return null; }
   };
-  const readingFor = (text) => (text === "ツモ" ? tsumoReading : text);
+  // 押した瞬間に鳴るように、最初に読み込んでおく
+  React.useEffect(() => { Object.keys(VOICE_FILES).forEach(voiceAudioFor); }, []);
   // done を渡すと、読み上げが終わってから実行する（読み上げの途中で画面が変わらないように）。
   // 読み上げなし・音声が使えない端末では、待たずにその場で実行する
   // 牌を倒す「パシッ」（Web Audioでその場で合成。音声ファイルは持たない）。
@@ -623,21 +629,23 @@ export default function MahjongScorer() {
   };
 
   // force は設定画面の試聴用（オフでも鳴らす）
-  // spoken を渡すと、その表記で読み上げる（読み方チップの試聴用。保存前でも選んだ音で鳴らせる）
-  const playVoice = (text, done, force, spoken) => {
+  const playVoice = (text, done, force) => {
     let called = false;
     const finish = () => { if (called) return; called = true; if (done) done(); };
     if (!force && !voiceOnFor(text)) { finish(); return; }
     // ツモ・ロンは牌を倒す音を先に鳴らしてから声を出す
     const withSlap = text === "ツモ" || text === "ロン";
     if (withSlap) playTileSlap();
+    // 収録音声が再生できない端末用のフォールバック（端末の音声合成で読む）
     const speak = () => {
+      if (called) return;   // すでに画面が進んだあとに遅れて鳴らさない
       try {
         const syn = window.speechSynthesis;
         if (!syn) { finish(); return; }
         syn.cancel();   // 続けて押されたときに重ならないようにする
-        // 「！」を付けると端末によっては強めに読んでくれる
-        const u = new SpeechSynthesisUtterance((spoken || readingFor(text)) + "！");
+        // 「！」を付けると端末によっては強めに読んでくれる。
+        // ツモは素の表記だと平板に読まれがちなので促音で切る
+        const u = new SpeechSynthesisUtterance((text === "ツモ" ? "ツモッ" : text) + "！");
         u.lang = "ja-JP";
         u.rate = 1.15;    // 読み上げよりは、卓での掛け声に近い速さ
         u.pitch = 0.95;
@@ -656,9 +664,52 @@ export default function MahjongScorer() {
         syn.speak(u);
       } catch { finish(); }
     };
-    if (withSlap) setTimeout(speak, 130); else speak();
+    // 収録した掛け声を再生する。だめなら読み上げに切り替える
+    const play = () => {
+      const a = voiceAudioFor(text);
+      if (!a) { speak(); return; }
+      try {
+        a.currentTime = 0;
+        a.onended = finish;
+        a.onerror = speak;
+        const p = a.play();
+        if (p && p.catch) p.catch(speak);
+      } catch { speak(); }
+    };
+    if (withSlap) setTimeout(play, 130); else play();
     // 保険: 終了が通知されない端末でも画面が止まらないようにする
     if (done) setTimeout(finish, 1700);
+  };
+
+  // 局の読み上げ（東一局 一本場 など）。麻雀の読みで発音させるためカタカナで渡す
+  const roundKana = (wind, dealer, honba2) => {
+    const W = { 東: "トン", 南: "ナン", 西: "シャー", 北: "ペー" };
+    const K = ["イッ", "ニー", "サン", "スー"];
+    const H = ["", "イッポンバ", "ニホンバ", "サンボンバ", "ヨンホンバ", "ゴホンバ",
+               "ロッポンバ", "ナナホンバ", "ハッポンバ", "キュウホンバ", "ジュッポンバ"];
+    const k = `${W[wind] || wind}${K[dealer] || dealer + 1}キョク`;
+    const h = honba2 > 0 ? (H[honba2] || `${honba2}ホンバ`) : "";
+    return h ? `${k}、${h}` : k;
+  };
+  const playRoundVoice = (wind, dealer, honba2, force) => {
+    if (!force && !voiceRoundOn) return;
+    try {
+      const syn = window.speechSynthesis;
+      if (!syn) return;
+      syn.cancel();
+      const u = new SpeechSynthesisUtterance(roundKana(wind, dealer, honba2));
+      u.lang = "ja-JP";
+      u.rate = 1.05;
+      u.volume = 1;
+      try {
+        const ja = (syn.getVoices() || []).filter(v => v && /^ja/i.test(v.lang || ""));
+        if (ja.length) {
+          const better = ja.find(v => /拡張|premium|enhanced|neural/i.test(v.name || ""));
+          u.voice = better || ja[0];
+        }
+      } catch {}
+      syn.speak(u);
+    } catch {}
   };
 
   const toggleDeclaredRiichi = (i) => {
@@ -1144,6 +1195,8 @@ export default function MahjongScorer() {
     });
     if (splashTimer.current) clearTimeout(splashTimer.current);
     splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
+    // 対局は東1局から始まるので、開始の演出に合わせて読み上げる
+    playRoundVoice("東", 0, 0);
   }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
 
   // 局や本場が変わったら、次の局が始まる前に演出を挟む
@@ -1165,6 +1218,7 @@ export default function MahjongScorer() {
     });
     if (splashTimer.current) clearTimeout(splashTimer.current);
     splashTimer.current = setTimeout(() => setStartSplash(null), 2200);
+    playRoundVoice(roundWind, dealerIdx, honba);
   }, [roundWind, dealerIdx, honba, gameStarted, gameFinished]);
 
   // ── Theme ──
@@ -6566,7 +6620,7 @@ input, select { padding: 10px 14px; }
             </>)}
 
             {secHdr("voice", "🔊", "音の設定",
-              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn].filter(Boolean).length}/4 がオン`)}
+              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`)}
             {setOpen === "voice" && (<>
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
               {[
@@ -6577,8 +6631,9 @@ input, select { padding: 10px 14px; }
                 { label: "🔴 リーチの声", desc: "リーチを宣言したときに「リーチ！」",
                   on: voiceRiichiOn, save: saveVoiceRiichi, preview: () => playVoice("リーチ", null, true) },
                 { label: "✋ ツモの声", desc: "ツモを選んだときに「ツモ！」",
-                  on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true),
-                  readings: true },
+                  on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true) },
+                { label: "📢 局の読み上げ", desc: "局の変わり目に「東一局」と読み上げます",
+                  on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
               ].map((row, i) => (
                 <div key={i} style={{
                   // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
@@ -6603,30 +6658,11 @@ input, select { padding: 10px 14px; }
                       <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
                     </button>
                   </div>
-                  {row.readings && (
-                    // 読み方の選択。音声合成は抑揚を直接指定できないので、表記を変えて近づける
-                    <div style={{ flexBasis: "100%", marginTop: 2 }}>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        {TSUMO_READINGS.map(r => (
-                          <button key={r} onClick={() => { saveTsumoReading(r); playVoice("ツモ", null, true, r); }} style={{
-                            flex: 1, padding: "9px 2px", borderRadius: 9, cursor: "pointer",
-                            border: `2px solid ${tsumoReading === r ? t.ac : t.bd}`,
-                            background: tsumoReading === r ? t.acS : "transparent",
-                            color: tsumoReading === r ? t.ac : t.tx,
-                            fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
-                          }}>{r}</button>
-                        ))}
-                      </div>
-                      <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.6 }}>
-                        イントネーションが合わないときは、読み方を変えると聞こえ方が変わります。
-                        押すとその読み方で試聴できます
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
               <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
-                声は端末に入っている音声を使います。音が出ないときは、本体の消音（マナーモード）が
+                リーチ・ロン・ツモは収録した掛け声を再生します（再生できない端末では読み上げで代用）。
+                局の読み上げは端末に入っている音声を使います。音が出ないときは、本体の消音（マナーモード）が
                 入っていないか、音量が下がっていないかを確かめてください。
               </div>
             </div>
