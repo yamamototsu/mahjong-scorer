@@ -4269,10 +4269,9 @@ input, select { padding: 10px 14px; }
           })}
         </div>
 
-        {/* 初期値に戻す */}
-        <button style={{ ...actionBtn(), fontSize: 12, color: t.dm }}
-          onClick={() => savePresetNames(DEFAULT_PRESET_NAMES)}>初期の名前に戻す</button>
-        <button style={actionBtn()} onClick={() => setView("home")}>メニューに戻る</button>
+        <button style={actionBtn()} onClick={() => setView(namesBackTo)}>
+          {namesBackTo === "leagueform" ? "← リーグ設定に戻る" : namesBackTo === "game" ? "← メンバー決定に戻る" : "メニューに戻る"}
+        </button>
       </div>
     );
   };
@@ -4825,6 +4824,8 @@ input, select { padding: 10px 14px; }
   };
   const [newNameInput, setNewNameInput] = useState("");
   const [editNameIdx, setEditNameIdx] = useState(null);
+  // 名前登録画面の戻り先（リーグ作成やセットアップから開いたときは、そこへ戻す）
+  const [namesBackTo, setNamesBackTo] = useState("home");
 
   // ── よく打つ4人の組み合わせ（グループ） ──
   const [groups, setGroups] = useState(() => {
@@ -6231,7 +6232,7 @@ input, select { padding: 10px 14px; }
             {secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`)}
             {setOpen === "players" && (<>
             {menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
-              setView("names"); setNewNameInput(""); setEditNameIdx(null);
+              setNamesBackTo("home"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
             })}
 
             {/* グループ */}
@@ -6355,7 +6356,7 @@ input, select { padding: 10px 14px; }
                       </div>
                       <button onClick={() => {
                         setGEditOpen(false); setGEditId(null); setGEditName(""); setGEditMembers([]);
-                        setView("names"); setNewNameInput(""); setEditNameIdx(null);
+                        setNamesBackTo("home"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
                       }} style={{
                         width: "100%", padding: "10px 8px", borderRadius: 9, cursor: "pointer",
                         border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700,
@@ -6847,7 +6848,7 @@ input, select { padding: 10px 14px; }
               );
             })}
           </div>
-          <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
+          <button onClick={() => { setNamesBackTo("leagueform"); setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
             background: "none", border: "none", color: t.ac, fontSize: 11,
             cursor: "pointer", textDecoration: "underline", marginTop: 6, padding: "9px 10px",
           }}>👤 名前を追加・編集する</button>
@@ -8556,7 +8557,7 @@ input, select { padding: 10px 14px; }
           <div style={question}>メンバー決定</div>
           <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 6 }}>名前の欄をタップして選択</div>
           <div style={{ textAlign: "center", marginBottom: 14 }}>
-            <button onClick={() => { setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
+            <button onClick={() => { setNamesBackTo("game"); setView("names"); setNewNameInput(""); setEditNameIdx(null); }} style={{
               background: "none", border: "none", color: t.ac, fontSize: 11, cursor: "pointer", textDecoration: "underline", padding: "9px 10px",
             }}>👤 リストの名前を編集</button>
           </div>
