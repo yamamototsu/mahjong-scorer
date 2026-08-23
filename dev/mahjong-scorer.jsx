@@ -551,14 +551,27 @@ export default function MahjongScorer() {
   const [declaredRiichi, setDeclaredRiichi] = useState([false, false, false, false]);
 
   // 発声の読み上げ（端末の音声合成を使う。音声ファイルは持たない）
-  // リーチ宣言・ツモ／ロンの確定で「リーチ」「ツモ」「ロン」と読み上げる
-  const [riichiVoiceOn, setRiichiVoiceOn] = useState(() => {
-    try { return localStorage.getItem("mj_riichi_voice") !== "0"; } catch { return true; }
-  });
-  const saveRiichiVoice = (on) => {
-    setRiichiVoiceOn(on);
-    try { localStorage.setItem("mj_riichi_voice", on ? "1" : "0"); } catch {}
+  // リーチ宣言・ツモ／ロンの確定で「リーチ」「ツモ」「ロン」と読み上げる。
+  // 声ごとに個別のオンオフ。昔の一括キー mj_riichi_voice からは初期値を引き継ぐ
+  const loadVoicePref = (key) => {
+    try {
+      const v = localStorage.getItem(key);
+      if (v !== null) return v !== "0";
+      return localStorage.getItem("mj_riichi_voice") !== "0";
+    } catch { return true; }
   };
+  const [voiceRiichiOn, setVoiceRiichiOn] = useState(() => loadVoicePref("mj_voice_riichi"));
+  const [voiceTsumoOn, setVoiceTsumoOn] = useState(() => loadVoicePref("mj_voice_tsumo"));
+  const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
+  const saveVoicePref = (key, setter) => (on) => {
+    setter(on);
+    try { localStorage.setItem(key, on ? "1" : "0"); } catch {}
+  };
+  const saveVoiceRiichi = saveVoicePref("mj_voice_riichi", setVoiceRiichiOn);
+  const saveVoiceTsumo = saveVoicePref("mj_voice_tsumo", setVoiceTsumoOn);
+  const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
+  const voiceOnFor = (text) =>
+    text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   // done を渡すと、読み上げが終わってから実行する（読み上げの途中で画面が変わらないように）。
   // 読み上げなし・音声が使えない端末では、待たずにその場で実行する
   // 牌を倒す「パシッ」（Web Audioでその場で合成。音声ファイルは持たない）。
@@ -596,10 +609,11 @@ export default function MahjongScorer() {
     } catch {}
   };
 
-  const playVoice = (text, done) => {
+  // force は設定画面の試聴用（オフでも鳴らす）
+  const playVoice = (text, done, force) => {
     let called = false;
     const finish = () => { if (called) return; called = true; if (done) done(); };
-    if (!riichiVoiceOn) { finish(); return; }
+    if (!force && !voiceOnFor(text)) { finish(); return; }
     // ツモ・ロンは牌を倒す音を先に鳴らしてから声を出す
     const withSlap = text === "ツモ" || text === "ロン";
     if (withSlap) playTileSlap();
@@ -4846,8 +4860,9 @@ input, select { padding: 10px 14px; }
     try { localStorage.setItem("mj_dice_sound", on ? "1" : "0"); } catch {}
   };
   const audioCtxRef = React.useRef(null);
-  const playDiceSound = () => {
-    if (!diceSoundOn) return;
+  // force は設定画面の試聴用（オフでも鳴らす）
+  const playDiceSound = (force) => {
+    if (!diceSoundOn && !force) return;
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -6502,7 +6517,7 @@ input, select { padding: 10px 14px; }
               </div>
             )}
 
-            {secHdr("dice", "🎲", "サイコロ設定", "表示時間と効果音")}
+            {secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間")}
             {setOpen === "dice" && (<>
             {/* サイコロ設定 */}
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
@@ -6527,42 +6542,52 @@ input, select { padding: 10px 14px; }
                 ))}
               </div>
               <div style={{ fontSize: 10, color: t.dm, marginTop: 8 }}>
-                振った後、自動で消えるまでの時間です
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.bd}33` }}>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>🔊 転がる効果音</div>
-                  <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>振ったときにカラカラ…と鳴ります</div>
-                </div>
-                <button onClick={() => saveDiceSound(!diceSoundOn)} style={{
-                  width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-                  background: diceSoundOn ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
-                }}>
-                  <span style={{ position: "absolute", top: 3, left: diceSoundOn ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
-                </button>
+                振った後、自動で消えるまでの時間です。効果音は「音の設定」にあります
               </div>
             </div>
             </>)}
 
-            {secHdr("voice", "🔊", "音の設定", riichiVoiceOn ? "発声の読み上げあり" : "発声の読み上げなし")}
+            {secHdr("voice", "🔊", "音の設定",
+              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn].filter(Boolean).length}/4 がオン`)}
             {setOpen === "voice" && (<>
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>🗣 発声の読み上げ</div>
-                  <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
-                    リーチの宣言で「リーチ」、あがり方を決めたときに「ツモ」「ロン」と読み上げます
+              {[
+                { label: "🎲 サイコロ音", desc: "振ったときにカラカラ…と鳴ります",
+                  on: diceSoundOn, save: saveDiceSound, preview: () => playDiceSound(true) },
+                { label: "🀄 ロンの声", desc: "放銃した人を確定したときに「ロン！」",
+                  on: voiceRonOn, save: saveVoiceRon, preview: () => playVoice("ロン", null, true) },
+                { label: "🔴 リーチの声", desc: "リーチを宣言したときに「リーチ！」",
+                  on: voiceRiichiOn, save: saveVoiceRiichi, preview: () => playVoice("リーチ", null, true) },
+                { label: "✋ ツモの声", desc: "ツモを選んだときに「ツモ！」",
+                  on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true) },
+              ].map((row, i) => (
+                <div key={i} style={{
+                  // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
+                  display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                  paddingTop: i === 0 ? 0 : 12, marginTop: i === 0 ? 0 : 12,
+                  borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`,
+                }}>
+                  <div style={{ flex: "1 1 150px", minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>{row.label}</div>
+                    <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.6 }}>{row.desc}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
+                    <button onClick={row.preview} style={{
+                      padding: "8px 12px", borderRadius: 9, cursor: "pointer",
+                      border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
+                      fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                    }}>▶ 試聴</button>
+                    <button onClick={() => row.save(!row.on)} style={{
+                      width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
+                      background: row.on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+                    }}>
+                      <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+                    </button>
                   </div>
                 </div>
-                <button onClick={() => { saveRiichiVoice(!riichiVoiceOn); if (!riichiVoiceOn) playVoice("リーチ"); }} style={{
-                  width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-                  background: riichiVoiceOn ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
-                }}>
-                  <span style={{ position: "absolute", top: 3, left: riichiVoiceOn ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
-                </button>
-              </div>
+              ))}
               <div style={{ fontSize: 10, color: t.dm, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${t.bd}33`, lineHeight: 1.8 }}>
-                端末に入っている音声を使います。声が出ないときは、本体の消音（マナーモード）が
+                声は端末に入っている音声を使います。音が出ないときは、本体の消音（マナーモード）が
                 入っていないか、音量が下がっていないかを確かめてください。
               </div>
             </div>
