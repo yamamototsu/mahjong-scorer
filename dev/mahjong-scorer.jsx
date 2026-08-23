@@ -477,8 +477,9 @@ export default function MahjongScorer() {
       startDate: iso(d),
       endDate: iso(end),
       rules: { ...defaultRules },
-      umaKey: "10-20",
-      uma: [20, 10, -10, -20],
+      // ウマの初期値は「なし（素点のみ）」。必要な卓だけフォームで選ぶ
+      umaKey: "none",
+      uma: [0, 0, 0, 0],
       status: "active",
       games: [],
       createdAt: Date.now(),
@@ -7104,8 +7105,8 @@ input, select { padding: 10px 14px; }
               <button key={n} onClick={() => {
                 if (n === lgPC) return;
                 // 人数の既定ルール・ウマに切り替える
-                if (n === 3) set({ playerCount: 3, rules: { ...d.rules, ...SANMA_DEFAULT_RULES }, umaKey: "renmei3", uma: [10, 0, -10] });
-                else set({ playerCount: 4, rules: { ...defaultRules }, umaKey: "10-20", uma: [20, 10, -10, -20] });
+                if (n === 3) set({ playerCount: 3, rules: { ...d.rules, ...SANMA_DEFAULT_RULES }, umaKey: "none3", uma: [0, 0, 0] });
+                else set({ playerCount: 4, rules: { ...defaultRules }, umaKey: "none", uma: [0, 0, 0, 0] });
               }} style={{
                 flex: 1, padding: "13px 6px", borderRadius: 11, cursor: "pointer",
                 border: `2px solid ${lgPC === n ? t.ac : t.bd}`,

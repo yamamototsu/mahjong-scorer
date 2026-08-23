@@ -669,8 +669,8 @@ function MahjongScorer() {
       rules: {
         ...defaultRules
       },
-      umaKey: "10-20",
-      uma: [20, 10, -10, -20],
+      umaKey: "none",
+      uma: [0, 0, 0, 0],
       status: "active",
       games: [],
       createdAt: Date.now()
@@ -13655,15 +13655,15 @@ input, select { padding: 10px 14px; }
             ...d.rules,
             ...SANMA_DEFAULT_RULES
           },
-          umaKey: "renmei3",
-          uma: [10, 0, -10]
+          umaKey: "none3",
+          uma: [0, 0, 0]
         });else set({
           playerCount: 4,
           rules: {
             ...defaultRules
           },
-          umaKey: "10-20",
-          uma: [20, 10, -10, -20]
+          umaKey: "none",
+          uma: [0, 0, 0, 0]
         });
       },
       style: {
