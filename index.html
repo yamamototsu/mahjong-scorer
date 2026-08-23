@@ -154,6 +154,10 @@ const UMA_PRESETS_3 = [{
 }];
 const MATCH_LABEL = mt => mt === "tonpu" ? "東風戦" : mt === "zenchan" ? "全荘戦" : "半荘戦";
 const MATCH_LABEL_SHORT = mt => mt === "tonpu" ? "東風" : mt === "zenchan" ? "全荘" : "半荘";
+const HHMM = ts => {
+  const d = new Date(ts);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 const LAST_WIND = mt => mt === "tonpu" ? "東" : mt === "zenchan" ? "北" : "南";
 const FU_OPTIONS = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
 function validFuOptions(han, isTsumo) {
@@ -1741,7 +1745,8 @@ function MahjongScorer() {
       players: players.slice(0, pcNow),
       rules: {
         ...rules
-      }
+      },
+      startedAt: Date.now()
     };
     setGameConfig(cfg);
     setScores(Array(pcNow).fill(sp));
@@ -21025,13 +21030,17 @@ input, select { padding: 10px 14px; }
             })),
             rounds: [...rounds],
             rules: gameConfig?.rules || {},
-            leagueId: activeLeagueId || null
+            leagueId: activeLeagueId || null,
+            startedAt: gameConfig?.startedAt || null,
+            endedAt: Date.now()
           }]);
         }
         const lg = leagues.find(l => l.id === activeLeagueId);
         if (lg && rounds.length > 0) {
           const res = calcGamePts(scores, scores.map((_, i) => i), lg);
           const entry = {
+            startedAt: gameConfig?.startedAt || null,
+            endedAt: Date.now(),
             date: gameConfig?.date || "",
             matchType: gameConfig?.matchType || "hanchan",
             players: players.slice(0, PC),
@@ -21556,7 +21565,13 @@ input, select { padding: 10px 14px; }
         fontWeight: 900,
         lineHeight: 1
       }
-    }, sel ? "✓" : ""), g.date), React.createElement("span", {
+    }, sel ? "✓" : ""), g.date, g.startedAt && g.endedAt && React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 400,
+        color: t.dm
+      }
+    }, HHMM(g.startedAt), "〜", HHMM(g.endedAt))), React.createElement("span", {
       style: {
         fontSize: 12,
         color: t.dm,
@@ -21777,7 +21792,14 @@ input, select { padding: 10px 14px; }
       fontSize: 16,
       fontWeight: 700
     }
-  }, historyDetail.date), React.createElement("span", {
+  }, historyDetail.date, historyDetail.startedAt && historyDetail.endedAt && React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 400,
+      color: t.dm,
+      marginLeft: 8
+    }
+  }, HHMM(historyDetail.startedAt), "〜", HHMM(historyDetail.endedAt))), React.createElement("span", {
     style: {
       fontSize: 12,
       color: t.dm,

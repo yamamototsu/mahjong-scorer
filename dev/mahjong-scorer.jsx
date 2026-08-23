@@ -85,6 +85,8 @@ const UMA_PRESETS_3 = [
 // 試合形式: tonpu=東風戦(東のみ) / hanchan=半荘戦(東南) / zenchan=全荘戦(東南西北)
 const MATCH_LABEL = (mt) => mt === "tonpu" ? "東風戦" : mt === "zenchan" ? "全荘戦" : "半荘戦";
 const MATCH_LABEL_SHORT = (mt) => mt === "tonpu" ? "東風" : mt === "zenchan" ? "全荘" : "半荘";
+// 履歴などに出す時刻（例 20:15）
+const HHMM = (ts) => { const d = new Date(ts); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`; };
 const LAST_WIND = (mt) => mt === "tonpu" ? "東" : mt === "zenchan" ? "北" : "南";
 const FU_OPTIONS = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
 // 翻数とアガリ方から、実戦でありえない符を除く
@@ -1333,7 +1335,7 @@ export default function MahjongScorer() {
     setLastRules({ ...rules });
     const activeLg = activeLeagueId ? leagues.find(l => l.id === activeLeagueId) : null;
     const pcNow = activeLg ? (activeLg.playerCount || 4) : playerCount;
-    const cfg = { date: gameDate, matchType, playerCount: pcNow, players: players.slice(0, pcNow), rules: { ...rules } };
+    const cfg = { date: gameDate, matchType, playerCount: pcNow, players: players.slice(0, pcNow), rules: { ...rules }, startedAt: Date.now() };
     setGameConfig(cfg);
     setScores(Array(pcNow).fill(sp));
     setDealerIdx(0);
@@ -10973,6 +10975,8 @@ input, select { padding: 10px 14px; }
               rounds: [...rounds],
               rules: gameConfig?.rules || {},
               leagueId: activeLeagueId || null,
+              startedAt: gameConfig?.startedAt || null,
+              endedAt: Date.now(),
             }]);
           }
           // リーグ戦なら成績表にも記録する
@@ -10980,6 +10984,7 @@ input, select { padding: 10px 14px; }
           if (lg && rounds.length > 0) {
             const res = calcGamePts(scores, scores.map((_, i) => i), lg);
             const entry = {
+              startedAt: gameConfig?.startedAt || null, endedAt: Date.now(),
               date: gameConfig?.date || "",
               matchType: gameConfig?.matchType || "hanchan",
               players: players.slice(0, PC),
@@ -11292,6 +11297,11 @@ input, select { padding: 10px 14px; }
                         }}>{sel ? "✓" : ""}</span>
                       )}
                       {g.date}
+                      {g.startedAt && g.endedAt && (
+                        <span style={{ fontSize: 11, fontWeight: 400, color: t.dm }}>
+                          {HHMM(g.startedAt)}〜{HHMM(g.endedAt)}
+                        </span>
+                      )}
                     </span>
                     <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
                       {MATCH_LABEL_SHORT(g.matchType)}
@@ -11392,7 +11402,14 @@ input, select { padding: 10px 14px; }
           <button style={backBtn} onClick={() => setHistoryDetail(null)}>← 一覧に戻る</button>
           <div style={{ ...card, padding: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>{historyDetail.date}</span>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>
+                {historyDetail.date}
+                {historyDetail.startedAt && historyDetail.endedAt && (
+                  <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, marginLeft: 8 }}>
+                    {HHMM(historyDetail.startedAt)}〜{HHMM(historyDetail.endedAt)}
+                  </span>
+                )}
+              </span>
               <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
                 {MATCH_LABEL(historyDetail.matchType)}
               </span>
