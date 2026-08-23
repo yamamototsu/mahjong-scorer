@@ -9998,7 +9998,6 @@ input, select { padding: 10px 14px; }
     setDiceSpin(v => v + 1);
     setWallBlink(true);
     if (wallBlinkTimer.current) clearTimeout(wallBlinkTimer.current);
-    wallBlinkTimer.current = setTimeout(() => setWallBlink(false), 10000);
     setDiceRoundKey(`${roundWind}${dealerIdx}-${honba}-${rounds.length}`);
     if (diceClearTimer.current) clearTimeout(diceClearTimer.current);
     setDiceRolling(true);
@@ -10014,8 +10013,10 @@ input, select { padding: 10px 14px; }
         setDiceRolling(false);
         setDiceSettled(true);
         if (diceClearTimer.current) clearTimeout(diceClearTimer.current);
+        if (wallBlinkTimer.current) clearTimeout(wallBlinkTimer.current);
         if (diceHoldSec > 0) {
           diceClearTimer.current = setTimeout(() => setDiceSettled(false), diceHoldSec * 1000);
+          wallBlinkTimer.current = setTimeout(() => setWallBlink(false), diceHoldSec * 1000);
         }
       }
     }, 70);
@@ -12835,7 +12836,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginTop: 8
       }
-    }, "振った後、自動で消えるまでの時間です。効果音は「音の設定」にあります"))), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn].filter(Boolean).length}/4 がオン`), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }, "振った後、サイコロと「この山を割る」の点滅が自動で消えるまでの時間です。 効果音は「音の設定」にあります"))), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn].filter(Boolean).length}/4 がオン`), setOpen === "voice" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,
