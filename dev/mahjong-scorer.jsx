@@ -887,6 +887,107 @@ export default function MahjongScorer() {
     setGStep(7);
   };
 
+  // ── チョンボ ──
+  // 誤ロンなどの罰符。局はやり直し（親・本場・供託は動かさない）で、
+  // その局で宣言済みのリーチ棒は宣言者に返す
+  const [chomboStep, setChomboStep] = useState(null);       // null | "who" | "pay"
+  const [chomboWho, setChomboWho] = useState(null);
+  const [chomboToOya, setChomboToOya] = useState(4000);     // 子のチョンボ: 親に払う額
+  const [chomboToKo, setChomboToKo] = useState(2000);       // 子に払う額（親のチョンボは全員こちら）
+  const [correctingChomboIdx, setCorrectingChomboIdx] = useState(null);
+  const chomboRules = () => {
+    const rs = (gameConfig || {}).rules || {};
+    return {
+      calc: rs.chomboCalc !== false,
+      oya: rs.chomboOya ?? 4000,       // 親のチョンボ → 子に払う額
+      koOya: rs.chomboKoOya ?? 4000,   // 子のチョンボ → 親に払う額
+      koKo: rs.chomboKoKo ?? 2000,     // 子のチョンボ → 子に払う額
+    };
+  };
+  const resetChombo = () => { setChomboStep(null); setChomboWho(null); setCorrectingChomboIdx(null); };
+  const openChombo = () => {
+    setChomboWho(null); setCorrectingChomboIdx(null); setChomboStep("who");
+  };
+  const pickChomboWho = (i) => {
+    const cr = chomboRules();
+    setChomboWho(i);
+    // 選んだ人に合わせて既定額を入れる（画面で変更できる）
+    if (i === dealerIdx || (correctingChomboIdx !== null && i === rounds[correctingChomboIdx]?.dealer)) {
+      setChomboToKo(cr.oya);
+    } else {
+      setChomboToOya(cr.koOya); setChomboToKo(cr.koKo);
+    }
+    setChomboStep("pay");
+  };
+  const openChomboCorrection = (idx) => {
+    const r = rounds[idx];
+    if (!r || !r.chombo) return;
+    setCorrectingChomboIdx(idx);
+    setChomboWho(r.offender);
+    setChomboToOya(r.toOya ?? 4000);
+    setChomboToKo(r.toKo ?? (r.offender === r.dealer ? 4000 : 2000));
+    setChomboStep("who");
+  };
+  // チョンボ1件ぶんの受け渡し（記録から導出。修正・再計算でも使う）
+  const chomboDeltas = (r, pc) => {
+    const d = Array(pc).fill(0);
+    if (r.noPay) return d;
+    let tot = 0;
+    for (let i = 0; i < pc; i++) {
+      if (i === r.offender) continue;
+      const a = (r.offender === r.dealer) ? (r.toKo ?? 4000)
+        : (i === r.dealer ? (r.toOya ?? 4000) : (r.toKo ?? 2000));
+      d[i] += a; tot += a;
+    }
+    d[r.offender] -= tot;
+    return d;
+  };
+  const applyChombo = (noPay) => {
+    if (chomboWho === null) return;
+
+    // 修正モード: 記録を差し替えて全体を再計算（供託・実況リーチは applyDraw の修正と同じ扱い）
+    if (correctingChomboIdx !== null) {
+      const old = rounds[correctingChomboIdx];
+      const rec = {
+        ...old, offender: chomboWho, noPay: !!noPay,
+        toOya: chomboWho === old.dealer ? null : chomboToOya,
+        toKo: chomboToKo,
+      };
+      const newRounds = [...rounds];
+      newRounds[correctingChomboIdx] = rec;
+      const recalced = recalcAllRounds(newRounds, gameConfig || {});
+      const newScores = [...recalced.scores];
+      let liveCount = 0;
+      for (let i = 0; i < PC; i++) { if (declaredRiichi[i]) { newScores[i] -= 1000; liveCount++; } }
+      setRounds(recalced.rounds);
+      setScores(newScores);
+      setRiichiBets(recalced.carry + liveCount);
+      resetChombo();
+      return;
+    }
+
+    const ns = [...scores];
+    // 宣言済みのリーチ棒は返す（この局は無効になるため）
+    let returned = 0;
+    for (let i = 0; i < PC; i++) { if (declaredRiichi[i]) { ns[i] += 1000; returned++; } }
+    const rec = {
+      id: rounds.length + 1, wind: roundWind, dealer: dealerIdx, honba,
+      chombo: true, offender: chomboWho, noPay: !!noPay,
+      toOya: chomboWho === dealerIdx ? null : chomboToOya,
+      toKo: chomboToKo,
+    };
+    const dts = chomboDeltas(rec, PC);
+    for (let i = 0; i < PC; i++) ns[i] += dts[i];
+    setScores(ns);
+    if (returned > 0) setRiichiBets(b => Math.max(0, b - returned));
+    setDeclaredRiichi([false, false, false, false]);
+    setRounds(prev => [...prev, rec]);
+    // 局はやり直し: 親・本場・供託はそのまま。トビ判定だけ通常どおり
+    const rs = (gameConfig || {}).rules || {};
+    if (rs.tobiEnd !== false && ns.some(s => s < 0)) setGameFinished(true);
+    resetChombo();
+  };
+
   // Draw (ryuukyoku) wizard
   const [showDrawWiz, setShowDrawWiz] = useState(false);
   const [drawTenpai, setDrawTenpai] = useState([false, false, false, false]); // who is tenpai
@@ -981,6 +1082,12 @@ export default function MahjongScorer() {
     const fixed = roundList.map(r => {
       const rc = r.riichi ? r.riichi.filter(Boolean).length : 0;
       if (r.riichi) { for (let i = 0; i < PC; i++) { if (r.riichi[i]) ns[i] -= 1000; } }
+      if (r.chombo) {
+        // チョンボ: 局はやり直しなので本場・供託は動かず、罰符だけ動く
+        const d = chomboDeltas(r, PC);
+        for (let i = 0; i < PC; i++) ns[i] += d[i];
+        return r;
+      }
       if (r.draw) {
         carry += rc; // 流局のリーチ棒は次の和了へ持ち越し
         const tc = r.tenpai ? r.tenpai.filter(Boolean).length : 0;
@@ -5237,7 +5344,16 @@ input, select { padding: 10px 14px; }
       const paidRiichi = r.riichi && r.riichi[pi];
       const parts = [];   // [{ label, amt }] 内訳。amt が null なら金額を出さない
 
-      if (r.draw) {
+      if (r.chombo) {
+        const rpc0 = cfg.playerCount || 4;
+        const d = chomboDeltas(r, rpc0);
+        if (r.noPay) {
+          parts.push({ label: r.offender === pi ? "チョンボ（記録のみ）" : "チョンボあり（記録のみ）", amt: null });
+        } else if (d[pi] !== 0) {
+          delta += d[pi];
+          parts.push({ label: r.offender === pi ? "チョンボ罰符" : "チョンボ受け取り", amt: d[pi] });
+        }
+      } else if (r.draw) {
         if (paidRiichi) delta -= 1000;
         const rpc = cfg.playerCount || 4;
         const tc = r.tenpai ? r.tenpai.slice(0, rpc).filter(Boolean).length : 0;
@@ -5442,6 +5558,10 @@ input, select { padding: 10px 14px; }
               {row("本場", `1本 = ${HU().toLocaleString()}点`,
                 `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`)}
               {row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います")}
+              {row("チョンボ", rs.chomboCalc !== false ? "罰符あり" : "記録のみ",
+                rs.chomboCalc !== false
+                  ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し`
+                  : "点数は動かさず記録だけ残します。局はやり直し")}
               {row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし",
                 rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)}
             </>
@@ -5511,6 +5631,9 @@ input, select { padding: 10px 14px; }
                 {tgl("ダブル役満あり", rs.doubleYakuman === true, () => patchGameRules({ doubleYakuman: !rs.doubleYakuman }),
                   "役満の複合を2倍・3倍で計算")}
                 {tgl("トビで終了", rs.tobiEnd !== false, () => patchGameRules({ tobiEnd: rs.tobiEnd === false }))}
+                {tgl("チョンボの計算（罰符）", rs.chomboCalc !== false,
+                  () => patchGameRules({ chomboCalc: rs.chomboCalc === false }),
+                  "OFFだと記録だけ残して点数は動かしません。金額はチョンボ入力のその場で変更できます")}
               </>
             );
           })()}
@@ -6050,6 +6173,11 @@ input, select { padding: 10px 14px; }
     const newRounds = rounds.filter((_, i) => i !== idx);
     const payers = PC - 1;
     newRounds.forEach(r => {
+      if (r.chombo) {
+        const d = chomboDeltas(r, PC);
+        for (let i = 0; i < PC; i++) newScores[i] += d[i];
+        return;
+      }
       if (r.draw) {
         const tc = r.tenpai ? r.tenpai.slice(0, PC).filter(Boolean).length : 0;
         const nc = PC - tc;
@@ -6629,16 +6757,20 @@ input, select { padding: 10px 14px; }
                 ["doubleYakuman", "ダブル役満あり", "役満の複合（大三元＋字一色など）を2倍・3倍で計算"],
                 ["orasYame", "オーラスは親トップで終了", "アガリやめ・テンパイやめ"],
                 ["tobiEnd", "トビで終了", "誰かの持ち点が0未満になった時点で終局"],
-              ].map(([key, label, hint]) => (
+                ["chomboCalc", "チョンボの計算（罰符）", "誤ロンなどのチョンボで罰符を動かすか。OFFだと記録だけ残して点数は動かしません"],
+              ].map(([key, label, hint]) => {
+                // chomboCalc は「未設定＝あり」なので !== false で判定する
+                const on = key === "chomboCalc" ? draftRules[key] !== false : !!draftRules[key];
+                return (
                 <div key={key} style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontSize: 14, color: t.tx }}>{label}</span>
-                    <button onClick={() => editDraft({ [key]: !draftRules[key] })} style={{
+                    <button onClick={() => editDraft({ [key]: !on })} style={{
                       width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-                      background: draftRules[key] ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+                      background: on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
                     }}>
                       <span style={{
-                        position: "absolute", top: 3, left: draftRules[key] ? 23 : 3,
+                        position: "absolute", top: 3, left: on ? 23 : 3,
                         width: 22, height: 22, borderRadius: "50%", background: "#fff",
                         transition: "left 0.15s",
                       }} />
@@ -6646,7 +6778,40 @@ input, select { padding: 10px 14px; }
                   </div>
                   {hint && <div style={{ fontSize: 10, color: t.dm, marginTop: 3 }}>{hint}</div>}
                 </div>
-              ))}
+                );
+              })}
+
+              {/* チョンボ罰符の既定額（計算ありのときだけ）。実際の入力画面でもその場で変更できる */}
+              {draftRules.chomboCalc !== false && (
+                <div style={{ padding: "10px 0" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 8 }}>チョンボ罰符の既定額（1,000点刻み）</div>
+                  {[
+                    ["chomboOya", "親のチョンボ → 子に払う額", 4000],
+                    ["chomboKoOya", "子のチョンボ → 親に払う額", 4000],
+                    ["chomboKoKo", "子のチョンボ → 子に払う額", 2000],
+                  ].map(([key, label, def]) => {
+                    const cur = draftRules[key] ?? def;
+                    return (
+                      <div key={key} style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, color: t.tx, marginBottom: 5 }}>{label}</div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {[1000, 2000, 3000, 4000].map(v => (
+                            <button key={v} onClick={() => editDraft({ [key]: v })} style={{
+                              flex: 1, padding: "10px 2px", borderRadius: 9, cursor: "pointer",
+                              border: `2px solid ${cur === v ? t.ac : t.bd}`,
+                              background: cur === v ? t.acS : "transparent",
+                              color: cur === v ? t.ac : t.tx, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                            }}>{v.toLocaleString()}</button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div style={{ fontSize: 10, color: t.dm, marginTop: 4 }}>
+                    標準は満貫払い相当（親のチョンボ 4,000ずつ＝計12,000／子のチョンボ 親4,000・子2,000＝計8,000）
+                  </div>
+                </div>
+              )}
 
             </div>
             </>)}
@@ -9341,9 +9506,17 @@ input, select { padding: 10px 14px; }
                 return `${label}：この内容だと親（${players[dealerIdx]}）は${stays ? "続行（連荘）" : "流れます"}`;
               })()}
             </div>
-            <button style={smallBtn()} onClick={() => {
-              setTmDrawMode(false); setDrawTenpai([false,false,false,false]); setCorrectingDrawIdx(null);
-            }}>キャンセル</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              {correctingDrawIdx === null && (
+                <button style={{ ...smallBtn(), flex: 1, color: t.rd, border: `1px solid ${t.rd}55` }} onClick={() => {
+                  setTmDrawMode(false); setDrawTenpai([false,false,false,false]);
+                  openChombo();
+                }}>⚠️ チョンボ</button>
+              )}
+              <button style={{ ...smallBtn(), flex: 1 }} onClick={() => {
+                setTmDrawMode(false); setDrawTenpai([false,false,false,false]); setCorrectingDrawIdx(null);
+              }}>キャンセル</button>
+            </div>
           </>
         ) : tmWinStep ? (
           <>
@@ -9698,7 +9871,9 @@ input, select { padding: 10px 14px; }
                     <button onClick={() => setEditingRoundIdx(editingRoundIdx === idx ? null : idx)}
                       style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "10px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 13, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
                       <span style={{ color: t.dm }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
-                      {r.draw ? <span style={{ color: t.dm }}>流局</span> : (
+                      {r.chombo ? (
+                        <span style={{ color: t.rd, fontWeight: 700 }}>チョンボ {players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
+                      ) : r.draw ? <span style={{ color: t.dm }}>流局</span> : (
                         <span>
                           <span style={{ color: t.ac, fontWeight: 600 }}>{players[r.winner]}</span>
                           {" "}<span style={{ fontWeight: 700, color: t.tx }}>{r.score?.toLocaleString()}</span>
@@ -9707,7 +9882,10 @@ input, select { padding: 10px 14px; }
                     </button>
                     {editingRoundIdx === idx && (
                       <div style={{ padding: "8px 0 12px", display: "flex", gap: 8 }}>
-                        {!r.draw ? (
+                        {r.chombo ? (
+                          <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                            onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openChomboCorrection(idx); }}>✏️ この局を修正</button>
+                        ) : !r.draw ? (
                           <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
                             onClick={() => { setShowRoundEdit(false); openCorrectionWizard(idx); }}>✏️ この局を修正</button>
                         ) : (
@@ -10230,6 +10408,120 @@ input, select { padding: 10px 14px; }
 
               <button style={actionBtn("p")} onClick={applyDraw}>確定</button>
               <button style={actionBtn()} onClick={resetDrawWiz}>キャンセル</button>
+              {correctingDrawIdx === null && (
+                <button onClick={() => { resetDrawWiz(); openChombo(); }} style={{
+                  width: "100%", background: "none", border: "none", color: t.rd, fontSize: 12,
+                  fontWeight: 700, cursor: "pointer", padding: "10px 4px", textDecoration: "underline",
+                }}>⚠️ チョンボがあったときはこちら</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── チョンボ ── */}
+      {chomboStep && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 130, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ width: "100%", maxWidth: 400 }}>
+            <div style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: t.rd, fontWeight: 700 }}>
+                  {correctingChomboIdx !== null
+                    ? `✏️ ${rounds[correctingChomboIdx]?.wind}${(rounds[correctingChomboIdx]?.dealer ?? 0) + 1}局のチョンボを修正`
+                    : "⚠️ チョンボ"}
+                </span>
+                <button style={{ background: "none", border: "none", color: t.dm, fontSize: 18, cursor: "pointer" }} onClick={resetChombo}>✕</button>
+              </div>
+
+              {chomboStep === "who" && (() => {
+                const cd = correctingChomboIdx !== null ? (rounds[correctingChomboIdx]?.dealer ?? dealerIdx) : dealerIdx;
+                return (
+                <>
+                  <div style={question}>誰がチョンボ？</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {players.slice(0, PC).map((p, i) => (
+                      <button key={i} style={{
+                        padding: "14px 8px", borderRadius: 12, cursor: "pointer",
+                        border: `2px solid ${chomboWho === i ? t.rd : t.bd}`,
+                        background: chomboWho === i ? "rgba(220,60,60,0.12)" : "transparent",
+                        color: t.tx, fontSize: 14, fontWeight: 700, textAlign: "center",
+                      }} onClick={() => pickChomboWho(i)}>
+                        <div style={{ fontSize: 11, color: t.dm, marginBottom: 2 }}>{SEAT_WINDS[(i - cd + PC) % PC]}{i === cd ? " (親)" : ""}</div>
+                        <div>{p}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <button style={{ ...actionBtn(), marginTop: 14, marginBottom: 0 }} onClick={resetChombo}>キャンセル</button>
+                </>
+                );
+              })()}
+
+              {chomboStep === "pay" && chomboWho !== null && (() => {
+                const cr = chomboRules();
+                const cd = correctingChomboIdx !== null ? (rounds[correctingChomboIdx]?.dealer ?? dealerIdx) : dealerIdx;
+                const isOya = chomboWho === cd;
+                const amtRow = (label, val, setVal) => (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 6 }}>{label}</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {[1000, 2000, 3000, 4000].map(v => (
+                        <button key={v} onClick={() => setVal(v)} style={{
+                          flex: 1, padding: "11px 2px", borderRadius: 10, cursor: "pointer",
+                          border: `2px solid ${val === v ? t.rd : t.bd}`,
+                          background: val === v ? "rgba(220,60,60,0.12)" : "transparent",
+                          color: val === v ? t.rd : t.tx, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                        }}>{v.toLocaleString()}</button>
+                      ))}
+                    </div>
+                  </div>
+                );
+                const rec = { chombo: true, dealer: cd, offender: chomboWho, toOya: chomboToOya, toKo: chomboToKo, noPay: false };
+                const d = chomboDeltas(rec, PC);
+                return (
+                <>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: t.rd, textAlign: "center", marginBottom: 2 }}>
+                    {players[chomboWho]}{isOya ? "（親）" : ""} のチョンボ
+                  </div>
+                  <div style={{ ...question, marginBottom: 4 }}>みんなに払う額</div>
+                  <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 12 }}>
+                    同じ局をやり直します（親・本場・供託はそのまま、宣言済みのリーチ棒は返します）
+                  </div>
+                  {cr.calc ? (
+                    <>
+                      {!isOya && amtRow(`親（${players[cd]}）に`, chomboToOya, setChomboToOya)}
+                      {amtRow(isOya ? "子に（1人あたり）" : "子に（1人あたり）", chomboToKo, setChomboToKo)}
+                      {/* 受け渡しの一覧 */}
+                      <div style={{ background: t.sf, borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+                        {players.slice(0, PC).map((p, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "3px 0", fontSize: 13 }}>
+                            <span style={{
+                              color: i === chomboWho ? t.rd : t.tx, fontWeight: i === chomboWho ? 700 : 400,
+                              // 狭い画面では末尾を省略して1行に収める
+                              flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                            }}>
+                              {p}{i === chomboWho ? "（チョンボ）" : ""}
+                            </span>
+                            <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums", color: d[i] > 0 ? t.gn : d[i] < 0 ? t.rd : t.dm }}>
+                              {d[i] > 0 ? "+" : ""}{d[i].toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <button style={{ ...actionBtn("p") }} onClick={() => applyChombo(false)}>この内容で確定</button>
+                      <button style={{ ...actionBtn() }} onClick={() => applyChombo(true)}>点数は動かさず記録だけ</button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 12, color: t.dm, textAlign: "center", lineHeight: 1.8, marginBottom: 12 }}>
+                        ルール設定で「チョンボの計算」がオフのため、点数は動かさず記録だけ残します
+                      </div>
+                      <button style={{ ...actionBtn("p") }} onClick={() => applyChombo(true)}>記録して局をやり直す</button>
+                    </>
+                  )}
+                  <button style={{ ...actionBtn(), marginBottom: 0 }} onClick={() => setChomboStep("who")}>← 戻る</button>
+                </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -10247,7 +10539,9 @@ input, select { padding: 10px 14px; }
               <button onClick={() => setEditingRoundIdx(editingRoundIdx === idx ? null : idx)}
                 style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 12, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
                 <span style={{ color: t.dm }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
-                {r.draw ? (
+                {r.chombo ? (
+                  <span style={{ color: t.rd, fontWeight: 700 }}>チョンボ {players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
+                ) : r.draw ? (
                   <span style={{ color: t.dm }}>
                     流局
                     {r.tenpai && r.tenpai.some(Boolean) && (
@@ -10267,7 +10561,12 @@ input, select { padding: 10px 14px; }
               </button>
               {editingRoundIdx === idx && (
                 <div style={{ padding: "8px 0 12px", display: "flex", gap: 8 }}>
-                  {!r.draw ? (
+                  {r.chombo ? (
+                    <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      onClick={() => { setEditingRoundIdx(null); openChomboCorrection(idx); }}>
+                      ✏️ この局を修正
+                    </button>
+                  ) : !r.draw ? (
                     <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
                       onClick={() => openCorrectionWizard(idx)}>
                       ✏️ この局を修正
@@ -10487,7 +10786,9 @@ input, select { padding: 10px 14px; }
           {rounds.map((r, idx) => (
             <div key={idx} style={{ padding: "6px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: t.dm }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
-              {r.draw ? (
+              {r.chombo ? (
+                <span style={{ color: t.rd, fontWeight: 700 }}>チョンボ {players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
+              ) : r.draw ? (
                 <span style={{ color: t.dm }}>
                   流局
                   {r.tenpai && r.tenpai.some(Boolean) && (
@@ -10674,7 +10975,7 @@ input, select { padding: 10px 14px; }
     if (gameFinished) return renderGameFinished();
     if (gameStarted) {
       // 卓上モード（ウィザードが開いている間は通常表示に戻す）
-      if (tableMode && !showGW && !showDrawWiz && !showExtendConfirm) return renderTableMode();
+      if (tableMode && !showGW && !showDrawWiz && !showExtendConfirm && !chomboStep) return renderTableMode();
       return renderGamePlay();
     }
     return renderSetup();
@@ -10870,7 +11171,9 @@ input, select { padding: 10px 14px; }
             {historyDetail.rounds.map((r, idx) => (
               <div key={idx} style={{ padding: "6px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: t.dm }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
-                {r.draw ? (
+                {r.chombo ? (
+                  <span style={{ color: t.rd, fontWeight: 700 }}>チョンボ {historyDetail.players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
+                ) : r.draw ? (
                   <span style={{ color: t.dm }}>
                     流局
                     {r.tenpai && r.tenpai.some(Boolean) && (
