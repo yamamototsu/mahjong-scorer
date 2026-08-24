@@ -99,7 +99,9 @@ function validFuOptions(han, isTsumo) {
     return true;
   });
 }
-const DEFAULT_PRESET_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
+// 登録名の初期値は空（以前は下の4件を入れていた）。
+// 保存済みのリストからも一度だけ取り除くために、名前だけ残しておく
+const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 
 export default function MahjongScorer() {
   const [view, setView] = useState("title");
@@ -4502,7 +4504,12 @@ input, select { padding: 10px 14px; }
             </div>
           )}
           {presetNames.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 20, fontSize: 13, color: t.dm }}>まだ登録がありません</div>
+            <div style={{ textAlign: "center", padding: "18px 8px", fontSize: 13, color: t.dm, lineHeight: 1.8 }}>
+              まだ登録がありません
+              <div style={{ fontSize: 11, marginTop: 4 }}>
+                上から登録できます。メンバー決定で名前を打ち込んでも自動で登録されます
+              </div>
+            </div>
           ) : presetNames.map((n, i) => {
             const nd = nameDrag;
             const isDragging = nd && nd.from === i;
@@ -5123,8 +5130,17 @@ input, select { padding: 10px 14px; }
   const [presetNames, setPresetNames] = useState(() => {
     try {
       const v = JSON.parse(localStorage.getItem("mj_preset_names") || "null");
-      return Array.isArray(v) && v.length ? v : DEFAULT_PRESET_NAMES;
-    } catch { return DEFAULT_PRESET_NAMES; }
+      if (!Array.isArray(v)) return [];
+      // 昔の初期値（つとむ・ひろこ・はじめ・こころ）を一度だけ取り除く。
+      // 掃除は1回きりにして、自分で登録し直した名前は消さない
+      if (localStorage.getItem("mj_preset_cleaned") === "1") return v;
+      const cleaned = v.filter(n => !LEGACY_DEFAULT_NAMES.includes(n));
+      try {
+        localStorage.setItem("mj_preset_cleaned", "1");
+        if (cleaned.length !== v.length) localStorage.setItem("mj_preset_names", JSON.stringify(cleaned));
+      } catch {}
+      return cleaned;
+    } catch { return []; }
   });
   const savePresetNames = (arr) => {
     setPresetNames(arr);
@@ -7376,6 +7392,11 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 10 }}>
             {lgPC}人以上。{lgPC + 1}人以上なら毎回そこから{lgPC}人を選んで打ちます（{d.members.length}人選択中）
           </div>
+          {presetNames.length === 0 && (
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, padding: "6px 0" }}>
+              登録された名前がありません。下の「名前を追加・編集する」から登録してください
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
             {presetNames.map(nm => {
               const on = d.members.includes(nm);

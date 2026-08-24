@@ -167,7 +167,7 @@ function validFuOptions(han, isTsumo) {
     return true;
   });
 }
-const DEFAULT_PRESET_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
+const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 function MahjongScorer() {
   const [view, setView] = useState("title");
   const [gameHistory, setGameHistory] = useState(() => {
@@ -8979,11 +8979,17 @@ input, select { padding: 10px 14px; }
     }, "長押し"), "して、そのまま上下にドラッグで並べ替え"), presetNames.length === 0 ? React.createElement("div", {
       style: {
         textAlign: "center",
-        padding: 20,
+        padding: "18px 8px",
         fontSize: 13,
-        color: t.dm
+        color: t.dm,
+        lineHeight: 1.8
       }
-    }, "まだ登録がありません") : presetNames.map((n, i) => {
+    }, "まだ登録がありません", React.createElement("div", {
+      style: {
+        fontSize: 11,
+        marginTop: 4
+      }
+    }, "上から登録できます。メンバー決定で名前を打ち込んでも自動で登録されます")) : presetNames.map((n, i) => {
       const nd = nameDrag;
       const isDragging = nd && nd.from === i;
       let shiftY = 0;
@@ -10145,9 +10151,16 @@ input, select { padding: 10px 14px; }
   const [presetNames, setPresetNames] = useState(() => {
     try {
       const v = JSON.parse(localStorage.getItem("mj_preset_names") || "null");
-      return Array.isArray(v) && v.length ? v : DEFAULT_PRESET_NAMES;
+      if (!Array.isArray(v)) return [];
+      if (localStorage.getItem("mj_preset_cleaned") === "1") return v;
+      const cleaned = v.filter(n => !LEGACY_DEFAULT_NAMES.includes(n));
+      try {
+        localStorage.setItem("mj_preset_cleaned", "1");
+        if (cleaned.length !== v.length) localStorage.setItem("mj_preset_names", JSON.stringify(cleaned));
+      } catch {}
+      return cleaned;
     } catch {
-      return DEFAULT_PRESET_NAMES;
+      return [];
     }
   });
   const savePresetNames = arr => {
@@ -14095,7 +14108,14 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginBottom: 10
       }
-    }, lgPC, "人以上。", lgPC + 1, "人以上なら毎回そこから", lgPC, "人を選んで打ちます（", d.members.length, "人選択中）"), React.createElement("div", {
+    }, lgPC, "人以上。", lgPC + 1, "人以上なら毎回そこから", lgPC, "人を選んで打ちます（", d.members.length, "人選択中）"), presetNames.length === 0 && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        padding: "6px 0"
+      }
+    }, "登録された名前がありません。下の「名前を追加・編集する」から登録してください"), React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
