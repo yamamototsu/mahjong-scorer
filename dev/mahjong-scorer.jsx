@@ -302,8 +302,13 @@ export default function MahjongScorer() {
 
   // 起動時のオープニング演出（このセッションで最初の1回だけ）
   // 最初はタイトルだけを見せ、演出が終わってからメニューを順に出す
-  // 起動画面は「TAP TO START」のタップ待ち（自動では進まない）
+  // 起動画面は「TAP TO START」のタップ待ち。3秒たったら自動でスキップする
   const [booting, setBooting] = useState(true);
+  React.useEffect(() => {
+    if (!booting) return;
+    const tm = setTimeout(() => setBooting(false), 3000);
+    return () => clearTimeout(tm);
+  }, [booting]);
   // メニューが出そろったあとの目印。タイトルへ戻るたびに出現アニメーションが
   // 再生されないよう、これが立ったら演出は一切かけない
   const [introDone, setIntroDone] = useState(false);
