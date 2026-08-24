@@ -6140,10 +6140,10 @@ input, select { padding: 10px 14px; }
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
             <defs>
               {/* markerUnits=userSpaceOnUse: 線の太さで矢じりの大きさが変わらないようにする */}
-              {/* 細長い矢じり。後ろに深い切り込みを入れて先端を鋭く見せる */}
+              {/* 小さめで鋭い矢じり。後ろに深い切り込みを入れて先端を鋭く見せる */}
               <marker id="payArrow" markerUnits="userSpaceOnUse"
-                markerWidth="13" markerHeight="6" refX="12.6" refY="3" orient="auto">
-                <path d="M0.4,0.5 L12.6,3 L0.4,5.5 L3.6,3 z" fill={t.gd} />
+                markerWidth="9.5" markerHeight="3.6" refX="9.1" refY="1.8" orient="auto">
+                <path d="M0.3,0.3 L9.1,1.8 L0.3,3.3 L2.3,1.8 z" fill={t.gd} />
               </marker>
             </defs>
             {flows.map((f, k) => {
