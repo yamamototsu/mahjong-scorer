@@ -417,6 +417,7 @@ export default function MahjongScorer() {
     const next = seatTiles.map((s, i) => i === pos ? { ...s, by: seatTurn, byName: players[seatTurn] } : s);
     setSeatTiles(next);
     try { if (navigator.vibrate) navigator.vibrate(10); } catch {}
+    playWindVoice(seatTiles[pos].wind);   // 開いた牌の風を読む（東→トン）
     if (seatTurn + 1 >= PC) {
       // 全員引き終わり → 席順にプレイヤーを並べ替える
       const byWind = {};
@@ -640,6 +641,7 @@ export default function MahjongScorer() {
   const [voiceTsumoOn, setVoiceTsumoOn] = useState(() => loadVoicePref("mj_voice_tsumo"));
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
   const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
+  const [voiceSeatOn, setVoiceSeatOn] = useState(() => loadVoicePref("mj_voice_seat"));
   const saveVoicePref = (key, setter) => (on) => {
     setter(on);
     try { localStorage.setItem(key, on ? "1" : "0"); } catch {}
@@ -648,6 +650,7 @@ export default function MahjongScorer() {
   const saveVoiceTsumo = saveVoicePref("mj_voice_tsumo", setVoiceTsumoOn);
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
+  const saveVoiceSeat = saveVoicePref("mj_voice_seat", setVoiceSeatOn);
   const voiceOnFor = (text) =>
     text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   // 収録した掛け声。再生できない端末では音声合成にフォールバックする
@@ -759,8 +762,9 @@ export default function MahjongScorer() {
 
   // 局の読み上げ（東一局 一本場 など）。麻雀の読みで発音させるためカタカナで渡す
   // （収録音声が再生できない端末用のフォールバック）
+  const WIND_KANA = { 東: "トン", 南: "ナン", 西: "シャー", 北: "ペー" };
   const roundKana = (wind, dealer, honba2) => {
-    const W = { 東: "トン", 南: "ナン", 西: "シャー", 北: "ペー" };
+    const W = WIND_KANA;
     const K = ["イッ", "ニー", "サン", "スー"];
     const H = ["", "イッポンバ", "ニホンバ", "サンボンバ", "ヨンホンバ", "ゴホンバ",
                "ロッポンバ", "ナナホンバ", "ハッポンバ", "キュウホンバ", "ジュッポンバ"];
@@ -768,12 +772,12 @@ export default function MahjongScorer() {
     const h = honba2 > 0 ? (H[honba2] || `${honba2}ホンバ`) : "";
     return h ? `${k}、${h}` : k;
   };
-  const speakRound = (wind, dealer, honba2) => {
+  const speakJa = (text) => {
     try {
       const syn = window.speechSynthesis;
       if (!syn) return;
       syn.cancel();
-      const u = new SpeechSynthesisUtterance(roundKana(wind, dealer, honba2));
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
       u.rate = 1.05;
       u.volume = 1;
@@ -787,6 +791,7 @@ export default function MahjongScorer() {
       syn.speak(u);
     } catch {}
   };
+  const speakRound = (wind, dealer, honba2) => speakJa(roundKana(wind, dealer, honba2));
 
   // 局の読み上げの収録音声（東・南・西・北／1〜4局／オーラス／1〜10本場）。
   // 部品をつないで「なん・にきょく・いっぽんば」のように順に再生する
@@ -838,6 +843,27 @@ export default function MahjongScorer() {
       } catch { fail(); }
     };
     next();
+  };
+
+  // 席決めで牌をめくったときの読み（東なら「トン」）。局の読み上げと同じ収録音声を使う
+  const playWindVoice = (wind, force) => {
+    if (!force && !voiceSeatOn) return;
+    const kana = WIND_KANA[wind] || wind;
+    const file = ROUND_WIND_FILES[wind];
+    if (!file) { speakJa(kana); return; }
+    // 局の読み上げが残っていたら止めてから鳴らす
+    const seq = ++roundSeqRef.current;
+    Object.values(roundAudioRef.current).forEach(a => { try { a.pause(); } catch {} });
+    const a = roundAudioFor(file);
+    if (!a) { speakJa(kana); return; }
+    const fail = () => { if (seq === roundSeqRef.current) speakJa(kana); };
+    try {
+      a.currentTime = 0;
+      a.onended = null;          // 局の読み上げでつないだ続きが残らないように
+      a.onerror = fail;
+      const p = a.play();
+      if (p && p.catch) p.catch(fail);
+    } catch { fail(); }
   };
 
   const toggleDeclaredRiichi = (i) => {
@@ -5729,6 +5755,8 @@ input, select { padding: 10px 14px; }
           on: voiceTsumoOn, save: saveVoiceTsumo, preview: () => playVoice("ツモ", null, true) },
         { label: "📢 局の読み上げ", desc: "局の変わり目に「東一局」と読み上げます",
           on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
+        { label: "🀫 席決めの牌の声", desc: "めくった牌に応じて「トン」など",
+          on: voiceSeatOn, save: saveVoiceSeat, preview: () => playWindVoice("東", true) },
       ].map((row, i) => (
         <div key={i} style={{
           // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
@@ -5971,7 +5999,7 @@ input, select { padding: 10px 14px; }
               </div>
               {[
                 ["voice", "🔊", "音の設定",
-                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`],
+                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`],
                 ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`],
                 ["screen", "💡", "画面設定", "対局中のスリープ防止"],
               ].map(([id, icon, title, sub]) => (
@@ -7208,7 +7236,7 @@ input, select { padding: 10px 14px; }
             {setOpen === "dice" && dicePanelCard()}
 
             {secHdr("voice", "🔊", "音の設定",
-              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`)}
+              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
             {setOpen === "voice" && voicePanelCard()}
 
             {secHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}

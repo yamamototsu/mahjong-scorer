@@ -620,6 +620,7 @@ function MahjongScorer() {
     try {
       if (navigator.vibrate) navigator.vibrate(10);
     } catch {}
+    playWindVoice(seatTiles[pos].wind);
     if (seatTurn + 1 >= PC) {
       const byWind = {};
       next.forEach(s => {
@@ -881,6 +882,7 @@ function MahjongScorer() {
   const [voiceTsumoOn, setVoiceTsumoOn] = useState(() => loadVoicePref("mj_voice_tsumo"));
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
   const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
+  const [voiceSeatOn, setVoiceSeatOn] = useState(() => loadVoicePref("mj_voice_seat"));
   const saveVoicePref = (key, setter) => on => {
     setter(on);
     try {
@@ -891,6 +893,7 @@ function MahjongScorer() {
   const saveVoiceTsumo = saveVoicePref("mj_voice_tsumo", setVoiceTsumoOn);
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
+  const saveVoiceSeat = saveVoicePref("mj_voice_seat", setVoiceSeatOn);
   const voiceOnFor = text => text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   const VOICE_FILES = {
     リーチ: "assets/voice/riichi.mp3",
@@ -1014,25 +1017,26 @@ function MahjongScorer() {
     if (withSlap) setTimeout(play, 130);else play();
     if (done) setTimeout(finish, 1700);
   };
+  const WIND_KANA = {
+    東: "トン",
+    南: "ナン",
+    西: "シャー",
+    北: "ペー"
+  };
   const roundKana = (wind, dealer, honba2) => {
-    const W = {
-      東: "トン",
-      南: "ナン",
-      西: "シャー",
-      北: "ペー"
-    };
+    const W = WIND_KANA;
     const K = ["イッ", "ニー", "サン", "スー"];
     const H = ["", "イッポンバ", "ニホンバ", "サンボンバ", "ヨンホンバ", "ゴホンバ", "ロッポンバ", "ナナホンバ", "ハッポンバ", "キュウホンバ", "ジュッポンバ"];
     const k = `${W[wind] || wind}${K[dealer] || dealer + 1}キョク`;
     const h = honba2 > 0 ? H[honba2] || `${honba2}ホンバ` : "";
     return h ? `${k}、${h}` : k;
   };
-  const speakRound = (wind, dealer, honba2) => {
+  const speakJa = text => {
     try {
       const syn = window.speechSynthesis;
       if (!syn) return;
       syn.cancel();
-      const u = new SpeechSynthesisUtterance(roundKana(wind, dealer, honba2));
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = "ja-JP";
       u.rate = 1.05;
       u.volume = 1;
@@ -1046,6 +1050,7 @@ function MahjongScorer() {
       syn.speak(u);
     } catch {}
   };
+  const speakRound = (wind, dealer, honba2) => speakJa(roundKana(wind, dealer, honba2));
   const ROUND_DIR = "assets/voice/round/";
   const ROUND_WIND_FILES = {
     東: "ton.mp3",
@@ -1115,6 +1120,38 @@ function MahjongScorer() {
       }
     };
     next();
+  };
+  const playWindVoice = (wind, force) => {
+    if (!force && !voiceSeatOn) return;
+    const kana = WIND_KANA[wind] || wind;
+    const file = ROUND_WIND_FILES[wind];
+    if (!file) {
+      speakJa(kana);
+      return;
+    }
+    const seq = ++roundSeqRef.current;
+    Object.values(roundAudioRef.current).forEach(a => {
+      try {
+        a.pause();
+      } catch {}
+    });
+    const a = roundAudioFor(file);
+    if (!a) {
+      speakJa(kana);
+      return;
+    }
+    const fail = () => {
+      if (seq === roundSeqRef.current) speakJa(kana);
+    };
+    try {
+      a.currentTime = 0;
+      a.onended = null;
+      a.onerror = fail;
+      const p = a.play();
+      if (p && p.catch) p.catch(fail);
+    } catch {
+      fail();
+    }
   };
   const toggleDeclaredRiichi = i => {
     setDeclaredRiichi(prev => {
@@ -11121,6 +11158,12 @@ input, select { padding: 10px 14px; }
     on: voiceRoundOn,
     save: saveVoiceRound,
     preview: () => playRoundVoice("東", 0, 1, true)
+  }, {
+    label: "🀫 席決めの牌の声",
+    desc: "めくった牌に応じて「トン」など",
+    on: voiceSeatOn,
+    save: saveVoiceSeat,
+    preview: () => playWindVoice("東", true)
   }].map((row, i) => React.createElement("div", {
     key: i,
     style: {
@@ -11521,7 +11564,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         letterSpacing: "0.05em"
       }
-    }, "音・サイコロ・画面の設定"), [["voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`], ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`], ["screen", "💡", "画面設定", "対局中のスリープ防止"]].map(([id, icon, title, sub]) => React.createElement(React.Fragment, {
+    }, "音・サイコロ・画面の設定"), [["voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`], ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`], ["screen", "💡", "画面設定", "対局中のスリープ防止"]].map(([id, icon, title, sub]) => React.createElement(React.Fragment, {
       key: id
     }, React.createElement("button", {
       onClick: () => setRcSet(v => v === id ? null : id),
@@ -13793,7 +13836,7 @@ input, select { padding: 10px 14px; }
       onUnitChange: u => editDraft({
         rateUnit: u
       })
-    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn].filter(Boolean).length}/5 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && screenPanelCard(), (rulesDirty || rulesSaved) && React.createElement("div", {
+    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), setOpen === "screen" && screenPanelCard(), (rulesDirty || rulesSaved) && React.createElement("div", {
       style: {
         ...card,
         padding: 10,
