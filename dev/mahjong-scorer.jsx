@@ -113,11 +113,14 @@ const payArrowPath = (a, b) => {
   // 短い矢印で矢じりだけが大きくならないように縮める
   const hs = Math.min(1, len / (o.headLen * 1.9));
   const headLen = o.headLen * hs, headHalf = o.headHalf * hs, barb = o.barb * hs;
-  const nx = -dy / len, ny = dx / len;                       // 進行方向の左
   // 真正面（縦・横に一直線）から来る矢印は曲げずにまっすぐ引く
   const straight = Math.abs(dx) < 0.5 || Math.abs(dy) < 0.5;
   const bow = straight ? 0 : Math.min(len * o.bow, o.bowMax);
-  const cx = (a.x + b.x) / 2 + nx * bow, cy = (a.y + b.y) / 2 + ny * bow;
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  // 反らせる向きは必ず卓の中心側。外側へ反ると角に寄って窮屈に見える
+  let nx = -dy / len, ny = dx / len;
+  if ((50 - mx) * nx + (50 - my) * ny < 0) { nx = -nx; ny = -ny; }
+  const cx = mx + nx * bow, cy = my + ny * bow;
   const P = (t) => ({
     x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * cx + t * t * b.x,
     y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * cy + t * t * b.y,
@@ -6216,11 +6219,14 @@ input, select { padding: 10px 14px; }
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
             {flows.map((f, k) => {
               const p0 = posOf(f.from);
-              const dx = win.x - p0.x, dy = win.y - p0.y;
+              // 払う人のパネルからはまず卓の中心側へ出て、そこから和了者へ向かう。
+              // 角どうしを斜めに直接結ぶと矢印が短くなって窮屈に見えるため
+              const inx = Math.abs(p0.rot) % 180 === 90 ? Math.sign(50 - p0.x) : 0;
+              const iny = Math.abs(p0.rot) % 180 === 90 ? 0 : Math.sign(50 - p0.y);
+              const a = edgeOf(p0, inx, iny, extOf(f.from), 1.5);
+              const dx = win.x - a.x, dy = win.y - a.y;
               const len = Math.sqrt(dx * dx + dy * dy) || 1;
               const ux = dx / len, uy = dy / len;
-              // パネルの枠ぎりぎりから枠ぎりぎりまで引いて、矢印を長く見せる
-              const a = edgeOf(p0, ux, uy, extOf(f.from), 1.5);
               const b = edgeOf(win, -ux, -uy, extOf(gWinner), 2.5);
               return <path key={k} d={payArrowPath(a, b)} fill={t.gd} />;
             })}
