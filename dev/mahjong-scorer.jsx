@@ -106,9 +106,9 @@ const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"
 // 表示の向きを回すボタンのアイコン。
 // 絵文字（🔄）は端末のフォントによって字形の位置がずれ、丸の中心に収まらないため、
 // 図形として描く。中心(12,12)に対して点対称なので、必ず枠の中心に来る
-const RotateIcon = ({ size = 34, color = "#fff" }) => (
+const RotateIcon = ({ size = 34 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block" }} aria-hidden="true" focusable="false">
-    <path fill={color} d="M4.17,9.75A8.15,8.15 0 0 1 19.83,9.75L17.82,10.33A6.05,6.05 0 0 0 6.18,10.33Z M19.73,13.22L16.09,10.31L21.28,8.82Z M19.83,14.25A8.15,8.15 0 0 1 4.17,14.25L6.18,13.67A6.05,6.05 0 0 0 17.82,13.67Z M4.27,10.78L7.91,13.69L2.72,15.18Z" />
+    <path fill="currentColor" d="M19.83,9.75A8.15,8.15 0 0 0 4.17,9.75L6.18,10.33A6.05,6.05 0 0 1 17.82,10.33Z M4.27,13.22L7.91,10.31L2.72,8.82Z M4.17,14.25A8.15,8.15 0 0 0 19.83,14.25L17.82,13.67A6.05,6.05 0 0 1 6.18,13.67Z M19.73,10.78L16.09,13.69L21.28,15.18Z" />
   </svg>
 );
 
@@ -9956,8 +9956,10 @@ input, select { padding: 10px 14px; }
               }}>⏸</button>
             <button style={{ ...smallBtn("p"), flex: 1 }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmWinStep("winner"); }}>アガリ入力</button>
             <button style={{ ...smallBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
-            <button aria-label="席順を回す" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
-              onClick={() => setSeatRot(r => (r + PC - 1) % PC)}>🔄</button>
+            <button aria-label="席順を回す" style={{
+              ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}><RotateIcon size={22} /></button>
           </div>
         )}
       </div>

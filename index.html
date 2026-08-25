@@ -169,8 +169,7 @@ function validFuOptions(han, isTsumo) {
 }
 const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 const RotateIcon = ({
-  size = 34,
-  color = "#fff"
+  size = 34
 }) => React.createElement("svg", {
   width: size,
   height: size,
@@ -181,8 +180,8 @@ const RotateIcon = ({
   "aria-hidden": "true",
   focusable: "false"
 }, React.createElement("path", {
-  fill: color,
-  d: "M4.17,9.75A8.15,8.15 0 0 1 19.83,9.75L17.82,10.33A6.05,6.05 0 0 0 6.18,10.33Z M19.73,13.22L16.09,10.31L21.28,8.82Z M19.83,14.25A8.15,8.15 0 0 1 4.17,14.25L6.18,13.67A6.05,6.05 0 0 0 17.82,13.67Z M4.27,10.78L7.91,13.69L2.72,15.18Z"
+  fill: "currentColor",
+  d: "M19.83,9.75A8.15,8.15 0 0 0 4.17,9.75L6.18,10.33A6.05,6.05 0 0 1 17.82,10.33Z M4.27,13.22L7.91,10.31L2.72,8.82Z M4.17,14.25A8.15,8.15 0 0 0 19.83,14.25L17.82,13.67A6.05,6.05 0 0 1 6.18,13.67Z M19.73,10.78L16.09,13.69L21.28,15.18Z"
 }));
 function MahjongScorer() {
   const [view, setView] = useState("title");
@@ -18962,11 +18961,15 @@ input, select { padding: 10px 14px; }
       style: {
         ...smallBtn(),
         flex: "0 0 46px",
-        fontSize: 19,
-        padding: "10px 0"
+        padding: "10px 0",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
       },
       onClick: () => setSeatRot(r => (r + PC - 1) % PC)
-    }, "🔄")));
+    }, React.createElement(RotateIcon, {
+      size: 22
+    }))));
     return React.createElement("div", {
       style: {
         padding: "6px 8px 10px",
