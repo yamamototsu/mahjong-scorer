@@ -168,6 +168,75 @@ function validFuOptions(han, isTsumo) {
   });
 }
 const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
+const PAY_ARROW = {
+  bow: 0.15,
+  bowMax: 6.5,
+  tail: 0.4,
+  body: 1.9,
+  taper: 0.85,
+  headLen: 7.4,
+  headHalf: 3.0,
+  barb: 1.3
+};
+const payArrowPath = (a, b) => {
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const o = PAY_ARROW;
+  const hs = Math.min(1, len / (o.headLen * 1.9));
+  const headLen = o.headLen * hs,
+    headHalf = o.headHalf * hs,
+    barb = o.barb * hs;
+  const nx = -dy / len,
+    ny = dx / len;
+  const bow = Math.min(len * o.bow, o.bowMax);
+  const cx = (a.x + b.x) / 2 + nx * bow,
+    cy = (a.y + b.y) / 2 + ny * bow;
+  const P = t => ({
+    x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * cx + t * t * b.x,
+    y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * cy + t * t * b.y
+  });
+  const T = t => {
+    const x = 2 * (1 - t) * (cx - a.x) + 2 * t * (b.x - cx);
+    const y = 2 * (1 - t) * (cy - a.y) + 2 * t * (b.y - cy);
+    const m = Math.sqrt(x * x + y * y) || 1;
+    return {
+      x: x / m,
+      y: y / m
+    };
+  };
+  const ts = Math.max(0.12, 1 - headLen / len);
+  const N = 12,
+    L = [],
+    R = [];
+  for (let i = 0; i <= N; i++) {
+    const t = ts * i / N,
+      p = P(t),
+      tan = T(t);
+    const w = (o.tail + (o.body - o.tail) * Math.pow(i / N, o.taper)) / 2;
+    L.push({
+      x: p.x - tan.y * w,
+      y: p.y + tan.x * w
+    });
+    R.push({
+      x: p.x + tan.y * w,
+      y: p.y - tan.x * w
+    });
+  }
+  const sp = P(ts),
+    st = T(ts),
+    tip = P(1);
+  const bL = {
+    x: sp.x - st.y * headHalf - st.x * barb,
+    y: sp.y + st.x * headHalf - st.y * barb
+  };
+  const bR = {
+    x: sp.x + st.y * headHalf - st.x * barb,
+    y: sp.y - st.x * headHalf - st.y * barb
+  };
+  const f = p => p.x.toFixed(2) + "," + p.y.toFixed(2);
+  return "M" + f(L[0]) + L.slice(1).map(p => "L" + f(p)).join("") + "L" + f(bL) + "L" + f(tip) + "L" + f(bR) + R.reverse().map(p => "L" + f(p)).join("") + "Z";
+};
 const RotateIcon = ({
   size = 34
 }) => React.createElement("svg", {
@@ -11866,18 +11935,7 @@ input, select { padding: 10px 14px; }
         width: "100%",
         height: "100%"
       }
-    }, React.createElement("defs", null, React.createElement("marker", {
-      id: "payArrow",
-      markerUnits: "userSpaceOnUse",
-      markerWidth: "9.5",
-      markerHeight: "3.6",
-      refX: "9.1",
-      refY: "1.8",
-      orient: "auto"
-    }, React.createElement("path", {
-      d: "M0.3,0.3 L9.1,1.8 L0.3,3.3 L2.3,1.8 z",
-      fill: t.gd
-    }))), flows.map((f, k) => {
+    }, flows.map((f, k) => {
       const p0 = posOf(f.from);
       const dx = win.x - p0.x,
         dy = win.y - p0.y;
@@ -11886,18 +11944,11 @@ input, select { padding: 10px 14px; }
         uy = dy / len;
       const a = edgeOf(p0, ux, uy, extOf(f.from), 1.5);
       const b = edgeOf(win, -ux, -uy, extOf(gWinner), 2.5);
-      return React.createElement("g", {
-        key: k
-      }, React.createElement("line", {
-        x1: a.x,
-        y1: a.y,
-        x2: b.x,
-        y2: b.y,
-        stroke: t.gd,
-        strokeWidth: "1.4",
-        strokeLinecap: "round",
-        markerEnd: "url(#payArrow)"
-      }));
+      return React.createElement("path", {
+        key: k,
+        d: payArrowPath(a, b),
+        fill: t.gd
+      });
     })), Array.from({
       length: PC
     }, (_, i) => i).map(i => {
