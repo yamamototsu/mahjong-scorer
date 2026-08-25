@@ -168,6 +168,22 @@ function validFuOptions(han, isTsumo) {
   });
 }
 const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
+const RotateIcon = ({
+  size = 34,
+  color = "#fff"
+}) => React.createElement("svg", {
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  style: {
+    display: "block"
+  },
+  "aria-hidden": "true",
+  focusable: "false"
+}, React.createElement("path", {
+  fill: color,
+  d: "M4.17,9.75A8.15,8.15 0 0 1 19.83,9.75L17.82,10.33A6.05,6.05 0 0 0 6.18,10.33Z M19.73,13.22L16.09,10.31L21.28,8.82Z M19.83,14.25A8.15,8.15 0 0 1 4.17,14.25L6.18,13.67A6.05,6.05 0 0 0 17.82,13.67Z M4.27,10.78L7.91,13.69L2.72,15.18Z"
+}));
 function MahjongScorer() {
   const [view, setView] = useState("title");
   const [gameHistory, setGameHistory] = useState(() => {
@@ -18312,17 +18328,19 @@ input, select { padding: 10px 14px; }
         width: 56,
         height: 56,
         borderRadius: 28,
+        padding: 0,
         border: "1.5px solid rgba(255,255,255,0.4)",
         background: "rgba(0,0,0,0.55)",
         color: "#fff",
-        fontSize: 26,
         cursor: "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         boxShadow: "0 3px 12px rgba(0,0,0,0.45)"
       }
-    }, "🔄"));
+    }, React.createElement(RotateIcon, {
+      size: 34
+    })));
   })(), React.createElement("div", {
     style: {
       fontSize: 10,
@@ -18335,7 +18353,7 @@ input, select { padding: 10px 14px; }
     style: {
       color: seatRot === 0 ? t.gd : t.tx
     }
-  }, players[(0 + seatRot) % PC]), seatRot === 0 ? "（東・起家）" : "", " ・ 🔄で表示の向きを回せます（対局画面にも反映）")), React.createElement("div", {
+  }, players[(0 + seatRot) % PC]), seatRot === 0 ? "（東・起家）" : "", " ・ 真ん中のボタンで表示の向きを回せます（対局画面にも反映）")), React.createElement("div", {
     style: {
       padding: "6px 0 0"
     }

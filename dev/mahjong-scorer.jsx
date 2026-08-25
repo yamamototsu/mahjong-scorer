@@ -103,6 +103,15 @@ function validFuOptions(han, isTsumo) {
 // 保存済みのリストからも一度だけ取り除くために、名前だけ残しておく
 const LEGACY_DEFAULT_NAMES = ["つとむ", "ひろこ", "はじめ", "こころ"];
 
+// 表示の向きを回すボタンのアイコン。
+// 絵文字（🔄）は端末のフォントによって字形の位置がずれ、丸の中心に収まらないため、
+// 図形として描く。中心(12,12)に対して点対称なので、必ず枠の中心に来る
+const RotateIcon = ({ size = 34, color = "#fff" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block" }} aria-hidden="true" focusable="false">
+    <path fill={color} d="M4.17,9.75A8.15,8.15 0 0 1 19.83,9.75L17.82,10.33A6.05,6.05 0 0 0 6.18,10.33Z M19.73,13.22L16.09,10.31L21.28,8.82Z M19.83,14.25A8.15,8.15 0 0 1 4.17,14.25L6.18,13.67A6.05,6.05 0 0 0 17.82,13.67Z M4.27,10.78L7.91,13.69L2.72,15.18Z" />
+  </svg>
+);
+
 export default function MahjongScorer() {
   const [view, setView] = useState("title");
   // 対局履歴。端末に保存する（これまでメモリ上だけで、閉じると消えていた）
@@ -9582,18 +9591,18 @@ input, select { padding: 10px 14px; }
                       {/* 表示の向きを回転 */}
                       <button onClick={() => setSeatRot(r => (r + PC - 1) % PC)} aria-label="表示を回転" style={{
                         position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-                        width: 56, height: 56, borderRadius: 28,
+                        width: 56, height: 56, borderRadius: 28, padding: 0,
                         border: "1.5px solid rgba(255,255,255,0.4)", background: "rgba(0,0,0,0.55)",
-                        color: "#fff", fontSize: 26, cursor: "pointer",
+                        color: "#fff", cursor: "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         boxShadow: "0 3px 12px rgba(0,0,0,0.45)",
-                      }}>🔄</button>
+                      }}><RotateIcon size={34} /></button>
                     </div>
                   );
                 })()}
                 <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 5, lineHeight: 1.7 }}>
                   手前: <b style={{ color: seatRot === 0 ? t.gd : t.tx }}>{players[(0 + seatRot) % PC]}</b>
-                  {seatRot === 0 ? "（東・起家）" : ""} ・ 🔄で表示の向きを回せます（対局画面にも反映）
+                  {seatRot === 0 ? "（東・起家）" : ""} ・ 真ん中のボタンで表示の向きを回せます（対局画面にも反映）
                 </div>
               </div>
               <div style={{ padding: "6px 0 0" }}>
