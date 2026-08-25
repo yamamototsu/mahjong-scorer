@@ -2975,6 +2975,10 @@ input, select { padding: 10px 14px; }
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
+@keyframes oyaBlink {
+  0%, 100% { opacity: 1;    text-shadow: 0 0 18px rgba(242,193,78,0.75); }
+  50%      { opacity: 0.32; text-shadow: 0 0 4px rgba(242,193,78,0.12); }
+}
 `;
 
   // ══════════════════════════════════
@@ -8985,7 +8989,10 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 12, color: t.dm, fontWeight: 700 }}>
                   出た目 <b style={{ color: t.gd, fontSize: 16 }}>{oyaDice.sum}</b>
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px" }}>
+                <div style={{
+                  fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px",
+                  animation: "oyaBlink 1.1s ease-in-out infinite",
+                }}>
                   {players[newDealer]} さん
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>が起家（親）です</div>
