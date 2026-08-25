@@ -114,7 +114,9 @@ const payArrowPath = (a, b) => {
   const hs = Math.min(1, len / (o.headLen * 1.9));
   const headLen = o.headLen * hs, headHalf = o.headHalf * hs, barb = o.barb * hs;
   const nx = -dy / len, ny = dx / len;                       // 進行方向の左
-  const bow = Math.min(len * o.bow, o.bowMax);
+  // 真正面（縦・横に一直線）から来る矢印は曲げずにまっすぐ引く
+  const straight = Math.abs(dx) < 0.5 || Math.abs(dy) < 0.5;
+  const bow = straight ? 0 : Math.min(len * o.bow, o.bowMax);
   const cx = (a.x + b.x) / 2 + nx * bow, cy = (a.y + b.y) / 2 + ny * bow;
   const P = (t) => ({
     x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * cx + t * t * b.x,

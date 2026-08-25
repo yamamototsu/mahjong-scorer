@@ -189,7 +189,8 @@ const payArrowPath = (a, b) => {
     barb = o.barb * hs;
   const nx = -dy / len,
     ny = dx / len;
-  const bow = Math.min(len * o.bow, o.bowMax);
+  const straight = Math.abs(dx) < 0.5 || Math.abs(dy) < 0.5;
+  const bow = straight ? 0 : Math.min(len * o.bow, o.bowMax);
   const cx = (a.x + b.x) / 2 + nx * bow,
     cy = (a.y + b.y) / 2 + ny * bow;
   const P = t => ({
