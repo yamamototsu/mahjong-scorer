@@ -9189,7 +9189,13 @@ input, select { padding: 10px 14px; }
                   width: "100%", padding: "13px 10px", borderRadius: 10, cursor: matchType ? "pointer" : "default", border: "none",
                   background: ok ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
                   opacity: matchType ? 1 : 0.4,
-                }}>{!hasLast ? "初期設定ルールでメンバー決定へ" : same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"}</button>
+                }}>{/* 「メンバー決定/へ」のように語の途中で折り返さないよう、
+                       意味の切れ目ごとに inline-block で区切る */
+                  (!hasLast ? ["初期設定ルールで", "メンバー決定へ"]
+                    : same ? ["このまま", "メンバー決定へ"]
+                    : ["前回と同じルールで", "メンバー決定へ"]
+                  ).map((part, k) => <span key={k} style={{ display: "inline-block" }}>{part}</span>)
+                }</button>
                 <div style={{ fontSize: 10, color: matchType ? t.dm : t.gd, marginTop: 7, textAlign: "center", fontWeight: matchType ? 400 : 700 }}>
                   {matchType ? "変更したい場合は、下の「ルールを変更する」から" : "まず上の試合形式を選んでください"}
                 </div>
@@ -9735,7 +9741,8 @@ input, select { padding: 10px 14px; }
     const nameFont = (name, base) => {
       const n = (name || "").length;
       const scale = n <= 4 ? 1 : n <= 6 ? 0.88 : n <= 8 ? 0.76 : n <= 11 ? 0.66 : 0.58;
-      return `${(base * scale).toFixed(2)}cqmin`;
+      // 狭い画面では cqmin だけだと読めない大きさまで縮むため、10px を下限にする
+      return `max(10px, ${(base * scale).toFixed(2)}cqmin)`;
     };
 
     const panelInner = (i) => {
@@ -9747,12 +9754,16 @@ input, select { padding: 10px 14px; }
       return (
         <div style={{
           width: PW, height: PH,
-          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "3cqmin 3.5cqmin", borderRadius: "3.5cqmin",
+          // 通常時は内側の余白を詰める。名前・風/点数・リーチの3段が
+          // はみ出さずに収まる幅を確保するため（横 3.5→2.4 / 縦 3→1.2）
+          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "1.2cqmin 2.4cqmin", borderRadius: "3.5cqmin",
           // 親は外枠だけ黄色に。背景は他家と同じ
           background: (tmWinStep || tmDrawMode) ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: (tmWinStep || tmDrawMode) ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
           textAlign: "center", boxSizing: "border-box",
-          display: "flex", flexDirection: "column", justifyContent: "center", gap: "1.5cqmin",
+          // 段間も詰める。リーチボタンが 32px 必要になった分、
+          // 狭い画面で3段が枠のふちに貼りつかないよう縦を空けている（1.5→0.2）
+          display: "flex", flexDirection: "column", justifyContent: "center", gap: "0.2cqmin",
           position: "relative",
           animation: isWallTarget ? "wallBlink 0.9s ease-in-out infinite" : "none",
         }}>
@@ -9881,29 +9892,33 @@ input, select { padding: 10px 14px; }
                 <div style={{
                   fontSize: nameFont(players[i], 4), fontWeight: 700, color: t.tx,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  lineHeight: 1.3, textAlign: "center", width: "100%", flexShrink: 0,
+                  lineHeight: 1.2, textAlign: "center", width: "100%", flexShrink: 0,
                 }}>{players[i]}</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "2cqmin", marginTop: "0.4cqmin" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.2cqmin", marginTop: 0 }}>
                   <span style={{
                     fontSize: "3.9cqmin", fontWeight: 900, lineHeight: 1,
                     color: isDealer ? "#1a1a1a" : t.tx,
                     background: isDealer ? t.gd : t.sf,
                     border: `1px solid ${isDealer ? t.gd : t.bd}`,
-                    borderRadius: "1.6cqmin", padding: "1.2cqmin 2cqmin", flexShrink: 0,
+                    borderRadius: "1.6cqmin", padding: "0.8cqmin 1.3cqmin", flexShrink: 0,
                   }}>{seatWind}</span>
                   <span style={{
-                    fontSize: "5.3cqmin", fontWeight: 900, lineHeight: 1.2, flexShrink: 0,
+                    fontSize: "5.3cqmin", fontWeight: 900, lineHeight: 1.1, flexShrink: 0,
                     color: score < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums",
                   }}>{score.toLocaleString()}</span>
                 </div>
               </div>
               {/* リーチボタン */}
               <button onClick={(e) => { e.stopPropagation(); toggleDeclaredRiichi(i); }} style={{
-                width: "100%", padding: "1.1cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "0.3cqmin",
+                // 指で押せる高さ（32px以上）と読める文字を確保する。
+                // 卓上モードは cqmin が基本だが、狭い画面では潰れて押せなくなるため
+                // 高さと文字だけ最低値を持たせている（大小関係は名前・点数より小さいまま）
+                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "0.3cqmin",
+                minHeight: "32px", boxSizing: "border-box",
                 border: `1px solid ${isRiichi ? t.rd : t.bd}`,
                 background: isRiichi ? t.rd : "transparent",
                 color: isRiichi ? "#fff" : t.dm,
-                fontSize: "2.5cqmin", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap",
+                fontSize: "max(10px, 2.9cqmin)", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap",
               }}>
                 {isRiichi ? "🔴 リーチ中 (取消)" : "リーチ"}
               </button>
@@ -10024,8 +10039,9 @@ input, select { padding: 10px 14px; }
                 setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
-            <button style={{ ...smallBtn("p"), flex: 1 }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmWinStep("winner"); }}>アガリ入力</button>
-            <button style={{ ...smallBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
+            {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
+            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={{ ...smallBtn(), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
             <button aria-label="席順を回す" style={{
               ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -10240,7 +10256,8 @@ input, select { padding: 10px 14px; }
                 return (
                   <button onClick={rollDice} aria-label="サイコロを振る" style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
-                    border: "none", background: "transparent", padding: 2, cursor: "pointer",
+                    // 指で押せる大きさを確保する（見た目は変えず当たり判定だけ広げる）
+                    border: "none", background: "transparent", padding: "7px 2px", minHeight: 32, cursor: "pointer",
                     transform: `rotate(${rot}deg)`,
                     transition: "transform 0.4s cubic-bezier(.3,1.2,.4,1)",
                   }}>
@@ -10283,7 +10300,7 @@ input, select { padding: 10px 14px; }
                   {diceRoundKey !== `${roundWind}${dealerIdx}-${honba}-${rounds.length}` && (
                     <div style={posBase(15.5)}>
                       <span style={{
-                        fontSize: "3.1cqmin", fontWeight: 800, color: t.gd,
+                        fontSize: "max(10px, 3.1cqmin)", fontWeight: 800, color: t.gd,
                         animation: "dicePrompt 1.6s ease-in-out infinite",
                       }}>タップしてサイコロ</span>
                     </div>
@@ -10291,11 +10308,11 @@ input, select { padding: 10px 14px; }
                   {/* サイコロの下: 本場・供託 */}
                   <div style={posBase(8.5)}>
                     <span style={{
-                      fontSize: "3.2cqmin", fontWeight: 800,
+                      fontSize: "max(10px, 3.2cqmin)", fontWeight: 800,
                       color: honba > 0 ? t.gd : "rgba(255,255,255,0.45)",
                     }}>{honba}本場</span>
                     {riichiBets > 0 && (
-                      <span style={{ fontSize: "3.2cqmin", fontWeight: 800, color: t.ac }}>
+                      <span style={{ fontSize: "max(10px, 3.2cqmin)", fontWeight: 800, color: t.ac }}>
                         供託{riichiBets}本
                       </span>
                     )}
@@ -10429,8 +10446,9 @@ input, select { padding: 10px 14px; }
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button style={{ ...actionBtn("p"), flex: 1 }} onClick={() => { resetGW(); setShowGW(true); setGStep(1); }}>アガリ入力</button>
-        <button style={{ ...actionBtn(), flex: 1 }} onClick={() => { setDrawTenpai([...declaredRiichi]); setShowDrawWiz(true); }}>流局</button>
+        {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
+        <button style={{ ...actionBtn("p"), flex: 1, padding: "15px 6px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setShowGW(true); setGStep(1); }}>アガリ入力</button>
+        <button style={{ ...actionBtn(), flex: 1, padding: "15px 6px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai([...declaredRiichi]); setShowDrawWiz(true); }}>流局</button>
         {/* 左右の余白を詰めて「ルー/ル」と途中で折り返さないようにする */}
         <button style={{ ...actionBtn(), flex: "0 0 92px", padding: "15px 4px", whiteSpace: "nowrap" }}
           onClick={() => setShowRuleCheck(true)}>📋 ルール</button>

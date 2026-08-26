@@ -17559,7 +17559,12 @@ input, select { padding: 10px 14px; }
         fontWeight: 800,
         opacity: matchType ? 1 : 0.4
       }
-    }, !hasLast ? "初期設定ルールでメンバー決定へ" : same ? "このままメンバー決定へ" : "前回と同じルールでメンバー決定へ"), React.createElement("div", {
+    }, (!hasLast ? ["初期設定ルールで", "メンバー決定へ"] : same ? ["このまま", "メンバー決定へ"] : ["前回と同じルールで", "メンバー決定へ"]).map((part, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, part))), React.createElement("div", {
       style: {
         fontSize: 10,
         color: matchType ? t.dm : t.gd,
@@ -18504,7 +18509,7 @@ input, select { padding: 10px 14px; }
     const nameFont = (name, base) => {
       const n = (name || "").length;
       const scale = n <= 4 ? 1 : n <= 6 ? 0.88 : n <= 8 ? 0.76 : n <= 11 ? 0.66 : 0.58;
-      return `${(base * scale).toFixed(2)}cqmin`;
+      return `max(10px, ${(base * scale).toFixed(2)}cqmin)`;
     };
     const panelInner = i => {
       const isDealer = i === dealerIdx;
@@ -18516,7 +18521,7 @@ input, select { padding: 10px 14px; }
         style: {
           width: PW,
           height: PH,
-          padding: tmWinStep || tmDrawMode ? "2cqmin" : "3cqmin 3.5cqmin",
+          padding: tmWinStep || tmDrawMode ? "2cqmin" : "1.2cqmin 2.4cqmin",
           borderRadius: "3.5cqmin",
           background: tmWinStep || tmDrawMode ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: tmWinStep || tmDrawMode ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
@@ -18525,7 +18530,7 @@ input, select { padding: 10px 14px; }
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          gap: "1.5cqmin",
+          gap: "0.2cqmin",
           position: "relative",
           animation: isWallTarget ? "wallBlink 0.9s ease-in-out infinite" : "none"
         }
@@ -18785,7 +18790,7 @@ input, select { padding: 10px 14px; }
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
-          lineHeight: 1.3,
+          lineHeight: 1.2,
           textAlign: "center",
           width: "100%",
           flexShrink: 0
@@ -18795,8 +18800,8 @@ input, select { padding: 10px 14px; }
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: "2cqmin",
-          marginTop: "0.4cqmin"
+          gap: "1.2cqmin",
+          marginTop: 0
         }
       }, React.createElement("span", {
         style: {
@@ -18807,14 +18812,14 @@ input, select { padding: 10px 14px; }
           background: isDealer ? t.gd : t.sf,
           border: `1px solid ${isDealer ? t.gd : t.bd}`,
           borderRadius: "1.6cqmin",
-          padding: "1.2cqmin 2cqmin",
+          padding: "0.8cqmin 1.3cqmin",
           flexShrink: 0
         }
       }, seatWind), React.createElement("span", {
         style: {
           fontSize: "5.3cqmin",
           fontWeight: 900,
-          lineHeight: 1.2,
+          lineHeight: 1.1,
           flexShrink: 0,
           color: score < 0 ? t.rd : t.tx,
           fontVariantNumeric: "tabular-nums"
@@ -18826,14 +18831,16 @@ input, select { padding: 10px 14px; }
         },
         style: {
           width: "100%",
-          padding: "1.1cqmin 1.2cqmin",
+          padding: "2.4cqmin 1.2cqmin",
           borderRadius: "2cqmin",
           cursor: "pointer",
           marginTop: "0.3cqmin",
+          minHeight: "32px",
+          boxSizing: "border-box",
           border: `1px solid ${isRiichi ? t.rd : t.bd}`,
           background: isRiichi ? t.rd : "transparent",
           color: isRiichi ? "#fff" : t.dm,
-          fontSize: "2.5cqmin",
+          fontSize: "max(10px, 2.9cqmin)",
           fontWeight: 800,
           letterSpacing: "0.04em",
           whiteSpace: "nowrap"
@@ -19046,7 +19053,9 @@ input, select { padding: 10px 14px; }
     }, "⏸"), React.createElement("button", {
       style: {
         ...smallBtn("p"),
-        flex: 1
+        flex: 1,
+        padding: "11px 4px",
+        whiteSpace: "nowrap"
       },
       onClick: () => {
         resetGW();
@@ -19058,7 +19067,9 @@ input, select { padding: 10px 14px; }
     }, "アガリ入力"), React.createElement("button", {
       style: {
         ...smallBtn(),
-        flex: 1
+        flex: 1,
+        padding: "11px 4px",
+        whiteSpace: "nowrap"
       },
       onClick: () => {
         setDrawTenpai([...declaredRiichi]);
@@ -19427,7 +19438,8 @@ input, select { padding: 10px 14px; }
           gap: 7,
           border: "none",
           background: "transparent",
-          padding: 2,
+          padding: "7px 2px",
+          minHeight: 32,
           cursor: "pointer",
           transform: `rotate(${rot}deg)`,
           transition: "transform 0.4s cubic-bezier(.3,1.2,.4,1)"
@@ -19477,7 +19489,7 @@ input, select { padding: 10px 14px; }
         style: posBase(15.5)
       }, React.createElement("span", {
         style: {
-          fontSize: "3.1cqmin",
+          fontSize: "max(10px, 3.1cqmin)",
           fontWeight: 800,
           color: t.gd,
           animation: "dicePrompt 1.6s ease-in-out infinite"
@@ -19486,13 +19498,13 @@ input, select { padding: 10px 14px; }
         style: posBase(8.5)
       }, React.createElement("span", {
         style: {
-          fontSize: "3.2cqmin",
+          fontSize: "max(10px, 3.2cqmin)",
           fontWeight: 800,
           color: honba > 0 ? t.gd : "rgba(255,255,255,0.45)"
         }
       }, honba, "本場"), riichiBets > 0 && React.createElement("span", {
         style: {
-          fontSize: "3.2cqmin",
+          fontSize: "max(10px, 3.2cqmin)",
           fontWeight: 800,
           color: t.ac
         }
@@ -19800,7 +19812,9 @@ input, select { padding: 10px 14px; }
   }, React.createElement("button", {
     style: {
       ...actionBtn("p"),
-      flex: 1
+      flex: 1,
+      padding: "15px 6px",
+      whiteSpace: "nowrap"
     },
     onClick: () => {
       resetGW();
@@ -19810,7 +19824,9 @@ input, select { padding: 10px 14px; }
   }, "アガリ入力"), React.createElement("button", {
     style: {
       ...actionBtn(),
-      flex: 1
+      flex: 1,
+      padding: "15px 6px",
+      whiteSpace: "nowrap"
     },
     onClick: () => {
       setDrawTenpai([...declaredRiichi]);
