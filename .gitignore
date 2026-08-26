@@ -1,5 +1,8 @@
-# Claude Code local config
-.claude/
+# Claude Code の設定（フックと共有設定はコミットする）
+.claude/*
+!.claude/hooks/
+!.claude/settings.json
+.claude/settings.local.json
 
 # ローカル検証用の生成物（build.jsが生成、コミットしない）
 local.html

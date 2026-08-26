@@ -1,81 +1,94 @@
-# 麻雀スコアラー 引き継ぎ資料
+# 麻雀スコアラー「卓上ポンづけ」引き継ぎ資料
 
-最終更新: 2026-08-16
+最終更新: 2026-08-26
 公開URL: https://yamamototsu.github.io/mahjong-scorer/
 リポジトリ: `yamamototsu/mahjong-scorer`
 
 ---
 
-## 新しいチャットでの始め方
+## 新しいセッションでの始め方
 
-**この資料を添付して、次の1行を送るだけです。**
+**このリポジトリで Claude Code のセッションを開くだけです。**
+資料を添付する必要も、コマンドを打つ必要もありません。
 
-```
-麻雀スコアラーの開発を続けます。まず下記を実行して環境を復元してください。
-curl -sf https://raw.githubusercontent.com/yamamototsu/mahjong-scorer/main/dev/setup.sh | bash
-```
+`.claude/hooks/session-start.sh` が自動で `dev/setup.sh` を実行し、
+約1分で以下が揃った状態からスタートします。
 
-ソースもビルドツールもリポジトリの `dev/` に入っているので、
-ファイルを添付する必要はありません。約1分で以下がすべて復元されます。
-
-- 最新のソース `mahjong-scorer.jsx`（約8,500行）を `/mnt/user-data/outputs/` へ
-- Babel（JSX→JS変換用）と React（動作検証用）を `npm install`
-- ビルド・検証・アップロードの各スクリプトを `/home/claude/` へ
+- ビルド・検証ツールを `../mj-tools`（既定 `/home/user/mj-tools`）へ配置
+- Babel / React / playwright-core を `npm install`
 - 試しに1回ビルドして動作確認
+
+手動でやり直したいときは `bash dev/setup.sh`。何度実行しても安全です。
 
 ### 反映のしかた
 
 ```bash
-export GH_TOKEN='＜トークンをここに貼る＞'
-bash /home/claude/deploy.sh "コミットメッセージ"
+node /home/user/mj-tools/build.js .      # index.html を再生成
+git add -A && git commit -m "..." && git push
 ```
 
-※ トークンはこのリポジトリには置けません（GitHubのシークレット検出で拒否されます）。
-手元の引き継ぎ資料か、パスワード管理アプリから貼り付けてください。
+push すると GitHub Pages が自動で再デプロイします（1〜2分）。
 
-構文チェック → ビルド → `index.html` と `dev/mahjong-scorer.jsx` の両方をpush、まで自動です。
-ソースもリポジトリに同期されるので、次回の引き継ぎも常に最新から始まります。
-
-**⚠ トークンは2026年8月22日で期限切れ。**
-更新時は Fine-grained で「Only select repositories」に `mahjong-scorer` を指定し、
-Contents を Read and write にすること（Public repositories モードでは書き込めません）。
+**GH_TOKEN は不要になりました。** 2026-08-26 に GitHub と直接つないだため、
+`dev/upload.py` / `dev/deploy.sh` による Contents API 経由のアップロードは役目を終えています
+（トークンも 2026-08-22 で期限切れ）。参考として残していますが、使いません。
 
 ---
 
 ## リポジトリの構成
 
 ```
-index.html                 ← 公開されるアプリ本体（変換済みJSを埋め込み済み）
-dev/mahjong-scorer.jsx     ← 編集するソース
-dev/setup.sh               ← 環境復元（これ1つで全部揃う）
-dev/deploy.sh              ← 検証+ビルド+アップロード
-dev/compile.js             ← JSX→JS変換
-dev/validate.js            ← 構文チェック
-dev/build-html.py          ← HTML生成
-dev/upload.py              ← GitHub Contents API でpush
+index.html                 ← 公開されるアプリ本体（build.js の生成物・手で編集しない）
+local.html                 ← ローカル検証用の生成物（.gitignore 済み・コミット禁止）
+dev/mahjong-scorer.jsx     ← 編集するのはここだけ（約12,000行の単一Reactコンポーネント）
+dev/AGENT_README.md        ← 開発時の共通指示書（作業前に必ず読む）
+dev/HANDOVER.md            ← この資料
+dev/REQUESTS.md            ← 要望・未対応事項の一覧
+dev/ASSET_LICENSES.md      ← 素材・依存ライブラリのライセンス台帳
+dev/setup.sh               ← 環境セットアップ（セッション開始時に自動実行）
+dev/build.js               ← JSX→JS変換 + index.html / local.html 生成
+dev/shot.js                ← Playwright でスクリーンショット + JSエラー検出
+dev/layout-check.js        ← 重なり・はみ出し・余白・詰まりの自動検査
+.claude/hooks/             ← セッション開始フック
+（以下は旧デプロイ方式の名残。使わない）
+dev/deploy.sh  dev/upload.py  dev/build-html.py  dev/compile.js
+dev/validate.js  dev/ssr-test.js
 ```
 
 ---
 
 ## 動作確認のしかた
 
-コンテナからCDNに繋がらないため、ローカル検証用HTMLを作ってPlaywrightで確認します。
+コンテナから CDN に繋がらないため、`build.js` が CDN と Google Fonts を
+ローカルの `node_modules` に差し替えた `local.html` も同時に生成します。
+これを Playwright で開いて確認します。
 
-```python
-c = open('/mnt/user-data/outputs/index.html', encoding='utf-8').read()
-for a, b in [
-  ('https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
-   'file:///home/claude/prev/node_modules/react/umd/react.production.min.js'),
-  ('https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
-   'file:///home/claude/prev/node_modules/react-dom/umd/react-dom.production.min.js'),
-  ('<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet">', ''),
-]:
-    c = c.replace(a, b)
-open('/home/claude/local.html', 'w', encoding='utf-8').write(c)
+```bash
+node /home/user/mj-tools/build.js .                              # ビルド
+node /home/user/mj-tools/shot.js local.html out.png              # 390×844 で描画
+node /home/user/mj-tools/shot.js local.html out.png actions.js   # 操作してから撮影
+node /home/user/mj-tools/layout-check.js local.html [actions.js] # レイアウト検査
 ```
 
-Playwright（390×844, device_scale_factor=2）でスクリーンショットを撮り、目視で確認する。
-`setup.sh` が React を `/home/claude/prev` に入れてあるので、そのまま使えます。
+`shot.js` が「JSエラーあり」と出たらその変更は不合格。
+`layout-check.js` は 280 / 320 / 390 / 430px の4幅で検査します。
+**画面に手を入れたら指摘ゼロにしてからコミットすること。**
+
+Chromium は Claude Code on the web の環境に同梱（`/opt/pw-browsers/chromium`）。
+`playwright install` は不要です。
+
+### 対局画面まで進む導線（2026-08-26 に実機確認）
+
+```js
+// actions.js
+module.exports = async (page) => {
+  for (const label of ['対局をはじめる', '四人麻雀', '半荘戦',
+                       '初期設定ルールでメンバー決定へ', 'クイックスタート']) {
+    await page.click(`text=${label}`);
+    await page.waitForTimeout(600);
+  }
+};
+```
 
 ---
 

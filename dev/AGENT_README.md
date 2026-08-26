@@ -8,6 +8,10 @@
 - まず `dev/HANDOVER.md` を読むこと（設計判断・実装済み機能・検証済み内容の一覧）。
 
 ## ビルドと検証（あなたのworktreeのルートで実行）
+
+ツール一式はセッション開始時に `dev/setup.sh` が `/home/user/mj-tools` へ用意する
+（手動でやり直すときは `bash dev/setup.sh`）。
+
 ```bash
 node /home/user/mj-tools/build.js .          # JSX構文チェック＋index.html/local.html生成
 node /home/user/mj-tools/shot.js local.html out.png            # 390×844で描画、JSエラー検出
@@ -16,8 +20,8 @@ node /home/user/mj-tools/shot.js local.html out.png actions.js # 操作してか
 - actions.js の形式: `module.exports = async (page) => { await page.click('text=対局メニューのボタン名'); }`
 - shot.js が「JSエラーあり」と出たら**その変更は不合格**。修正するか取り消すこと。
 - 変更前後のスクリーンショットを撮って目視比較すること。
-- 対局画面まで進む導線（実証済み）:
-  `対局をはじめる` → `四人麻雀` → `半荘戦` → `ルール確定・メンバー選択へ` → `クイックスタート`
+- 対局画面まで進む導線（2026-08-26 に実機で再確認）:
+  `対局をはじめる` → `四人麻雀` → `半荘戦` → `初期設定ルールでメンバー決定へ` → `クイックスタート`
 
 ## レイアウト検査（ユーザー指示・毎回必須）
 
