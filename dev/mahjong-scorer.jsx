@@ -1333,6 +1333,7 @@ export default function MahjongScorer() {
       ns[gLoser] -= gResult.total + hb;
     }
     setScores(ns);
+    setTmCorrectBackup(null);
     // この局でリーチした人（ウィザードでの入力＋卓上で宣言済みの人）
     const roundRiichi = [0, 1, 2, 3].map(i => !!(gRiichi[i] || declaredRiichi[i]));
     const newRounds = [...rounds, { id: rounds.length + 1, wind: roundWind, dealer: dealerIdx, honba, winner: gWinner, loser: gLoser, han: gHan, fu: gHan >= 5 ? null : gFu, score: gResult.total, tsumo: gTsumo, limitName: gLimit, riichi: roundRiichi, pool: totalRiichiPool }];
@@ -2955,6 +2956,9 @@ export default function MahjongScorer() {
 *, *::before, *::after { box-sizing: border-box; }
 button { padding: 8px 12px; }
 input, select { padding: 10px 14px; }
+/* 受け渡しパネルの「本人分含む」。極端に狭い画面では卓が小さく、
+   4行＋注記を読める大きさで収められないので出さない */
+@media (max-width: 329px) { .tm-own-note { display: none; } }
 @keyframes bootTile {
   0%   { opacity: 0; transform: translateY(-38px) rotate(-25deg) scale(0.7); }
   55%  { opacity: 1; transform: translateY(6px) rotate(6deg) scale(1.06); }
@@ -5142,6 +5146,9 @@ input, select { padding: 10px 14px; }
   const [tableMode, setTableMode] = useState(true);
   const [homeCat, setHomeCat] = useState(null); // null | play | practice | settings
   const [tmWinStep, setTmWinStep] = useState(null); // null | "winner" | "how"
+  // 最終確認画面の「訂正」で卓の選択に戻ったときの控え。
+  // 選択をキャンセルしたら対局画面ではなく元の確認画面に戻す
+  const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false); // 卓上モードの流局入力
   const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル
   const [seatRot, setSeatRot] = useState(0); // 卓の回転（0-3）自分を手前に持ってくる
@@ -6324,7 +6331,7 @@ input, select { padding: 10px 14px; }
                   <React.Fragment key={k2}>
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "baseline",
-                    width: "100%", gap: 4, lineHeight: tight ? 1.05 : many ? 1.18 : 1.3,
+                    width: "100%", gap: 2, lineHeight: tight ? 1 : many ? 1.18 : 1.3,
                     // 合計は内訳と区切って見せる
                     borderTop: r2.strong ? `1px solid rgba(255,255,255,0.28)` : "none",
                     marginTop: r2.strong ? fs(many ? 1 : 2) : 0, paddingTop: r2.strong ? fs(many ? 1 : 2) : 0,
@@ -6342,7 +6349,9 @@ input, select { padding: 10px 14px; }
                       }}>{r2.sticks > 0 ? "+" : "-"}{Math.abs(r2.sticks)}本</span>
                     ) : (
                     <span style={{
-                      fontSize: fs(r2.strong ? (tight ? 13 : many ? 15 : 17.5) : (tight ? 11 : many ? 13 : 15)),
+                      // 役満など桁数が多い点数は少し縮めて行に収める
+                      fontSize: fs((r2.strong ? (tight ? 13 : many ? 15 : 17.5) : (tight ? 11 : many ? 13 : 15))
+                        * (`${r2.v}`.replace("-", "").length >= 6 ? 0.86 : `${r2.v}`.replace("-", "").length >= 5 ? 0.93 : 1)),
                       fontWeight: 900, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
                       color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
                     }}>{r2.v > 0 ? "+" : ""}{r2.v.toLocaleString()}</span>
@@ -6351,8 +6360,8 @@ input, select { padding: 10px 14px; }
                   {/* アガった人が自分でもリーチしていたときは、受け取る中に
                       自分のぶんが入っていることを小さく添える */}
                   {r2.own && (
-                    <div style={{
-                      width: "100%", textAlign: "right", lineHeight: 1.1, marginTop: fs(0.5),
+                    <div className="tm-own-note" style={{
+                      width: "100%", textAlign: "right", lineHeight: 1, marginTop: 0,
                       fontSize: fs(10), fontWeight: 700, color: "rgba(255,255,255,0.7)",
                       whiteSpace: "nowrap",
                     }}>本人分含む</div>
@@ -10070,7 +10079,18 @@ input, select { padding: 10px 14px; }
                 }}>← 戻る</button>
               )}
               <button style={{ ...smallBtn(), flex: 1 }} onClick={() => {
-                setTmWinStep(null); setGWinner(null); setRonPick([]); setMultiRon(null); setRonRuleWarn(false); setRonLoserPick(null);
+                setTmWinStep(null); setRonRuleWarn(false); setRonLoserPick(null);
+                // 確認画面の「訂正」から来ていたら、訂正をやめて元の確認画面に戻す
+                if (tmCorrectBackup) {
+                  const b = tmCorrectBackup;
+                  setGStep(b.gStep); setGWinner(b.gWinner); setGTsumo(b.gTsumo); setGLoser(b.gLoser);
+                  setGHan(b.gHan); setGFu(b.gFu); setGRiichi(b.gRiichi); setGKnownNaki(b.gKnownNaki);
+                  setFuGuide(b.fuGuide); setRonPick(b.ronPick); setMultiRon(b.multiRon);
+                  setShowGW(b.showGW); setCorrectingIdx(b.correctingIdx);
+                  setTmCorrectBackup(null);
+                  return;
+                }
+                setGWinner(null); setRonPick([]); setMultiRon(null);
               }}>キャンセル</button>
             </div>
           </>
@@ -10084,7 +10104,7 @@ input, select { padding: 10px 14px; }
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
             {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
-            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
             <button style={{ ...smallBtn(), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
             <button aria-label="席順を回す" style={{
               ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
@@ -10735,6 +10755,11 @@ input, select { padding: 10px 14px; }
                     // 卓上モードでは、あがった人・あがり方は卓の画面で選び直す
                     const rowStyle = { width: "100%", background: "transparent", border: "none", padding: "11px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", gap: 10 };
                     const backToTable = (step) => {
+                      // 選択をキャンセルされたときに、この確認画面へ戻せるよう控えておく
+                      setTmCorrectBackup({
+                        gStep, gWinner, gTsumo, gLoser, gHan, gFu, gKnownNaki, fuGuide,
+                        gRiichi: [...gRiichi], ronPick: [...ronPick], multiRon, showGW, correctingIdx,
+                      });
                       resetGW(); setMultiRon(null);
                       if (step === "winner") setRonPick([]);
                       setTmWinStep(step);
