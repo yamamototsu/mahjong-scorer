@@ -13585,7 +13585,7 @@ input, select { padding: 10px 14px; }
         fontSize: 11,
         color: t.dm
       }
-    }, "新しい対局を始める時の初期設定"))), React.createElement(RuleHelp, null), React.createElement("div", {
+    }, "新しい対局を始める時の初期設定"))), RuleHelp(), React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
@@ -14721,7 +14721,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginBottom: 12
       }
-    }, "リーグ中の全対局に適用されます"), React.createElement(RuleHelp, null), React.createElement("div", {
+    }, "リーグ中の全対局に適用されます"), RuleHelp(), React.createElement("div", {
       style: {
         fontSize: 11,
         fontWeight: 700,
@@ -17643,7 +17643,7 @@ input, select { padding: 10px 14px; }
       transform: rulesOpen ? "rotate(180deg)" : "none",
       transition: "transform 0.2s"
     }
-  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, React.createElement(RuleHelp, null), React.createElement("div", {
+  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, RuleHelp(), React.createElement("div", {
     style: {
       marginBottom: 8,
       marginTop: 16
@@ -19200,7 +19200,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 600
       },
       onClick: () => setShowRoundEdit(true)
-    }, "📋 局の修正")), React.createElement(RuleCheckModal, null), React.createElement(RonRuleWarnModal, null), actionRow(true), React.createElement("div", {
+    }, "📋 局の修正")), RuleCheckModal(), RonRuleWarnModal(), actionRow(true), React.createElement("div", {
       style: {
         flex: "1 1 auto",
         minHeight: 0,
@@ -19581,7 +19581,7 @@ input, select { padding: 10px 14px; }
         textAlign: "center",
         marginTop: 6
       }
-    }, "点数を長押しすると順位と点差が見られます"), React.createElement(StartSplash, null), React.createElement(PayTableView, null), React.createElement(RankPeekOverlay, null), React.createElement(PlayerHistoryModal, null), showRoundEdit && React.createElement("div", {
+    }, "点数を長押しすると順位と点差が見られます"), StartSplash(), PayTableView(), RankPeekOverlay(), PlayerHistoryModal(), showRoundEdit && React.createElement("div", {
       style: {
         position: "fixed",
         top: 0,
@@ -19870,7 +19870,7 @@ input, select { padding: 10px 14px; }
       marginBottom: 10,
       marginTop: -8
     }
-  }, "点数を長押しすると順位と点差が見られます"), React.createElement(StartSplash, null), React.createElement(PayTableView, null), React.createElement(RankPeekOverlay, null), React.createElement(PlayerHistoryModal, null), React.createElement(RuleCheckModal, null), React.createElement("div", {
+  }, "点数を長押しすると順位と点差が見られます"), StartSplash(), PayTableView(), RankPeekOverlay(), PlayerHistoryModal(), RuleCheckModal(), React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -19918,7 +19918,7 @@ input, select { padding: 10px 14px; }
       setDiceSettled(false);
       setTimeout(rollDice, 150);
     }
-  }, "🎲 サイコロを振る"), React.createElement(DiceModal, null), showGW && React.createElement("div", {
+  }, "🎲 サイコロを振る"), DiceModal(), showGW && React.createElement("div", {
     style: {
       position: "fixed",
       top: 0,
@@ -22825,7 +22825,7 @@ input, select { padding: 10px 14px; }
       width: 62,
       flexShrink: 0
     }
-  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), showFuHelp && React.createElement(FuHelpModal, null)));
+  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), showFuHelp && FuHelpModal()));
 }
 
 ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));

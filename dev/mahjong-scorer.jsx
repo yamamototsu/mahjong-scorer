@@ -5832,6 +5832,9 @@ input, select { padding: 10px 14px; }
   );
 
   // 対局中のルール確認モーダル
+  // このファイルの画面内コンポーネントは <X /> ではなく {X()} で呼ぶこと。
+  // JSX要素にすると再描画のたびに型が別物になり、React が中身を作り直すため、
+  // スクロール位置が 0 に戻る（アコーディオンを開くと画面が上に飛ぶ）
   const RuleCheckModal = () => {
     if (!showRuleCheck) return null;
     const rs = gameConfig?.rules || {};
@@ -7134,7 +7137,7 @@ input, select { padding: 10px 14px; }
               </div>
 
               {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
-              <RuleHelp />
+              {RuleHelp()}
 
               <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 6, marginTop: 16 }}>流局したときの親</div>
               {[
@@ -7728,7 +7731,7 @@ input, select { padding: 10px 14px; }
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>リーグ中の全対局に適用されます</div>
 
           {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
-          <RuleHelp />
+          {RuleHelp()}
 
           {/* 流局したときの親 */}
           <div style={{ fontSize: 11, fontWeight: 700, color: t.dm, marginBottom: 6, marginTop: 16 }}>流局したときの親</div>
@@ -9270,7 +9273,7 @@ input, select { padding: 10px 14px; }
 
           {rulesOpen && (<>
           {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
-          <RuleHelp />
+          {RuleHelp()}
 
           <div style={{ marginBottom: 8, marginTop: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>流局したときの親</div>
@@ -10137,8 +10140,8 @@ input, select { padding: 10px 14px; }
           )}
         </div>
 
-        <RuleCheckModal />
-        <RonRuleWarnModal />
+        {RuleCheckModal()}
+        {RonRuleWarnModal()}
         {actionRow(true)}
 
         <div style={{
@@ -10394,10 +10397,10 @@ input, select { padding: 10px 14px; }
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
         </div>
-        <StartSplash />
-        <PayTableView />
-        <RankPeekOverlay />
-        <PlayerHistoryModal />
+        {StartSplash()}
+        {PayTableView()}
+        {RankPeekOverlay()}
+        {PlayerHistoryModal()}
 
         {/* 局の修正モーダル */}
         {showRoundEdit && (
@@ -10505,11 +10508,11 @@ input, select { padding: 10px 14px; }
       <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 10, marginTop: -8 }}>
         点数を長押しすると順位と点差が見られます
       </div>
-      <StartSplash />
-      <PayTableView />
-      <RankPeekOverlay />
-      <PlayerHistoryModal />
-      <RuleCheckModal />
+      {StartSplash()}
+      {PayTableView()}
+      {RankPeekOverlay()}
+      {PlayerHistoryModal()}
+      {RuleCheckModal()}
 
       {/* Actions */}
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
@@ -10525,7 +10528,7 @@ input, select { padding: 10px 14px; }
         onClick={() => { setDiceOpen(true); setDiceSettled(false); setTimeout(rollDice, 150); }}>
         🎲 サイコロを振る
       </button>
-      <DiceModal />
+      {DiceModal()}
 
       {/* ── Round Wizard Modal ── */}
       {showGW && (
@@ -12047,7 +12050,7 @@ input, select { padding: 10px 14px; }
         {view === "table" && renderTable()}
         {view === "startguide" && renderStartGuide()}
         {view === "names" && renderNames()}
-        {showFuHelp && <FuHelpModal />}
+        {showFuHelp && FuHelpModal()}
       </div>
     </>
   );
