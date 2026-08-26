@@ -2907,11 +2907,11 @@ export default function MahjongScorer() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10 }}>
               <span style={{ fontSize: 16, color: t.dm, fontWeight: 700 }}>合計</span>
-              <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1 }}>{result.total.toLocaleString()}</span>
+              <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1.1 }}>{result.total.toLocaleString()}</span>
             </div>
             <div style={{ padding: "12px 0", borderTop: `1px solid ${t.bd}`, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12 }}>
               <span style={{ fontSize: 18, color: t.gd, fontWeight: 800 }}>全員から</span>
-              <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1 }}>
+              <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1.1 }}>
                 {result.each.toLocaleString()}
                 <span style={{ fontSize: 15, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{PC - 1}</span>
               </span>
@@ -2922,25 +2922,25 @@ export default function MahjongScorer() {
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10, paddingBottom: 12 }}>
               <span style={{ fontSize: 16, color: t.dm, fontWeight: 700 }}>合計</span>
-              <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1 }}>{result.total.toLocaleString()}</span>
+              <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1.1 }}>{result.total.toLocaleString()}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12, padding: "12px 0", borderTop: `1px solid ${t.bd}` }}>
-              <span style={{ fontSize: 18, color: t.ac, fontWeight: 800, width: 70, textAlign: "right" }}>子から</span>
-              <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1, minWidth: 110, textAlign: "left" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12, padding: "12px 0 10px", marginBottom: 2, borderTop: `1px solid ${t.bd}` }}>
+              <span style={{ fontSize: 18, color: t.ac, fontWeight: 800, width: "min(70px, 20vw)", flexShrink: 0, textAlign: "right" }}>子から</span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1.1, minWidth: "min(110px, 30vw)", textAlign: "left" }}>
                 {result.fromChild.toLocaleString()}
                 {PC - 2 >= 2 && <span style={{ fontSize: 14, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{PC - 2}</span>}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12, padding: "12px 0 0", borderTop: `1px solid ${t.bd}33` }}>
-              <span style={{ fontSize: 18, color: t.gd, fontWeight: 800, width: 70, textAlign: "right" }}>親から</span>
-              <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1, minWidth: 110, textAlign: "left" }}>{result.fromParent.toLocaleString()}</span>
+              <span style={{ fontSize: 18, color: t.gd, fontWeight: 800, width: "min(70px, 20vw)", flexShrink: 0, textAlign: "right" }}>親から</span>
+              <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1.1, minWidth: "min(110px, 30vw)", textAlign: "left" }}>{result.fromParent.toLocaleString()}</span>
             </div>
           </div>
         )
       ) : (
         /* ロン */
         <div>
-          <div style={{ fontSize: 48, fontWeight: 900, color: t.ac, lineHeight: 1 }}>{result.total.toLocaleString()}</div>
+          <div style={{ fontSize: 48, fontWeight: 900, color: t.ac, lineHeight: 1.1 }}>{result.total.toLocaleString()}</div>
           <div style={{ fontSize: 15, color: t.dm, marginTop: 8, fontWeight: 600 }}>放銃者から受け取る</div>
         </div>
       )}
@@ -6291,7 +6291,7 @@ input, select { padding: 10px 14px; }
                 transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
                 // 余白を%にすると卓全体の幅が基準になり、枠に対して大きくなりすぎて
                 // 名前が入らなくなる。卓の大きさに比例する fs() で指定する
-                padding: `${fs(4)} ${fs(7)}`, borderRadius: 12,
+                padding: `${fs(4)} ${fs(5)}`, borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : net < 0 ? t.rd : t.bd}`,
                 width: "38%", height: "26%", boxSizing: "border-box",
@@ -10431,17 +10431,20 @@ input, select { padding: 10px 14px; }
               border: declaredRiichi[i] ? `1px solid ${t.rd}` : isD ? `1px solid ${t.gd}55` : "1px solid transparent",
               background: declaredRiichi[i] ? "rgba(220,60,60,0.12)" : isD ? t.gdS : "transparent" }}>
               <div {...longPressHandlers(i)} style={{ ...longPressHandlers(i).style, display: "flex", alignItems: "center", gap: 10, flex: 1, cursor: "pointer", minWidth: 0 }}>
+                {/* 狭い画面では固定24pxだと行に収まらず枠からあふれる */}
                 <span style={{
-                  fontSize: 24, fontWeight: 900, lineHeight: 1,
+                  fontSize: "clamp(16px, 6.2vw, 24px)", fontWeight: 900, lineHeight: 1.1,
                   color: isD ? "#1a1a1a" : t.tx,
                   background: isD ? t.gd : t.sf,
                   border: `1px solid ${isD ? t.gd : t.bd}`,
-                  borderRadius: 7, padding: "5px 10px", flexShrink: 0,
+                  borderRadius: 7, padding: "5px clamp(6px, 2.6vw, 10px)", flexShrink: 0,
                 }}>{sw}</span>
                 <span style={{ fontSize: 18, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
               </div>
               <button onClick={() => toggleDeclaredRiichi(i)} style={{
-                padding: "5px 10px", marginRight: 10, borderRadius: 7, cursor: "pointer",
+                // 26pxしかなく指で押しにくかったので高さを32px以上にする
+                padding: "8px clamp(5px, 2vw, 10px)", marginRight: "clamp(4px, 1.6vw, 8px)", borderRadius: 7, cursor: "pointer",
+                minHeight: 32, boxSizing: "border-box",
                 border: `1px solid ${declaredRiichi[i] ? t.rd : t.bd}`,
                 background: declaredRiichi[i] ? t.rd : "transparent",
                 color: declaredRiichi[i] ? "#fff" : t.dm,
@@ -10694,8 +10697,11 @@ input, select { padding: 10px 14px; }
                     background: t.acS, border: `1px solid ${t.ac}44`,
                   }}>
                     <span style={{ fontSize: 13 }}>✏️</span>
+                    {/* 「訂正できます」だけが次の行に落ちないよう意味の切れ目で区切る */}
                     <span style={{ fontSize: 12, fontWeight: 700, color: t.ac }}>
-                      直したい項目をタップすると訂正できます
+                      {["直したい項目を", "タップすると", "訂正できます"].map((x, k) => (
+                        <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                      ))}
                     </span>
                   </div>
                   {/* Editable summary - tap each row to jump to that step */}

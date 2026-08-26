@@ -5080,7 +5080,7 @@ function MahjongScorer() {
       fontSize: 40,
       fontWeight: 900,
       color: t.ac,
-      lineHeight: 1
+      lineHeight: 1.1
     }
   }, result.total.toLocaleString())), React.createElement("div", {
     style: {
@@ -5102,7 +5102,7 @@ function MahjongScorer() {
       fontSize: 34,
       fontWeight: 900,
       color: t.gd,
-      lineHeight: 1
+      lineHeight: 1.1
     }
   }, result.each.toLocaleString(), React.createElement("span", {
     style: {
@@ -5135,7 +5135,7 @@ function MahjongScorer() {
       fontSize: 40,
       fontWeight: 900,
       color: t.ac,
-      lineHeight: 1
+      lineHeight: 1.1
     }
   }, result.total.toLocaleString())), React.createElement("div", {
     style: {
@@ -5143,7 +5143,8 @@ function MahjongScorer() {
       alignItems: "baseline",
       justifyContent: "center",
       gap: 12,
-      padding: "12px 0",
+      padding: "12px 0 10px",
+      marginBottom: 2,
       borderTop: `1px solid ${t.bd}`
     }
   }, React.createElement("span", {
@@ -5151,7 +5152,8 @@ function MahjongScorer() {
       fontSize: 18,
       color: t.ac,
       fontWeight: 800,
-      width: 70,
+      width: "min(70px, 20vw)",
+      flexShrink: 0,
       textAlign: "right"
     }
   }, "子から"), React.createElement("span", {
@@ -5159,8 +5161,8 @@ function MahjongScorer() {
       fontSize: 32,
       fontWeight: 900,
       color: t.tx,
-      lineHeight: 1,
-      minWidth: 110,
+      lineHeight: 1.1,
+      minWidth: "min(110px, 30vw)",
       textAlign: "left"
     }
   }, result.fromChild.toLocaleString(), PC - 2 >= 2 && React.createElement("span", {
@@ -5184,7 +5186,8 @@ function MahjongScorer() {
       fontSize: 18,
       color: t.gd,
       fontWeight: 800,
-      width: 70,
+      width: "min(70px, 20vw)",
+      flexShrink: 0,
       textAlign: "right"
     }
   }, "親から"), React.createElement("span", {
@@ -5192,8 +5195,8 @@ function MahjongScorer() {
       fontSize: 32,
       fontWeight: 900,
       color: t.tx,
-      lineHeight: 1,
-      minWidth: 110,
+      lineHeight: 1.1,
+      minWidth: "min(110px, 30vw)",
       textAlign: "left"
     }
   }, result.fromParent.toLocaleString()))) : React.createElement("div", null, React.createElement("div", {
@@ -5201,7 +5204,7 @@ function MahjongScorer() {
       fontSize: 48,
       fontWeight: 900,
       color: t.ac,
-      lineHeight: 1
+      lineHeight: 1.1
     }
   }, result.total.toLocaleString()), React.createElement("div", {
     style: {
@@ -12046,7 +12049,7 @@ input, select { padding: 10px 14px; }
           top: `${pos.y}%`,
           left: `${pos.x}%`,
           transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
-          padding: `${fs(4)} ${fs(7)}`,
+          padding: `${fs(4)} ${fs(5)}`,
           borderRadius: 12,
           background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
           border: `2px solid ${isWin ? t.gd : net < 0 ? t.rd : t.bd}`,
@@ -19762,14 +19765,14 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("span", {
       style: {
-        fontSize: 24,
+        fontSize: "clamp(16px, 6.2vw, 24px)",
         fontWeight: 900,
-        lineHeight: 1,
+        lineHeight: 1.1,
         color: isD ? "#1a1a1a" : t.tx,
         background: isD ? t.gd : t.sf,
         border: `1px solid ${isD ? t.gd : t.bd}`,
         borderRadius: 7,
-        padding: "5px 10px",
+        padding: "5px clamp(6px, 2.6vw, 10px)",
         flexShrink: 0
       }
     }, sw), React.createElement("span", {
@@ -19783,10 +19786,12 @@ input, select { padding: 10px 14px; }
     }, p)), React.createElement("button", {
       onClick: () => toggleDeclaredRiichi(i),
       style: {
-        padding: "5px 10px",
-        marginRight: 10,
+        padding: "8px clamp(5px, 2vw, 10px)",
+        marginRight: "clamp(4px, 1.6vw, 8px)",
         borderRadius: 7,
         cursor: "pointer",
+        minHeight: 32,
+        boxSizing: "border-box",
         border: `1px solid ${declaredRiichi[i] ? t.rd : t.bd}`,
         background: declaredRiichi[i] ? t.rd : "transparent",
         color: declaredRiichi[i] ? "#fff" : t.dm,
@@ -20341,7 +20346,12 @@ input, select { padding: 10px 14px; }
       fontWeight: 700,
       color: t.ac
     }
-  }, "直したい項目をタップすると訂正できます")), (() => {
+  }, ["直したい項目を", "タップすると", "訂正できます"].map((x, k) => React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-block"
+    }
+  }, x)))), (() => {
     const rowStyle = {
       width: "100%",
       background: "transparent",
