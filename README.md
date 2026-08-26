@@ -2,7 +2,7 @@
 
 ブラウザだけで動く、かんたん麻雀点数計算 ＆ 対局管理アプリ。
 
-**👉 [ライブデモ](https://widespreder.github.io/mahjong-scorer/)**
+**👉 [ライブデモ](https://yamamototsu.github.io/mahjong-scorer/)**
 
 ## 主な機能
 

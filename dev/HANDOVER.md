@@ -1,8 +1,8 @@
 # 麻雀スコアラー 引き継ぎ資料
 
 最終更新: 2026-08-16
-公開URL: https://widespreder.github.io/mahjong-scorer/
-リポジトリ: `widespreder/mahjong-scorer`
+公開URL: https://yamamototsu.github.io/mahjong-scorer/
+リポジトリ: `yamamototsu/mahjong-scorer`
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```
 麻雀スコアラーの開発を続けます。まず下記を実行して環境を復元してください。
-curl -sf https://raw.githubusercontent.com/widespreder/mahjong-scorer/main/dev/setup.sh | bash
+curl -sf https://raw.githubusercontent.com/yamamototsu/mahjong-scorer/main/dev/setup.sh | bash
 ```
 
 ソースもビルドツールもリポジトリの `dev/` に入っているので、

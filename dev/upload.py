@@ -1,7 +1,7 @@
 import base64, json, os, subprocess, sys
 
 TOKEN = os.environ["GH_TOKEN"]
-REPO = "widespreder/mahjong-scorer"
+REPO = "yamamototsu/mahjong-scorer"
 MSG = sys.argv[1] if len(sys.argv) > 1 else "update"
 
 # (リポジトリ上のパス, ローカルのパス)

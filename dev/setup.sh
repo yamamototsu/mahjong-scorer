@@ -3,7 +3,7 @@
 # 使い方: bash setup.sh
 set -e
 
-REPO="widespreder/mahjong-scorer"
+REPO="yamamototsu/mahjong-scorer"
 RAW="https://raw.githubusercontent.com/$REPO/main"
 
 echo "▶ 1/4 ソースを取得"
