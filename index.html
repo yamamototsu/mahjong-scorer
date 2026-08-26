@@ -9383,7 +9383,11 @@ input, select { padding: 10px 14px; }
         color: t.ac,
         flexShrink: 0
       }
-    }, "•"), React.createElement("span", null, item)))), s.note && React.createElement("div", {
+    }, "•"), React.createElement("span", {
+      style: {
+        textWrap: "balance"
+      }
+    }, item)))), s.note && React.createElement("div", {
       style: {
         background: t.gdS,
         borderRadius: 10,
@@ -12965,9 +12969,9 @@ input, select { padding: 10px 14px; }
     }, subBtn("🎓", "練習問題", "点数・役・符", () => {
       setView("home");
       setHomeCat("practice");
-    }), subBtn("🎴", "始め方", "図解で解説", () => {
-      setView("startguide");
-      setGuideStep(0);
+    }), subBtn("💡", "使い方", "アプリの説明", () => {
+      setView("home");
+      setHomeCat("howto");
     }), subBtn("⚙️", "設定", "ルール初期値", () => {
       setDraftRules({
         ...defaultRules
@@ -12975,22 +12979,110 @@ input, select { padding: 10px 14px; }
       setRulesSaved(false);
       setView("home");
       setHomeCat("settings");
-    })), React.createElement("div", {
+    })));
+  };
+  const renderHome = () => {
+    const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
+      onClick: onClick,
       style: {
-        ...card,
-        marginTop: 18,
-        padding: "14px 16px 16px",
-        ...reveal(4)
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 15,
+        padding: "18px 18px",
+        background: highlight ? t.gdS : t.card,
+        border: `1px solid ${highlight ? t.gd + "55" : t.bd}`,
+        borderRadius: 14,
+        cursor: "pointer",
+        marginBottom: 12,
+        textAlign: "left",
+        lineHeight: 1.6
       }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 22,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        background: highlight ? t.gd + "22" : t.acS,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 16,
+        fontWeight: 700,
+        color: t.tx
+      }
+    }, label), sub && React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 12,
+        color: t.dm,
+        marginTop: 2
+      }
+    }, sub)), React.createElement("span", {
+      style: {
+        color: t.dm,
+        fontSize: 18
+      }
+    }, "›"));
+    if (homeCat === null) return renderTitle();
+    const CATS = {
+      practice: {
+        title: "練習問題",
+        icon: "🎓"
+      },
+      howto: {
+        title: "使い方",
+        icon: "💡"
+      },
+      settings: {
+        title: "設定",
+        icon: "⚙️"
+      }
+    };
+    const cat = CATS[homeCat];
+    return React.createElement("div", {
+      style: body
     }, React.createElement("div", {
       style: {
-        fontSize: 13,
-        fontWeight: 800,
-        color: t.gd,
-        letterSpacing: "0.08em",
-        marginBottom: 4
+        fontSize: 20,
+        fontWeight: 900,
+        marginBottom: 16
       }
-    }, "使い方"), React.createElement("div", {
+    }, cat.icon, " ", cat.title), homeCat === "practice" && React.createElement(React.Fragment, null, menuItem("📚", "用語問題集", "麻雀用語を漢字と読みで覚える", () => {
+      setView("termquiz");
+      setTermCat(null);
+      setTermFinished(false);
+    }), menuItem("📖", "役一覧", "全ての役の解説と翻数", () => {
+      setView("dict");
+      setDictCat("1翻");
+      setDictExpanded(null);
+    }), menuItem("🎯", "翻数・役名テスト", "役の翻数クイズ・役名テスト", () => {
+      setView("quiz");
+      setQuizMode(null);
+    }), menuItem("📐", "符計算講座", "レベル別に符を学ぶ", () => {
+      setView("fucourse");
+      setFuLessonPhase("menu");
+    }), menuItem("🔢", "点数問題集", "4翻以下の点数を当てる（選択・入力）", () => {
+      setView("scorequiz");
+      setSqMode(null);
+      setSqQ(null);
+    }), menuItem("📊", "点数早見表", "符×翻のマトリックス表", () => setView("table"))), homeCat === "howto" && React.createElement("div", {
+      style: {
+        ...card,
+        padding: "14px 16px 16px"
+      }
+    }, React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
@@ -13058,101 +13150,7 @@ input, select { padding: 10px 14px; }
         fontSize: 13,
         fontWeight: 700
       }
-    }, "麻雀そのものの始め方を見る")));
-  };
-  const renderHome = () => {
-    const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
-      onClick: onClick,
-      style: {
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        gap: 15,
-        padding: "18px 18px",
-        background: highlight ? t.gdS : t.card,
-        border: `1px solid ${highlight ? t.gd + "55" : t.bd}`,
-        borderRadius: 14,
-        cursor: "pointer",
-        marginBottom: 12,
-        textAlign: "left",
-        lineHeight: 1.6
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 22,
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        background: highlight ? t.gd + "22" : t.acS,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, icon), React.createElement("span", {
-      style: {
-        flex: 1,
-        minWidth: 0
-      }
-    }, React.createElement("span", {
-      style: {
-        display: "block",
-        fontSize: 16,
-        fontWeight: 700,
-        color: t.tx
-      }
-    }, label), sub && React.createElement("span", {
-      style: {
-        display: "block",
-        fontSize: 12,
-        color: t.dm,
-        marginTop: 2
-      }
-    }, sub)), React.createElement("span", {
-      style: {
-        color: t.dm,
-        fontSize: 18
-      }
-    }, "›"));
-    if (homeCat === null) return renderTitle();
-    const CATS = {
-      practice: {
-        title: "練習問題",
-        icon: "🎓"
-      },
-      settings: {
-        title: "設定",
-        icon: "⚙️"
-      }
-    };
-    const cat = CATS[homeCat];
-    return React.createElement("div", {
-      style: body
-    }, React.createElement("div", {
-      style: {
-        fontSize: 20,
-        fontWeight: 900,
-        marginBottom: 16
-      }
-    }, cat.icon, " ", cat.title), homeCat === "practice" && React.createElement(React.Fragment, null, menuItem("📚", "用語問題集", "麻雀用語を漢字と読みで覚える", () => {
-      setView("termquiz");
-      setTermCat(null);
-      setTermFinished(false);
-    }), menuItem("📖", "役一覧", "全ての役の解説と翻数", () => {
-      setView("dict");
-      setDictCat("1翻");
-      setDictExpanded(null);
-    }), menuItem("🎯", "翻数・役名テスト", "役の翻数クイズ・役名テスト", () => {
-      setView("quiz");
-      setQuizMode(null);
-    }), menuItem("📐", "符計算講座", "レベル別に符を学ぶ", () => {
-      setView("fucourse");
-      setFuLessonPhase("menu");
-    }), menuItem("🔢", "点数問題集", "4翻以下の点数を当てる（選択・入力）", () => {
-      setView("scorequiz");
-      setSqMode(null);
-      setSqQ(null);
-    }), menuItem("📊", "点数早見表", "符×翻のマトリックス表", () => setView("table"))), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`), setOpen === "players" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
+    }, "麻雀そのものの始め方を見る")), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`), setOpen === "players" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
       setNamesBackTo("home");
       setView("names");
       setNewNameInput("");

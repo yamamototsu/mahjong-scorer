@@ -4716,7 +4716,8 @@ input, select { padding: 10px 14px; }
               {s.box.map((item, i) => (
                 <div key={i} style={{ fontSize: 12.5, lineHeight: 1.7, color: t.tx, display: "flex", gap: 7 }}>
                   <span style={{ color: t.ac, flexShrink: 0 }}>•</span>
-                  <span>{item}</span>
+                  {/* 最終行に数文字だけ残る折り返しを避け、行の長さを揃える */}
+                  <span style={{ textWrap: "balance" }}>{item}</span>
                 </div>
               ))}
             </div>
@@ -6787,52 +6788,12 @@ input, select { padding: 10px 14px; }
         </div>
         <div style={{ display: "flex", gap: 8, ...reveal(3) }}>
           {subBtn("🎓", "練習問題", "点数・役・符", () => { setView("home"); setHomeCat("practice"); })}
-          {subBtn("🎴", "始め方", "図解で解説", () => { setView("startguide"); setGuideStep(0); })}
+          {subBtn("💡", "使い方", "アプリの説明", () => { setView("home"); setHomeCat("howto"); })}
           {subBtn("⚙️", "設定", "ルール初期値", () => {
             setDraftRules({ ...defaultRules }); setRulesSaved(false); setView("home"); setHomeCat("settings");
           })}
         </div>
 
-        {/* 使い方 */}
-        <div style={{ ...card, marginTop: 18, padding: "14px 16px 16px", ...reveal(4) }}>
-          <div style={{
-            fontSize: 13, fontWeight: 800, color: t.gd, letterSpacing: "0.08em", marginBottom: 4,
-          }}>使い方</div>
-          <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
-            スマホを卓の真ん中に置いたまま、4人で見て使えます
-          </div>
-          {[
-            ["🀄", "卓の真ん中に置く",
-              "4人ぶんの点数がそれぞれの席の向きで表示されます。対局中は画面が動かないので、置きっぱなしで大丈夫です"],
-            ["👥", "メンバーと席を決める",
-              "名前を登録しておけばワンタップ。牌を引いて席を決めることもできます"],
-            ["🔴", "リーチはボタンを押すだけ",
-              "1,000点の減算と供託への持ち越しは自動です。「リーチ」と読み上げます"],
-            ["🏆", "アガリは選ぶだけ",
-              "あがった人・ツモかロン・翻・符を選ぶと点数を計算します。誰がいくら払うかは矢印で表示します"],
-            ["📋", "流局・本場・連荘も自動",
-              "テンパイした人を選べば、ノーテン罰符と親の継続を判定します"],
-          ].map(([icon, title, desc], i) => (
-            <div key={i} style={{
-              display: "flex", gap: 10, alignItems: "flex-start",
-              paddingTop: i === 0 ? 0 : 11, marginTop: i === 0 ? 0 : 11,
-              borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`,
-            }}>
-              <span style={{
-                fontSize: 15, width: 28, height: 28, borderRadius: 8, background: t.acS, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1,
-              }}>{icon}</span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: t.tx, lineHeight: 1.5 }}>{title}</span>
-                <span style={{ display: "block", fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 2 }}>{desc}</span>
-              </span>
-            </div>
-          ))}
-          <button onClick={() => { setView("startguide"); setGuideStep(0); }} style={{
-            width: "100%", marginTop: 14, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 13, fontWeight: 700,
-          }}>麻雀そのものの始め方を見る</button>
-        </div>
       </div>
     );
   };
@@ -6867,6 +6828,7 @@ input, select { padding: 10px 14px; }
 
     const CATS = {
       practice: { title: "練習問題", icon: "🎓" },
+      howto: { title: "使い方", icon: "💡" },
       settings: { title: "設定", icon: "⚙️" },
     };
     const cat = CATS[homeCat];
@@ -6894,6 +6856,45 @@ input, select { padding: 10px 14px; }
             })}
             {menuItem("📊", "点数早見表", "符×翻のマトリックス表", () => setView("table"))}
           </>
+        )}
+
+        {homeCat === "howto" && (
+          <div style={{ ...card, padding: "14px 16px 16px" }}>
+            <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
+              スマホを卓の真ん中に置いたまま、4人で見て使えます
+            </div>
+            {[
+              ["🀄", "卓の真ん中に置く",
+                "4人ぶんの点数がそれぞれの席の向きで表示されます。対局中は画面が動かないので、置きっぱなしで大丈夫です"],
+              ["👥", "メンバーと席を決める",
+                "名前を登録しておけばワンタップ。牌を引いて席を決めることもできます"],
+              ["🔴", "リーチはボタンを押すだけ",
+                "1,000点の減算と供託への持ち越しは自動です。「リーチ」と読み上げます"],
+              ["🏆", "アガリは選ぶだけ",
+                "あがった人・ツモかロン・翻・符を選ぶと点数を計算します。誰がいくら払うかは矢印で表示します"],
+              ["📋", "流局・本場・連荘も自動",
+                "テンパイした人を選べば、ノーテン罰符と親の継続を判定します"],
+            ].map(([icon, title, desc], i) => (
+              <div key={i} style={{
+                display: "flex", gap: 10, alignItems: "flex-start",
+                paddingTop: i === 0 ? 0 : 11, marginTop: i === 0 ? 0 : 11,
+                borderTop: i === 0 ? "none" : `1px solid ${t.bd}33`,
+              }}>
+                <span style={{
+                  fontSize: 15, width: 28, height: 28, borderRadius: 8, background: t.acS, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1,
+                }}>{icon}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: t.tx, lineHeight: 1.5 }}>{title}</span>
+                  <span style={{ display: "block", fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 2 }}>{desc}</span>
+                </span>
+              </div>
+            ))}
+            <button onClick={() => { setView("startguide"); setGuideStep(0); }} style={{
+              width: "100%", marginTop: 14, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 13, fontWeight: 700,
+            }}>麻雀そのものの始め方を見る</button>
+          </div>
         )}
 
         {homeCat === "settings" && (
