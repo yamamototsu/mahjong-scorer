@@ -12018,7 +12018,7 @@ input, select { padding: 10px 14px; }
       const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;
       const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : gLoser !== null ? hb2 : 0;
       const decl = !!(declaredRiichi[i] || gRiichi[i]);
-      const stick = (isWin ? pool : 0) - (decl ? 1000 : 0);
+      const sticks = pool / 1000;
       const rows = [];
       if (isWin) rows.push({
         lb: "和了点",
@@ -12037,11 +12037,17 @@ input, select { padding: 10px 14px; }
         v: sub,
         strong: true
       });
-      if (stick !== 0) rows.push({
+      if (isWin) {
+        if (sticks > 0) rows.push({
+          lb: "リーチ棒",
+          sticks,
+          own: decl
+        });
+      } else if (decl) rows.push({
         lb: "リーチ棒",
-        v: stick
+        sticks: -1
       });
-      const net = sub + stick;
+      const net = sub + (isWin ? pool : 0) - (gRiichi[i] ? 1000 : 0);
       return React.createElement("div", {
         key: i,
         style: {
@@ -12072,7 +12078,7 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("span", {
         style: {
-          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0))))) * (rows.length >= 4 ? 0.85 : 1)),
+          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))) * (rows.some(r => r.own) ? 0.75 : rows.length >= 4 ? 0.85 : 1))),
           fontWeight: 800,
           color: "#fff",
           lineHeight: 1.2,
@@ -12092,16 +12098,19 @@ input, select { padding: 10px 14px; }
         lb: "和了点",
         v: 0
       }]).map((r2, k2, arr) => {
-        const many = arr.length >= 4;
-        return React.createElement("div", {
-          key: k2,
+        const lines = arr.length + (arr.some(r => r.own) ? 1 : 0);
+        const many = lines >= 4,
+          tight = lines >= 5;
+        return React.createElement(React.Fragment, {
+          key: k2
+        }, React.createElement("div", {
           style: {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "baseline",
             width: "100%",
             gap: 4,
-            lineHeight: many ? 1.18 : 1.3,
+            lineHeight: tight ? 1.05 : many ? 1.18 : 1.3,
             borderTop: r2.strong ? `1px solid rgba(255,255,255,0.28)` : "none",
             marginTop: r2.strong ? fs(many ? 1 : 2) : 0,
             paddingTop: r2.strong ? fs(many ? 1 : 2) : 0
@@ -12113,15 +12122,33 @@ input, select { padding: 10px 14px; }
             whiteSpace: "nowrap",
             color: r2.strong ? "#fff" : "rgba(255,255,255,0.78)"
           }
-        }, r2.lb), React.createElement("span", {
+        }, r2.lb), r2.sticks !== undefined ? React.createElement("span", {
           style: {
-            fontSize: fs(r2.strong ? many ? 15 : 17.5 : many ? 13 : 15),
+            fontSize: fs(tight ? 11 : many ? 13 : 15),
+            fontWeight: 900,
+            whiteSpace: "nowrap",
+            color: r2.sticks > 0 ? t.gd : "#ff8a8a"
+          }
+        }, r2.sticks > 0 ? "+" : "-", Math.abs(r2.sticks), "本") : React.createElement("span", {
+          style: {
+            fontSize: fs(r2.strong ? tight ? 13 : many ? 15 : 17.5 : tight ? 11 : many ? 13 : 15),
             fontWeight: 900,
             fontVariantNumeric: "tabular-nums",
             whiteSpace: "nowrap",
             color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)"
           }
-        }, r2.v > 0 ? "+" : "", r2.v.toLocaleString()));
+        }, r2.v > 0 ? "+" : "", r2.v.toLocaleString())), r2.own && React.createElement("div", {
+          style: {
+            width: "100%",
+            textAlign: "right",
+            lineHeight: 1.1,
+            marginTop: fs(0.5),
+            fontSize: fs(10),
+            fontWeight: 700,
+            color: "rgba(255,255,255,0.7)",
+            whiteSpace: "nowrap"
+          }
+        }, "本人分含む"));
       }));
     }));
   };

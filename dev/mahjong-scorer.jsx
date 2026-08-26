@@ -6272,8 +6272,7 @@ input, select { padding: 10px 14px; }
             const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る積み棒ぶん
             // この局にリーチ棒を出した人（卓上の宣言・ウィザード入力のどちらでも）
             const decl = !!(declaredRiichi[i] || gRiichi[i]);
-            // リーチ棒: アガった人は供託を受け取り、出した人は1,000を失う（両方なら差し引き）
-            const stick = (isWin ? pool : 0) - (decl ? 1000 : 0);
+            const sticks = pool / 1000;   // 卓に出ているリーチ棒の本数（前局からの供託を含む）
             // 並びは 和了点 → 積み棒 → 合計 → リーチ棒。
             // 合計は和了点と積み棒の小計で、供託のやりとりであるリーチ棒は含めない
             const rows = [];
@@ -6283,8 +6282,13 @@ input, select { padding: 10px 14px; }
             const sub = rows.reduce((a, r) => a + r.v, 0);
             // 積み棒が無いときは和了点がそのまま合計なので、同じ数字を2行出さない
             if (rows.length >= 2) rows.push({ lb: "合計", v: sub, strong: true });
-            if (stick !== 0) rows.push({ lb: "リーチ棒", v: stick });
-            const net = sub + stick;
+            // リーチ棒は点数ではなく本数で示す。卓上で宣言した人は宣言した時点で
+            // 1,000点を引いてあり、ウィザードで後から入力した人は精算時に引く。
+            // 点で書くと人によって動く額が変わり誤解を招くため、本数に統一する
+            if (isWin) { if (sticks > 0) rows.push({ lb: "リーチ棒", sticks, own: decl }); }
+            else if (decl) rows.push({ lb: "リーチ棒", sticks: -1 });
+            // 枠の色に使う実際の増減（卓上で宣言済みのぶんはもう引かれている）
+            const net = sub + (isWin ? pool : 0) - (gRiichi[i] ? 1000 : 0);
             return (
               <div key={i} style={{
                 position: "absolute", top: `${pos.y}%`, left: `${pos.x}%`,
@@ -6303,7 +6307,7 @@ input, select { padding: 10px 14px; }
                   gap: 3, width: "100%", maxWidth: "100%",
                 }}>
                   <span style={{
-                    fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0))))) * (rows.length >= 4 ? 0.85 : 1)),
+                    fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))) * (rows.some(r => r.own) ? 0.75 : rows.length >= 4 ? 0.85 : 1))),
                     fontWeight: 800, color: "#fff", lineHeight: 1.2,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
                   }}>{players[i]}</span>
@@ -6313,11 +6317,14 @@ input, select { padding: 10px 14px; }
                     和了点・積み棒・合計・リーチ棒の4行になると枠に収まらないので、
                     そのときだけ字送りと文字を詰める */}
                 {(rows.length ? rows : [{ lb: "和了点", v: 0 }]).map((r2, k2, arr) => {
-                  const many = arr.length >= 4;
+                  // 「本人分含む」の注記が入る分も行数に数える
+                  const lines = arr.length + (arr.some(r => r.own) ? 1 : 0);
+                  const many = lines >= 4, tight = lines >= 5;
                   return (
-                  <div key={k2} style={{
+                  <React.Fragment key={k2}>
+                  <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "baseline",
-                    width: "100%", gap: 4, lineHeight: many ? 1.18 : 1.3,
+                    width: "100%", gap: 4, lineHeight: tight ? 1.05 : many ? 1.18 : 1.3,
                     // 合計は内訳と区切って見せる
                     borderTop: r2.strong ? `1px solid rgba(255,255,255,0.28)` : "none",
                     marginTop: r2.strong ? fs(many ? 1 : 2) : 0, paddingTop: r2.strong ? fs(many ? 1 : 2) : 0,
@@ -6326,12 +6333,31 @@ input, select { padding: 10px 14px; }
                       fontSize: fs(many ? 10 : 10.5), fontWeight: r2.strong ? 900 : 700, whiteSpace: "nowrap",
                       color: r2.strong ? "#fff" : "rgba(255,255,255,0.78)",
                     }}>{r2.lb}</span>
+                    {r2.sticks !== undefined ? (
+                      /* リーチ棒は本数で示す */
+                      <span style={{
+                        fontSize: fs(tight ? 11 : many ? 13 : 15),
+                        fontWeight: 900, whiteSpace: "nowrap",
+                        color: r2.sticks > 0 ? t.gd : "#ff8a8a",
+                      }}>{r2.sticks > 0 ? "+" : "-"}{Math.abs(r2.sticks)}本</span>
+                    ) : (
                     <span style={{
-                      fontSize: fs(r2.strong ? (many ? 15 : 17.5) : (many ? 13 : 15)),
+                      fontSize: fs(r2.strong ? (tight ? 13 : many ? 15 : 17.5) : (tight ? 11 : many ? 13 : 15)),
                       fontWeight: 900, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
                       color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
                     }}>{r2.v > 0 ? "+" : ""}{r2.v.toLocaleString()}</span>
+                    )}
                   </div>
+                  {/* アガった人が自分でもリーチしていたときは、受け取る中に
+                      自分のぶんが入っていることを小さく添える */}
+                  {r2.own && (
+                    <div style={{
+                      width: "100%", textAlign: "right", lineHeight: 1.1, marginTop: fs(0.5),
+                      fontSize: fs(10), fontWeight: 700, color: "rgba(255,255,255,0.7)",
+                      whiteSpace: "nowrap",
+                    }}>本人分含む</div>
+                  )}
+                  </React.Fragment>
                   );
                 })}
               </div>
