@@ -12024,15 +12024,21 @@ input, select { padding: 10px 14px; }
         lb: "和了点",
         v: -(f.amt - hbPay)
       });
-      if (stick !== 0) rows.push({
-        lb: "リーチ棒",
-        v: stick
-      });
       if (isWin ? hbGet > 0 : f && hbPay > 0) rows.push({
         lb: "積み棒",
         v: isWin ? hbGet : -hbPay
       });
-      const net = rows.reduce((a, r) => a + r.v, 0);
+      const sub = rows.reduce((a, r) => a + r.v, 0);
+      if (rows.length >= 2) rows.push({
+        lb: "合計",
+        v: sub,
+        strong: true
+      });
+      if (stick !== 0) rows.push({
+        lb: "リーチ棒",
+        v: stick
+      });
+      const net = sub + stick;
       return React.createElement("div", {
         key: i,
         style: {
@@ -12063,7 +12069,7 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("span", {
         style: {
-          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))))),
+          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0))))) * (rows.length >= 4 ? 0.85 : 1)),
           fontWeight: 800,
           color: "#fff",
           lineHeight: 1.2,
@@ -12082,32 +12088,38 @@ input, select { padding: 10px 14px; }
       }, "親")), (rows.length ? rows : [{
         lb: "和了点",
         v: 0
-      }]).map((r2, k2) => React.createElement("div", {
-        key: k2,
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          width: "100%",
-          gap: 4,
-          lineHeight: 1.3
-        }
-      }, React.createElement("span", {
-        style: {
-          fontSize: fs(10.5),
-          fontWeight: 700,
-          color: "rgba(255,255,255,0.78)",
-          whiteSpace: "nowrap"
-        }
-      }, r2.lb), React.createElement("span", {
-        style: {
-          fontSize: fs(15),
-          fontWeight: 900,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)"
-        }
-      }, r2.v > 0 ? "+" : "", r2.v.toLocaleString()))));
+      }]).map((r2, k2, arr) => {
+        const many = arr.length >= 4;
+        return React.createElement("div", {
+          key: k2,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            width: "100%",
+            gap: 4,
+            lineHeight: many ? 1.18 : 1.3,
+            borderTop: r2.strong ? `1px solid rgba(255,255,255,0.28)` : "none",
+            marginTop: r2.strong ? fs(many ? 1 : 2) : 0,
+            paddingTop: r2.strong ? fs(many ? 1 : 2) : 0
+          }
+        }, React.createElement("span", {
+          style: {
+            fontSize: fs(many ? 10 : 10.5),
+            fontWeight: r2.strong ? 900 : 700,
+            whiteSpace: "nowrap",
+            color: r2.strong ? "#fff" : "rgba(255,255,255,0.78)"
+          }
+        }, r2.lb), React.createElement("span", {
+          style: {
+            fontSize: fs(r2.strong ? many ? 15 : 17.5 : many ? 13 : 15),
+            fontWeight: 900,
+            fontVariantNumeric: "tabular-nums",
+            whiteSpace: "nowrap",
+            color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)"
+          }
+        }, r2.v > 0 ? "+" : "", r2.v.toLocaleString()));
+      }));
     }));
   };
   const PayTableView = () => {
