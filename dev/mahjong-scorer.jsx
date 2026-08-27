@@ -3045,6 +3045,11 @@ input, select { padding: 10px 14px; }
   0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }
 }
+/* 卓の中央の「対局中」。進行中だとひと目で分かるようゆっくり点滅させる */
+@keyframes playingBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
 @keyframes wallBlink {
   0%, 100% {
     background: rgba(56,189,248,0.28);
@@ -10416,6 +10421,7 @@ input, select { padding: 10px 14px; }
                         fontSize: 17, fontWeight: 900, color: "rgba(255,255,255,0.9)",
                         letterSpacing: "0.14em", whiteSpace: "nowrap",
                         textShadow: "0 2px 8px rgba(0,0,0,0.6)",
+                        animation: "playingBlink 1.8s ease-in-out infinite",
                       }}>対局中</span>
                     ) : (
                       <>
