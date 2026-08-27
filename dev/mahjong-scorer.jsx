@@ -9309,7 +9309,7 @@ input, select { padding: 10px 14px; }
                   ).map((part, k) => <span key={k} style={{ display: "inline-block" }}>{part}</span>)
                 }</button>
                 <div style={{ fontSize: 10, color: matchType ? t.dm : t.gd, marginTop: 7, textAlign: "center", fontWeight: matchType ? 400 : 700 }}>
-                  {matchType ? "変更したい場合は、下の「ルールを変更する」から" : "まず上の試合形式を選んでください"}
+                  {matchType ? "変更したい場合は、下の「ルール・設定を変更する」から" : "まず上の試合形式を選んでください"}
                 </div>
               </div>
             );
@@ -9323,7 +9323,10 @@ input, select { padding: 10px 14px; }
             color: rulesOpen ? t.ac : t.tx, fontSize: 14, fontWeight: 800, marginBottom: 10,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}>
-            <span>{rulesOpen ? "ルールの詳細を閉じる" : "ルールを変更する"}</span>
+            <span>{/* 狭い画面で最終行に1文字だけ残らないよう区切る */
+              (rulesOpen ? ["ルール・設定を", "閉じる"] : ["ルール・設定を", "変更する"]).map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}</span>
             <span style={{ fontSize: 12, transform: rulesOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
           </button>
 

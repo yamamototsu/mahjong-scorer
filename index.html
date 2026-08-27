@@ -17713,7 +17713,7 @@ input, select { padding: 10px 14px; }
         textAlign: "center",
         fontWeight: matchType ? 400 : 700
       }
-    }, matchType ? "変更したい場合は、下の「ルールを変更する」から" : "まず上の試合形式を選んでください"));
+    }, matchType ? "変更したい場合は、下の「ルール・設定を変更する」から" : "まず上の試合形式を選んでください"));
   })(), React.createElement("button", {
     onClick: () => setRulesOpen(v => !v),
     style: {
@@ -17732,7 +17732,12 @@ input, select { padding: 10px 14px; }
       justifyContent: "center",
       gap: 8
     }
-  }, React.createElement("span", null, rulesOpen ? "ルールの詳細を閉じる" : "ルールを変更する"), React.createElement("span", {
+  }, React.createElement("span", null, (rulesOpen ? ["ルール・設定を", "閉じる"] : ["ルール・設定を", "変更する"]).map((x, k) => React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-block"
+    }
+  }, x))), React.createElement("span", {
     style: {
       fontSize: 12,
       transform: rulesOpen ? "rotate(180deg)" : "none",
