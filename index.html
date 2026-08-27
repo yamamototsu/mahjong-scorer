@@ -1221,6 +1221,7 @@ function MahjongScorer() {
   const [gHan, setGHan] = useState(null);
   const [gFu, setGFu] = useState(null);
   const [showGW, setShowGW] = useState(false);
+  const [gEditing, setGEditing] = useState(false);
   const [gRiichi, setGRiichi] = useState([false, false, false, false]);
   const [fuGuide, setFuGuide] = useState(null);
   const [fuGuideStep, setFuGuideStep] = useState(0);
@@ -1237,6 +1238,9 @@ function MahjongScorer() {
     setPickerUra(0);
     setYakuPickerOpen(false);
   };
+  React.useEffect(() => {
+    if (gStep === 7) setGEditing(false);
+  }, [gStep]);
   const activePickerRules = () => gameStarted && gameConfig && gameConfig.rules ? gameConfig.rules : rules;
   const pickerTotalHan = () => {
     const dbl = activePickerRules().doubleYakuman === true;
@@ -1377,6 +1381,7 @@ function MahjongScorer() {
     return Math.ceil(total / 10) * 10;
   };
   const resetGW = useCallback(() => {
+    setGEditing(false);
     setGStep(0);
     setGWinner(null);
     setGTsumo(null);
@@ -20068,7 +20073,24 @@ input, select { padding: 10px 14px; }
       width: "100%",
       maxWidth: 400
     }
-  }, gStep === 1 && React.createElement("div", {
+  }, gEditing && gStep !== 7 && React.createElement("button", {
+    onClick: () => {
+      setGEditing(false);
+      setGStep(7);
+    },
+    style: {
+      width: "100%",
+      padding: "13px 10px",
+      borderRadius: 11,
+      cursor: "pointer",
+      border: `1px solid ${t.bd}`,
+      background: t.sf,
+      color: t.tx,
+      fontSize: 14,
+      fontWeight: 700,
+      marginBottom: 10
+    }
+  }, "訂正をやめる（確認画面に戻る）"), gStep === 1 && React.createElement("div", {
     style: card
   }, React.createElement("div", {
     style: {
@@ -20565,7 +20587,10 @@ input, select { padding: 10px 14px; }
       setTmWinStep(step);
     };
     return React.createElement(React.Fragment, null, React.createElement("button", {
-      onClick: () => tableMode && correctingIdx === null ? backToTable("winner") : setGStep(1),
+      onClick: () => {
+        setGEditing(true);
+        return tableMode && correctingIdx === null ? backToTable("winner") : setGStep(1);
+      },
       style: {
         ...rowStyle,
         cursor: "pointer"
@@ -20590,7 +20615,10 @@ input, select { padding: 10px 14px; }
     }, players[gWinner]), React.createElement("span", {
       style: editTag
     }, "訂正"))), React.createElement("button", {
-      onClick: () => tableMode && correctingIdx === null ? backToTable("how") : setGStep(2),
+      onClick: () => {
+        setGEditing(true);
+        return tableMode && correctingIdx === null ? backToTable("how") : setGStep(2);
+      },
       style: {
         ...rowStyle,
         cursor: "pointer"
@@ -20628,7 +20656,10 @@ input, select { padding: 10px 14px; }
         color: declaredRiichi.some(Boolean) ? t.gd : t.dm
       }
     }, declaredRiichi.some(Boolean) ? `${declaredRiichi.filter(Boolean).length}本` : "なし")) : React.createElement("button", {
-      onClick: () => setGStep(4),
+      onClick: () => {
+        setGEditing(true);
+        setGStep(4);
+      },
       style: {
         ...rowStyle,
         cursor: "pointer"
@@ -20654,7 +20685,10 @@ input, select { padding: 10px 14px; }
       style: editTag
     }, "訂正"))));
   })(), React.createElement("button", {
-    onClick: () => setGStep(5),
+    onClick: () => {
+      setGEditing(true);
+      setGStep(5);
+    },
     style: {
       width: "100%",
       background: "transparent",
@@ -20686,7 +20720,10 @@ input, select { padding: 10px 14px; }
   }, gHan >= 13 ? getLimitName(gHan) : `${gHan}翻`), React.createElement("span", {
     style: editTag
   }, "訂正"))), gHan < 5 && React.createElement("button", {
-    onClick: () => setGStep(6),
+    onClick: () => {
+      setGEditing(true);
+      setGStep(6);
+    },
     style: {
       width: "100%",
       background: "transparent",

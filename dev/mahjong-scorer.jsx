@@ -920,6 +920,9 @@ export default function MahjongScorer() {
   const [gHan, setGHan] = useState(null);
   const [gFu, setGFu] = useState(null);
   const [showGW, setShowGW] = useState(false);
+  // 最終確認画面の「訂正」から各入力画面へ入ったか。
+  // true のあいだは「訂正をやめる」を出し、押したら確認画面へ戻す
+  const [gEditing, setGEditing] = useState(false);
   const [gRiichi, setGRiichi] = useState([false, false, false, false]); // who declared riichi this round
   // Fu guide state
   const [fuGuide, setFuGuide] = useState(null); // null=not started, object={mentsu, machi, jantou}
@@ -935,6 +938,9 @@ export default function MahjongScorer() {
   const [pickerUra, setPickerUra] = useState(0);   // 裏ドラ
 
   const resetYakuPicker = () => { setPickedYaku([]); setPickerNaki(null); setPickerDora(0); setPickerUra(0); setYakuPickerOpen(false); };
+
+  // 訂正しなおして確認画面に戻ってきたら、訂正モードを解除する
+  React.useEffect(() => { if (gStep === 7) setGEditing(false); }, [gStep]);
 
   // 対局中は対局ルール、それ以外（単独計算機）は現在のルール
   const activePickerRules = () => (gameStarted && gameConfig && gameConfig.rules) ? gameConfig.rules : rules;
@@ -1014,7 +1020,7 @@ export default function MahjongScorer() {
     if (hasNaki && !isTsumo && total === 20) total = 30;
     return Math.ceil(total / 10) * 10;
   };
-  const resetGW = useCallback(() => { setGStep(0); setGWinner(null); setGTsumo(null); setGLoser(null); setGHan(null); setGFu(null); setGRiichi([false,false,false,false]); setFuGuide(null); setGKnownNaki(null); setShowGW(false); setCorrectingIdx(null); }, []);
+  const resetGW = useCallback(() => { setGEditing(false); setGStep(0); setGWinner(null); setGTsumo(null); setGLoser(null); setGHan(null); setGFu(null); setGRiichi([false,false,false,false]); setFuGuide(null); setGKnownNaki(null); setShowGW(false); setCorrectingIdx(null); }, []);
 
   // Score correction: which round index is being corrected
   const [correctingIdx, setCorrectingIdx] = useState(null);
@@ -10626,6 +10632,15 @@ input, select { padding: 10px 14px; }
       {showGW && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
+            {/* 確認画面の「訂正」から来たときは、どのステップからでも
+                やめて確認画面に戻れるようにする */}
+            {gEditing && gStep !== 7 && (
+              <button onClick={() => { setGEditing(false); setGStep(7); }} style={{
+                width: "100%", padding: "13px 10px", borderRadius: 11, cursor: "pointer",
+                border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                fontSize: 14, fontWeight: 700, marginBottom: 10,
+              }}>訂正をやめる（確認画面に戻る）</button>
+            )}
             {gStep === 1 && (
               <div style={card}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -10861,7 +10876,7 @@ input, select { padding: 10px 14px; }
                     };
                     return (
                       <>
-                        <button onClick={() => (tableMode && correctingIdx === null) ? backToTable("winner") : setGStep(1)}
+                        <button onClick={() => { setGEditing(true); return (tableMode && correctingIdx === null) ? backToTable("winner") : setGStep(1); }}
                           style={{ ...rowStyle, cursor: "pointer" }}>
                           <span style={{ fontSize: 12, color: t.dm }}>あがった人</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -10869,7 +10884,7 @@ input, select { padding: 10px 14px; }
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
-                        <button onClick={() => (tableMode && correctingIdx === null) ? backToTable("how") : setGStep(2)}
+                        <button onClick={() => { setGEditing(true); return (tableMode && correctingIdx === null) ? backToTable("how") : setGStep(2); }}
                           style={{ ...rowStyle, cursor: "pointer" }}>
                           <span style={{ fontSize: 12, color: t.dm }}>あがり方</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -10885,7 +10900,7 @@ input, select { padding: 10px 14px; }
                             </span>
                           </div>
                         ) : (
-                          <button onClick={() => setGStep(4)} style={{ ...rowStyle, cursor: "pointer" }}>
+                          <button onClick={() => { setGEditing(true); setGStep(4); }} style={{ ...rowStyle, cursor: "pointer" }}>
                             <span style={{ fontSize: 12, color: t.dm }}>リーチ棒</span>
                             <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                               <span style={{ fontSize: 13, fontWeight: 700, color: gRiichi.some(Boolean) ? t.gd : t.dm }}>{gRiichi.some(Boolean) ? `${gRiichi.filter(Boolean).length}本` : "なし"}</span>
@@ -10896,7 +10911,7 @@ input, select { padding: 10px 14px; }
                       </>
                     );
                   })()}
-                  <button onClick={() => setGStep(5)} style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
+                  <button onClick={() => { setGEditing(true); setGStep(5); }} style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
                     <span style={{ fontSize: 12, color: t.dm }}>翻数</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{gHan >= 13 ? getLimitName(gHan) : `${gHan}翻`}</span>
@@ -10904,7 +10919,7 @@ input, select { padding: 10px 14px; }
                     </span>
                   </button>
                   {gHan < 5 && (
-                    <button onClick={() => setGStep(6)} style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
+                    <button onClick={() => { setGEditing(true); setGStep(6); }} style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
                       <span style={{ fontSize: 12, color: t.dm }}>符数</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{gFu}符</span>
