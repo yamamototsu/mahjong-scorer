@@ -496,10 +496,33 @@ export default function MahjongScorer() {
     return out;
   };
 
-  // 順位の決め方。"total"=総合ポイント（従来）/ "avg"=1半荘あたりの平均ポイント
-  const leagueScoring = (lg) => (lg && lg.scoring === "avg") ? "avg" : "total";
-  // 平均ポイント制のときの規定半荘数（これに届かない人は下に回す）
-  const leagueMinGames = (lg) => (leagueScoring(lg) === "avg" ? (lg.minGames ?? PONZUKE_MIN_GAMES) : 0);
+  // ── 点数の計算方式（成績表で誰を上位にするか） ──
+  //  total  : 総合ポイント（ぜんぶ合計）
+  //  avg    : 平均ポイント（合計 ÷ 半荘数）
+  //  best   : 上位N半荘の合計（成績のよかったぶんだけ＝上澄み）
+  //  recent : 直近N半荘の合計（最近の調子で決める）
+  const SCORING_MODES = [
+    { key: "total",  label: "総合ポイント",     short: "総合",
+      desc: "打ったぶんをぜんぶ合計する。全員が同じ半荘数を打つときはこちら", needN: false },
+    { key: "avg",    label: "平均ポイント",     short: "平均",
+      desc: "総合ポイント ÷ 半荘数。打った半荘数がちがっても比べられる", needN: false },
+    { key: "best",   label: "上位◯半荘の合計", short: "上位",
+      desc: "成績のよかった上位◯半荘だけを合計する（上澄み）。たくさん打つほど有利", needN: true },
+    { key: "recent", label: "直近◯半荘の合計", short: "直近",
+      desc: "最後に打った◯半荘だけを合計する。今の調子で順位が決まる", needN: true },
+  ];
+  const leagueScoring = (lg) => {
+    const k = lg && lg.scoring;
+    return SCORING_MODES.some(m => m.key === k) ? k : "total";
+  };
+  const leagueScoringN = (lg) => Math.max(1, (lg && lg.scoringN) || 10);
+  // 規定半荘数（1人が最低これだけ打たないと順位に入らない）
+  const leagueMinGames = (lg) => Math.max(0, (lg && lg.minGames) || 0);
+  // 成績表の見出しに出す短いラベル
+  const scoringLabel = (lg) => {
+    const m = leagueScoring(lg), n = leagueScoringN(lg);
+    return m === "best" ? `上位${n}` : m === "recent" ? `直近${n}` : m === "avg" ? "平均" : "総合";
+  };
 
   // 通算成績
   const leagueStandings = (lg) => {
@@ -508,9 +531,11 @@ export default function MahjongScorer() {
     // 素点＝返し点との差。返し点が持ち点を下回る古い設定はオカが負になるので揃える
     const retPt = Math.max(lg.rules?.startPoints ?? 25000, lg.rules?.returnPoints ?? 30000);
     const minG = leagueMinGames(lg);
+    const mode = leagueScoring(lg);
+    const nSel = leagueScoringN(lg);
     const rows = lg.members.map(name => ({
       name, games: 0, pt: 0, rankSum: 0, ranks: [0, 0, 0, 0], sotenSum: 0,
-      best: null, worst: null, tobi: 0,
+      ptList: [], best: null, worst: null, tobi: 0,
     }));
     const byName = Object.fromEntries(rows.map(r => [r.name, r]));
     (lg.games || []).forEach(g => {
@@ -519,6 +544,7 @@ export default function MahjongScorer() {
         if (!r) return;
         r.games++;
         r.pt += g.pts[i];
+        r.ptList.push(g.pts[i]);          // 打った順。上位◯・直近◯の計算に使う
         r.rankSum += g.ranks[i];
         r.ranks[g.ranks[i] - 1]++;
         r.sotenSum += (g.scores[i] - retPt);
@@ -527,6 +553,7 @@ export default function MahjongScorer() {
         if (g.scores[i] < 0) r.tobi++;
       });
     });
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
     rows.forEach(r => {
       r.avgRank = r.games ? r.rankSum / r.games : 0;
       r.avgPt = r.games ? r.pt / r.games : 0;
@@ -534,11 +561,13 @@ export default function MahjongScorer() {
       r.topRate = r.games ? r.ranks[0] / r.games : 0;
       r.renRate = r.games ? (r.ranks[0] + r.ranks[1]) / r.games : 0;   // 連対＝1位か2位
       r.lastRate = r.games ? r.ranks[pcN - 1] / r.games : 0;
+      r.bestSum = sum([...r.ptList].sort((a, b) => b - a).slice(0, nSel));
+      r.recentSum = sum(r.ptList.slice(-nSel));
+      r.usedGames = Math.min(r.games, nSel);   // 上位◯・直近◯で実際に使った半荘数
       r.qualified = r.games >= minG;
+      // 成績表で比べる値
+      r.score = mode === "avg" ? r.avgPt : mode === "best" ? r.bestSum : mode === "recent" ? r.recentSum : r.pt;
     });
-    if (leagueScoring(lg) !== "avg") {
-      return rows.sort((a, b) => b.pt - a.pt || a.avgRank - b.avgRank);
-    }
     // 直接対決＝二人がそろって出た対局のポイント合計。多いほうを上位にする
     const headToHead = (a, b) => {
       let pa = 0, pb = 0;
@@ -549,10 +578,10 @@ export default function MahjongScorer() {
       });
       return pb - pa;
     };
-    // ① 平均ポイント ② トップ率 ③ 素点平均 ④ 直接対決（規定未満の人は下）
+    // ① 計算方式の値 ② トップ率 ③ 素点平均 ④ 直接対決（規定に届かない人は下）
     return rows.sort((a, b) =>
       (a.qualified === b.qualified ? 0 : a.qualified ? -1 : 1) ||
-      (b.avgPt - a.avgPt) ||
+      (b.score - a.score) ||
       (b.topRate - a.topRate) ||
       (b.avgSoten - a.avgSoten) ||
       headToHead(a, b) ||
@@ -600,6 +629,9 @@ export default function MahjongScorer() {
       members: [...presetNames].slice(0, 4),
       mode: "count",
       targetCount: 10,
+      scoring: "total",
+      scoringN: 10,
+      minGames: 0,
       startDate: iso(d),
       endDate: iso(end),
       rules: { ...defaultRules },
@@ -626,6 +658,7 @@ export default function MahjongScorer() {
       preset: "ponzuke",
       playerCount: 4,
       scoring: "avg",
+      scoringN: 10,
       minGames: PONZUKE_MIN_GAMES,
       // 5人が規定16半荘に届く回数（5×16÷4）を初期値にする
       mode: "count",
@@ -7516,9 +7549,10 @@ input, select { padding: 10px 14px; }
           </div>
           {leader && (
             <div style={{ fontSize: 12, color: t.gd, marginTop: 6, fontWeight: 700 }}>
-              首位 {leader.name}　{leagueScoring(lg) === "avg"
-                ? `平均 ${leader.avgPt > 0 ? "+" : leader.avgPt < 0 ? "−" : ""}${Math.abs(leader.avgPt).toFixed(1)}pt`
-                : `${leader.pt > 0 ? "+" : ""}${leader.pt}pt`}
+              首位 {leader.name}　{(() => {
+                const v = leader.score, dg = leagueScoring(lg) === "avg" ? 1 : 0;
+                return `${scoringLabel(lg)} ${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dg)}pt`;
+              })()}
             </div>
           )}
         </button>
@@ -7692,82 +7726,106 @@ input, select { padding: 10px 14px; }
           }}>👤 名前を追加・編集する</button>
         </div>
 
-        {/* 終わり方（回数のみ。期間で終わる方式は使わない） */}
+        {/* 何半荘やるか（リーグ全体） */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>3. 終わり方</div>
-          <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>何回で終わりにしますか（2〜100）</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>3. 何半荘やるか</div>
+          <div style={{ fontSize: 11, color: t.dm, marginBottom: 8 }}>リーグ全体で打つ数（2〜100）</div>
           <select
             value={d.targetCount}
             onChange={e => set({ targetCount: parseInt(e.target.value, 10) })}
             style={{ ...selectStyle, fontSize: 17, fontWeight: 800, padding: "14px 12px", textAlign: "center" }}
           >
             {Array.from({ length: 99 }, (_, i) => i + 2).map(n => (
-              <option key={n} value={n}>{n} 回</option>
+              <option key={n} value={n}>{n} 半荘</option>
             ))}
           </select>
           <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
-            この回数に達すると自動で終了になります
+            この数に達すると自動で終了になります
           </div>
-          {/* 規定半荘に全員を届かせるのに必要な回数の目安 */}
-          {d.scoring === "avg" && (d.minGames ?? 0) > 0 && d.members.length >= lgPC && (() => {
+        </div>
+
+        {/* 1人あたりの最低半荘数（規定） */}
+        <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>4. 最低何半荘やるか</div>
+          <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.8 }}>
+            1人あたりの規定半荘数。これに届かない人は順位に入れず、成績表の下に参考として出します
+          </div>
+          <select value={d.minGames ?? 0}
+            onChange={e => set({ minGames: parseInt(e.target.value, 10) })}
+            style={{ ...selectStyle, fontSize: 17, fontWeight: 800, padding: "14px 12px", textAlign: "center" }}>
+            {[0, 2, 4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50].map(n => (
+              <option key={n} value={n}>{n === 0 ? "なし（1半荘から）" : `${n} 半荘以上`}</option>
+            ))}
+          </select>
+          {/* 規定に全員を届かせるのに必要な半荘数の目安 */}
+          {(d.minGames ?? 0) > 0 && d.members.length >= lgPC && (() => {
             const need = Math.ceil(d.members.length * d.minGames / lgPC);
             return (
-              <div style={{ fontSize: 10, color: need > d.targetCount ? t.gd : t.dm, marginTop: 6, lineHeight: 1.8 }}>
-                {`全員が規定${d.minGames}半荘に届くには ${need}回 くらい必要です`}
+              <div style={{ fontSize: 10, color: need > d.targetCount ? t.gd : t.dm, marginTop: 8, lineHeight: 1.8 }}>
+                {`全員が規定${d.minGames}半荘に届くには ${need}半荘 くらい必要です`}
                 {`（${d.members.length}人 × ${d.minGames}半荘 ÷ ${lgPC}人）`}
+                {need > d.targetCount && `。今は上の「何半荘やるか」が${d.targetCount}半荘です`}
               </div>
             );
           })()}
         </div>
 
-        {/* 順位の決め方 */}
+        {/* 点数の計算方式 */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>4. 順位の決め方</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. 点数の計算方式</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 10 }}>成績表で誰を上位にするか</div>
-          {[
-            { key: "total", label: "総合ポイント", desc: "ポイントの合計が多い人が上位。全員が同じ回数打つときはこちら" },
-            { key: "avg",   label: "平均ポイント", desc: "総合ポイント ÷ 半荘数。打った回数がちがっても比べられる" },
-          ].map(o => {
-            const on = (d.scoring === "avg" ? "avg" : "total") === o.key;
+          {SCORING_MODES.map(o => {
+            const on = (d.scoring || "total") === o.key;
             return (
-              <button key={o.key} onClick={() => set({ scoring: o.key, minGames: o.key === "avg" ? (d.minGames ?? PONZUKE_MIN_GAMES) : 0 })} style={{
-                width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 9,
-                padding: "11px 12px", marginBottom: 7, borderRadius: 10, cursor: "pointer",
-                border: `2px solid ${on ? t.ac : t.bd}`, background: on ? t.acS : "transparent",
-              }}>
-                <span style={{
-                  width: 16, height: 16, borderRadius: "50%", flexShrink: 0, marginTop: 2,
-                  border: `2px solid ${on ? t.ac : t.bd}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>{on && <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.ac }} />}</span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: on ? t.ac : t.tx }}>{o.label}</span>
-                  <span style={{ display: "block", fontSize: 10, color: t.dm, marginTop: 3, lineHeight: 1.7 }}>{o.desc}</span>
-                </span>
-              </button>
+              <div key={o.key}>
+                <button onClick={() => set({ scoring: o.key, scoringN: d.scoringN || 10 })} style={{
+                  width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 9,
+                  padding: "11px 12px", marginBottom: 7, borderRadius: 10, cursor: "pointer",
+                  border: `2px solid ${on ? t.ac : t.bd}`, background: on ? t.acS : "transparent",
+                }}>
+                  <span style={{
+                    width: 16, height: 16, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                    border: `2px solid ${on ? t.ac : t.bd}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>{on && <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.ac }} />}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: on ? t.ac : t.tx }}>
+                      {o.needN ? o.label.replace("◯", String(d.scoringN || 10)) : o.label}
+                    </span>
+                    <span style={{ display: "block", fontSize: 10, color: t.dm, marginTop: 3, lineHeight: 1.7 }}>
+                      {o.needN ? o.desc.replace("◯", String(d.scoringN || 10)) : o.desc}
+                    </span>
+                  </span>
+                </button>
+                {on && o.needN && (
+                  <div style={{ margin: "0 0 10px", paddingLeft: 4 }}>
+                    <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>何半荘ぶんを使いますか</div>
+                    <select value={d.scoringN || 10}
+                      onChange={e => set({ scoringN: parseInt(e.target.value, 10) })}
+                      style={{ ...selectStyle, fontSize: 16, fontWeight: 800, padding: "13px 12px", textAlign: "center" }}>
+                      {[3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 30, 40, 50].map(n => (
+                        <option key={n} value={n}>{n} 半荘</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             );
           })}
-          {d.scoring === "avg" && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>規定半荘数（これに届くまで順位に入れない）</div>
-              <select value={d.minGames ?? PONZUKE_MIN_GAMES}
-                onChange={e => set({ minGames: parseInt(e.target.value, 10) })}
-                style={{ ...selectStyle, fontSize: 16, fontWeight: 800, padding: "13px 12px", textAlign: "center" }}>
-                {[0, 4, 8, 12, 16, 20, 24, 30, 40, 50].map(n => (
-                  <option key={n} value={n}>{n === 0 ? "なし（1半荘から）" : `${n} 半荘以上`}</option>
-                ))}
-              </select>
-              <div style={{ fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.8 }}>
-                例）20半荘 +160P なら平均 +8.0、16半荘 +144P なら平均 +9.0 で後者が上位。
-                同じ平均のときは トップ率 → 素点平均 → 直接対決 の順で決めます
-              </div>
-            </div>
-          )}
+          <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.9 }}>
+            {(d.scoring || "total") === "avg" &&
+              "例）20半荘 +160P なら平均 +8.0、16半荘 +144P なら平均 +9.0 で後者が上位。"}
+            {(d.scoring || "total") === "best" &&
+              `例）30半荘打った人も、成績のよかった上位${d.scoringN || 10}半荘ぶんだけで比べます。`}
+            {(d.scoring || "total") === "recent" &&
+              `例）最後に打った${d.scoringN || 10}半荘ぶんだけで比べます。それより前の成績は順位に入りません。`}
+            同じ点数のときは トップ率 → 素点平均 → 直接対決 の順で決めます
+          </div>
         </div>
 
         {/* ウマ・オカ */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. ウマ・オカ</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>6. ウマ・オカ</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 10 }}>順位によってやりとりするポイント</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 12 }}>
             {(lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).map(u => {
@@ -7898,7 +7956,7 @@ input, select { padding: 10px 14px; }
 
         {/* 対局ルール */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>6. 対局ルール</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>7. 対局ルール</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>リーグ中の全対局に適用されます</div>
 
           {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
@@ -8078,7 +8136,10 @@ input, select { padding: 10px 14px; }
 
         {/* 成績表 */}
         {leagueTab === "stand" && (() => {
-          const isAvg = leagueScoring(lg) === "avg";
+          const mode = leagueScoring(lg);
+          const nSel = leagueScoringN(lg);
+          const isAvg = mode === "avg";
+          const headLabel = scoringLabel(lg);
           const minG = leagueMinGames(lg);
           const sgn = (v, dg = 0) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dg)}`;
           const pct = (v) => `${Math.round(v * 100)}%`;
@@ -8099,16 +8160,18 @@ input, select { padding: 10px 14px; }
             ) : (
               <>
                 <div style={{ fontSize: 11, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
-                  {isAvg
-                    ? `順位は1半荘あたりの平均ポイントで決めます${minG > 0 ? `（規定 ${minG}半荘以上）` : ""}`
+                  {mode === "avg" ? "順位は1半荘あたりの平均ポイントで決めます"
+                    : mode === "best" ? `順位は成績のよかった上位${nSel}半荘の合計で決めます`
+                    : mode === "recent" ? `順位は直近${nSel}半荘の合計で決めます`
                     : "順位は総合ポイントで決めます"}
+                  {minG > 0 && `（規定 ${minG}半荘以上）`}
                 </div>
                 {st.map((r, i) => {
-                  const head = isAvg ? r.avgPt : r.pt;
-                  const ranked = r.games > 0 && (!isAvg || r.qualified);
+                  const head = r.score;
+                  const ranked = r.games > 0 && r.qualified;
                   // 規定に届いていない人は下にまとめる。見出しは切り替わる最初の1回だけ
                   const prev = st[i - 1];
-                  const showRefHdr = isAvg && !ranked && r.games > 0 && (i === 0 || (prev.qualified && prev.games > 0));
+                  const showRefHdr = minG > 0 && !ranked && r.games > 0 && (i === 0 || (prev.qualified && prev.games > 0));
                   return (
                     <React.Fragment key={r.name}>
                     {showRefHdr && (
@@ -8137,14 +8200,14 @@ input, select { padding: 10px 14px; }
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>{r.name}</span>
                         <span style={{ display: "flex", alignItems: "baseline", gap: 4, flexShrink: 0 }}>
-                          <span style={{ fontSize: 10, color: t.dm, whiteSpace: "nowrap" }}>{isAvg ? "平均" : "総合"}</span>
+                          <span style={{ fontSize: 10, color: t.dm, whiteSpace: "nowrap" }}>{headLabel}</span>
                           <span style={{
                             fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
                             whiteSpace: "nowrap", color: r.games ? ptColor(head) : t.dm,
                           }}>{r.games ? sgn(head, isAvg ? 1 : 0) : "—"}</span>
                         </span>
                       </div>
-                      {isAvg && r.games > 0 && !r.qualified && (
+                      {minG > 0 && r.games > 0 && !r.qualified && (
                         <div style={{ fontSize: 10, color: t.gd, marginTop: 4, marginLeft: 33, lineHeight: 1.7 }}>
                           規定{minG}半荘まで あと{minG - r.games}半荘
                         </div>
@@ -8157,9 +8220,10 @@ input, select { padding: 10px 14px; }
                           display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))",
                           gap: "7px 8px", marginTop: 9, marginLeft: 33,
                         }}>
-                          {isAvg
-                            ? stat("総合ポイント", sgn(r.pt), ptColor(r.pt))
-                            : stat("平均ポイント", sgn(r.avgPt, 1), ptColor(r.avgPt))}
+                          {mode !== "total" && stat("総合ポイント", sgn(r.pt), ptColor(r.pt))}
+                          {mode !== "avg" && stat("平均ポイント", sgn(r.avgPt, 1), ptColor(r.avgPt))}
+                          {(mode === "best" || mode === "recent") &&
+                            stat(mode === "best" ? "使った半荘" : "直近の半荘", `${r.usedGames}／${nSel}半荘`)}
                           {stat("トップ率", pct(r.topRate), t.gd)}
                           {stat("連対率", pct(r.renRate))}
                           {stat("ラス率", pct(r.lastRate), r.lastRate > 0 ? t.rd : t.tx)}
@@ -8172,9 +8236,7 @@ input, select { padding: 10px 14px; }
                   );
                 })}
                 <div style={{ fontSize: 10, color: t.dm, marginTop: 12, lineHeight: 1.9, borderTop: `1px solid ${t.bd}55`, paddingTop: 10 }}>
-                  {isAvg
-                    ? "同じ平均ポイントのときは トップ率 → 素点平均 → 直接対決 の順で決めます。"
-                    : "同じポイントのときは平均順位が良いほうを上位にしています。"}
+                  同じ点数のときは トップ率 → 素点平均 → 直接対決 の順で決めます。
                   <br />
                   連対率 = 1位か2位だった割合。ラス率 = 最下位だった割合。
                 </div>
@@ -8234,12 +8296,16 @@ input, select { padding: 10px 14px; }
           <div style={{ ...card, padding: 16 }}>
             <div style={{ fontSize: 13, lineHeight: 2.1, color: t.tx }}>
               <div><span style={{ color: t.dm }}>メンバー: </span>{lg.members.join("、")}</div>
-              <div><span style={{ color: t.dm }}>終わり方: </span>
-                {lg.mode === "count" ? `${lg.targetCount}回で終了` : `${lg.startDate} 〜 ${lg.endDate}`}</div>
-              <div><span style={{ color: t.dm }}>順位の決め方: </span>
-                {leagueScoring(lg) === "avg"
-                  ? `平均ポイント${leagueMinGames(lg) > 0 ? `（規定 ${leagueMinGames(lg)}半荘以上）` : "（規定なし）"}`
-                  : "総合ポイント"}</div>
+              <div><span style={{ color: t.dm }}>何半荘やるか: </span>
+                {lg.mode === "count" ? `${lg.targetCount}半荘で終了` : `${lg.startDate} 〜 ${lg.endDate}`}</div>
+              <div><span style={{ color: t.dm }}>点数の計算方式: </span>
+                {/* 「直近12半荘の合/計」と途中で折り返さないよう、値はひとかたまりで扱う */}
+                <span style={{ display: "inline-block" }}>{(() => {
+                  const m = SCORING_MODES.find(x => x.key === leagueScoring(lg));
+                  return m.needN ? m.label.replace("◯", String(leagueScoringN(lg))) : m.label;
+                })()}</span></div>
+              <div><span style={{ color: t.dm }}>最低半荘数: </span>
+                {leagueMinGames(lg) > 0 ? `1人 ${leagueMinGames(lg)}半荘以上` : "なし（1半荘から）"}</div>
               <div><span style={{ color: t.dm }}>ウマ: </span>{lg.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}</div>
               <div><span style={{ color: t.dm }}>持ち点 / 返し点: </span>
                 {lg.rules.startPoints.toLocaleString()} / {lg.rules.returnPoints.toLocaleString()}</div>
