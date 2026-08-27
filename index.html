@@ -12695,57 +12695,23 @@ input, select { padding: 10px 14px; }
       onClick: () => setPlayerDetail(null)
     }, "閉じる"))));
   };
-  const deleteRound = useCallback(idx => {
+  const deleteRound = idx => {
     const cfg = gameConfig || {};
-    const sp = cfg.rules?.startPoints || 30000;
-    let newScores = Array(PC).fill(sp);
     const newRounds = rounds.filter((_, i) => i !== idx);
-    const payers = PC - 1;
-    newRounds.forEach(r => {
-      if (r.chombo) {
-        const d = chomboDeltas(r, PC);
-        for (let i = 0; i < PC; i++) newScores[i] += d[i];
-        return;
+    const recalced = recalcAllRounds(newRounds, cfg);
+    const newScores = [...recalced.scores];
+    let liveCount = 0;
+    for (let i = 0; i < PC; i++) {
+      if (declaredRiichi[i]) {
+        newScores[i] -= 1000;
+        liveCount++;
       }
-      if (r.draw) {
-        const tc = r.tenpai ? r.tenpai.slice(0, PC).filter(Boolean).length : 0;
-        const nc = PC - tc;
-        if (tc > 0 && tc < PC) {
-          const np = Math.floor(3000 / nc),
-            tg = Math.floor(3000 / tc);
-          for (let i = 0; i < PC; i++) {
-            if (r.tenpai[i]) newScores[i] += tg;else newScores[i] -= np;
-          }
-        }
-      } else {
-        const result = calcScore(r.han >= 5 ? 30 : r.fu || 30, r.han, r.winner === r.dealer, r.tsumo, gameConfig?.rules?.kiriage, PC);
-        const rc = r.riichi ? r.riichi.filter(Boolean).length : 0;
-        if (r.riichi) {
-          for (let i = 0; i < PC; i++) {
-            if (r.riichi[i]) newScores[i] -= 1000;
-          }
-        }
-        const hb = r.honba * HU();
-        if (r.tsumo) {
-          if (isSanma || r.winner === r.dealer) {
-            for (let i = 0; i < PC; i++) {
-              if (i === r.winner) newScores[i] += result.each * payers + hb + rc * 1000;else newScores[i] -= result.each + Math.floor(hb / payers);
-            }
-          } else {
-            for (let i = 0; i < PC; i++) {
-              if (i === r.winner) newScores[i] += result.total + hb + rc * 1000;else if (i === r.dealer) newScores[i] -= result.fromParent + Math.floor(hb / payers);else newScores[i] -= result.fromChild + Math.floor(hb / payers);
-            }
-          }
-        } else {
-          newScores[r.winner] += result.total + hb + rc * 1000;
-          newScores[r.loser] -= result.total + hb;
-        }
-      }
-    });
-    setRounds(newRounds);
+    }
+    setRounds(recalced.rounds);
     setScores(newScores);
+    setRiichiBets(recalced.carry + liveCount);
     setEditingRoundIdx(null);
-  }, [rounds, gameConfig]);
+  };
   const renderTitle = () => {
     const resumeGame = () => {
       setGameConfig(suspendedGame.config);
@@ -19208,7 +19174,45 @@ input, select { padding: 10px 14px; }
         setRonPick([]);
         setMultiRon(null);
       }
-    }, "キャンセル"))) : React.createElement("div", {
+    }, "キャンセル"))) : reviewing ? React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, React.createElement("button", {
+      "aria-label": "ルール確認",
+      style: {
+        ...smallBtn(),
+        flex: "0 0 46px",
+        fontSize: 19,
+        padding: "10px 0"
+      },
+      onClick: () => setShowRuleCheck(flip ? "flip" : true)
+    }, "📋"), React.createElement("button", {
+      style: {
+        ...smallBtn("p"),
+        flex: 1,
+        padding: "11px 4px",
+        whiteSpace: "nowrap"
+      },
+      onClick: () => {
+        setEditingRoundIdx(null);
+        setShowRoundEdit(true);
+      }
+    }, "✏️ 局を選んで修正"), React.createElement("button", {
+      "aria-label": "席順を回す",
+      style: {
+        ...smallBtn(),
+        flex: "0 0 46px",
+        padding: "10px 0",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      },
+      onClick: () => setSeatRot(r => (r + PC - 1) % PC)
+    }, React.createElement(RotateIcon, {
+      size: 22
+    }))) : React.createElement("div", {
       style: {
         display: "flex",
         gap: 8
@@ -19328,7 +19332,10 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         fontSize: 11,
         cursor: "pointer",
-        fontWeight: 600
+        fontWeight: 600,
+        padding: "9px 10px",
+        minHeight: 34,
+        boxSizing: "border-box"
       },
       onClick: () => setShowRoundEdit(true)
     }, "📋 局の修正")), RuleCheckModal(), RonRuleWarnModal(), actionRow(true), React.createElement("div", {
@@ -19785,7 +19792,8 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("span", {
       style: {
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap"
       }
     }, r.wind, r.dealer + 1, "局", r.honba > 0 ? ` ${r.honba}本場` : ""), r.chombo ? React.createElement("span", {
       style: {
@@ -19808,13 +19816,17 @@ input, select { padding: 10px 14px; }
       }
     }, r.score?.toLocaleString()))), editingRoundIdx === idx && React.createElement("div", {
       style: {
-        padding: "8px 0 12px",
+        padding: "8px 0 12px"
+      }
+    }, React.createElement("div", {
+      style: {
         display: "flex",
-        gap: 8
+        gap: 8,
+        flexWrap: "wrap"
       }
     }, r.chombo ? React.createElement("button", {
       style: {
-        flex: 1,
+        flex: "1 1 120px",
         padding: "10px",
         borderRadius: 8,
         border: `1px solid ${t.ac}`,
@@ -19831,7 +19843,7 @@ input, select { padding: 10px 14px; }
       }
     }, "✏️ この局を修正") : !r.draw ? React.createElement("button", {
       style: {
-        flex: 1,
+        flex: "1 1 120px",
         padding: "10px",
         borderRadius: 8,
         border: `1px solid ${t.ac}`,
@@ -19847,7 +19859,7 @@ input, select { padding: 10px 14px; }
       }
     }, "✏️ この局を修正") : React.createElement("button", {
       style: {
-        flex: 1,
+        flex: "1 1 120px",
         padding: "10px",
         borderRadius: 8,
         border: `1px solid ${t.ac}`,
@@ -19864,7 +19876,7 @@ input, select { padding: 10px 14px; }
       }
     }, "✏️ この局を修正"), React.createElement("button", {
       style: {
-        flex: 1,
+        flex: "1 1 120px",
         padding: "10px",
         borderRadius: 8,
         border: `1px solid ${t.bd}`,
@@ -19874,7 +19886,25 @@ input, select { padding: 10px 14px; }
         cursor: "pointer"
       },
       onClick: () => setEditingRoundIdx(null)
-    }, "キャンセル")))), React.createElement("button", {
+    }, "キャンセル")), React.createElement("button", {
+      style: {
+        width: "100%",
+        marginTop: 8,
+        padding: "10px",
+        borderRadius: 8,
+        border: `1px solid ${t.rd}55`,
+        background: "transparent",
+        color: t.rd,
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer"
+      },
+      onClick: () => {
+        const nm = `${r.wind}${r.dealer + 1}局${r.honba > 0 ? ` ${r.honba}本場` : ""}`;
+        if (!window.confirm(`${nm} を記録から削除しますか？\n残りの局で点数を計算し直します。`)) return;
+        deleteRound(idx);
+      }
+    }, "🗑 この局を記録から削除")))), React.createElement("button", {
       style: {
         ...actionBtn(),
         marginTop: 12

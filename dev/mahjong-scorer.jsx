@@ -6665,38 +6665,21 @@ input, select { padding: 10px 14px; }
     );
   };
 
-  const deleteRound = useCallback((idx) => {
+  // 局を記録から消す。残った局は修正と同じ手順（recalcAllRounds）で
+  // 最初から計算し直すので、供託・本場のつじつまが合ったままになる
+  const deleteRound = (idx) => {
     const cfg = gameConfig || {};
-    const sp = cfg.rules?.startPoints || 30000;
-    let newScores = Array(PC).fill(sp);
     const newRounds = rounds.filter((_, i) => i !== idx);
-    const payers = PC - 1;
-    newRounds.forEach(r => {
-      if (r.chombo) {
-        const d = chomboDeltas(r, PC);
-        for (let i = 0; i < PC; i++) newScores[i] += d[i];
-        return;
-      }
-      if (r.draw) {
-        const tc = r.tenpai ? r.tenpai.slice(0, PC).filter(Boolean).length : 0;
-        const nc = PC - tc;
-        if (tc > 0 && tc < PC) {
-          const np = Math.floor(3000 / nc), tg = Math.floor(3000 / tc);
-          for (let i = 0; i < PC; i++) { if (r.tenpai[i]) newScores[i] += tg; else newScores[i] -= np; }
-        }
-      } else {
-        const result = calcScore(r.han >= 5 ? 30 : (r.fu || 30), r.han, r.winner === r.dealer, r.tsumo, gameConfig?.rules?.kiriage, PC);
-        const rc = r.riichi ? r.riichi.filter(Boolean).length : 0;
-        if (r.riichi) { for (let i = 0; i < PC; i++) { if (r.riichi[i]) newScores[i] -= 1000; } }
-        const hb = r.honba * HU();
-        if (r.tsumo) {
-          if (isSanma || r.winner === r.dealer) { for (let i = 0; i < PC; i++) { if (i === r.winner) newScores[i] += result.each * payers + hb + rc * 1000; else newScores[i] -= result.each + Math.floor(hb / payers); } }
-          else { for (let i = 0; i < PC; i++) { if (i === r.winner) newScores[i] += result.total + hb + rc * 1000; else if (i === r.dealer) newScores[i] -= result.fromParent + Math.floor(hb / payers); else newScores[i] -= result.fromChild + Math.floor(hb / payers); } }
-        } else { newScores[r.winner] += result.total + hb + rc * 1000; newScores[r.loser] -= result.total + hb; }
-      }
-    });
-    setRounds(newRounds); setScores(newScores); setEditingRoundIdx(null);
-  }, [rounds, gameConfig]);
+    const recalced = recalcAllRounds(newRounds, cfg);
+    const newScores = [...recalced.scores];
+    // 現在宣言中の実況リーチ分を復元（宣言時に既に-1000されている状態）
+    let liveCount = 0;
+    for (let i = 0; i < PC; i++) { if (declaredRiichi[i]) { newScores[i] -= 1000; liveCount++; } }
+    setRounds(recalced.rounds);
+    setScores(newScores);
+    setRiichiBets(recalced.carry + liveCount);
+    setEditingRoundIdx(null);
+  };
   // ── タイトル画面（アプリを開いて最初に出るページ） ──
   const renderTitle = () => {
     const resumeGame = () => {
@@ -10194,6 +10177,19 @@ input, select { padding: 10px 14px; }
               }}>キャンセル</button>
             </div>
           </>
+        ) : reviewing ? (
+          /* 結果画面から戻ってきた修正モード。対局は終わっているので
+             「アガリ入力」「流局」は出さない（押すと局が増えてしまう） */
+          <div style={{ display: "flex", gap: 8 }}>
+            <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+              onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
+            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }}
+              onClick={() => { setEditingRoundIdx(null); setShowRoundEdit(true); }}>✏️ 局を選んで修正</button>
+            <button aria-label="席順を回す" style={{
+              ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}><RotateIcon size={22} /></button>
+          </div>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
             <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
@@ -10232,8 +10228,11 @@ input, select { padding: 10px 14px; }
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginBottom: 4, padding: "0 6px" }}>
           {rounds.length > 0 && (
-            <button style={{ background: "none", border: "none", color: t.dm, fontSize: 11, cursor: "pointer", fontWeight: 600 }}
-              onClick={() => setShowRoundEdit(true)}>📋 局の修正</button>
+            <button style={{
+              background: "none", border: "none", color: t.dm, fontSize: 11, cursor: "pointer", fontWeight: 600,
+              // 31pxしかなく指で押しにくかったので高さを34px以上にする
+              padding: "9px 10px", minHeight: 34, boxSizing: "border-box",
+            }} onClick={() => setShowRoundEdit(true)}>📋 局の修正</button>
           )}
         </div>
 
@@ -10515,7 +10514,7 @@ input, select { padding: 10px 14px; }
                   <div key={idx}>
                     <button onClick={() => setEditingRoundIdx(editingRoundIdx === idx ? null : idx)}
                       style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "10px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 13, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
-                      <span style={{ color: t.dm }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
+                      <span style={{ color: t.dm, whiteSpace: "nowrap" }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
                       {r.chombo ? (
                         <span style={{ color: t.rd, fontWeight: 700 }}>チョンボ {players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
                       ) : r.draw ? <span style={{ color: t.dm }}>流局</span> : (
@@ -10526,19 +10525,29 @@ input, select { padding: 10px 14px; }
                       )}
                     </button>
                     {editingRoundIdx === idx && (
-                      <div style={{ padding: "8px 0 12px", display: "flex", gap: 8 }}>
-                        {r.chombo ? (
-                          <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                            onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openChomboCorrection(idx); }}>✏️ この局を修正</button>
-                        ) : !r.draw ? (
-                          <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                            onClick={() => { setShowRoundEdit(false); openCorrectionWizard(idx); }}>✏️ この局を修正</button>
-                        ) : (
-                          <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                            onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openDrawCorrection(idx); }}>✏️ この局を修正</button>
-                        )}
-                        <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 12, cursor: "pointer" }}
-                          onClick={() => setEditingRoundIdx(null)}>キャンセル</button>
+                      <div style={{ padding: "8px 0 12px" }}>
+                        {/* 狭い幅では横に2つ並ばないので、折り返して縦に積む */}
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {r.chombo ? (
+                            <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                              onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openChomboCorrection(idx); }}>✏️ この局を修正</button>
+                          ) : !r.draw ? (
+                            <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                              onClick={() => { setShowRoundEdit(false); openCorrectionWizard(idx); }}>✏️ この局を修正</button>
+                          ) : (
+                            <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                              onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openDrawCorrection(idx); }}>✏️ この局を修正</button>
+                          )}
+                          <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 12, cursor: "pointer" }}
+                            onClick={() => setEditingRoundIdx(null)}>キャンセル</button>
+                        </div>
+                        {/* まちがえて増やしてしまった局を消せるようにする */}
+                        <button style={{ width: "100%", marginTop: 8, padding: "10px", borderRadius: 8, border: `1px solid ${t.rd}55`, background: "transparent", color: t.rd, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                          onClick={() => {
+                            const nm = `${r.wind}${r.dealer + 1}局${r.honba > 0 ? ` ${r.honba}本場` : ""}`;
+                            if (!window.confirm(`${nm} を記録から削除しますか？\n残りの局で点数を計算し直します。`)) return;
+                            deleteRound(idx);
+                          }}>🗑 この局を記録から削除</button>
                       </div>
                     )}
                   </div>
