@@ -496,11 +496,20 @@ export default function MahjongScorer() {
     return out;
   };
 
+  // 順位の決め方。"total"=総合ポイント（従来）/ "avg"=1半荘あたりの平均ポイント
+  const leagueScoring = (lg) => (lg && lg.scoring === "avg") ? "avg" : "total";
+  // 平均ポイント制のときの規定半荘数（これに届かない人は下に回す）
+  const leagueMinGames = (lg) => (leagueScoring(lg) === "avg" ? (lg.minGames ?? PONZUKE_MIN_GAMES) : 0);
+
   // 通算成績
   const leagueStandings = (lg) => {
     if (!lg) return [];
+    const pcN = lg.playerCount || 4;
+    // 素点＝返し点との差。返し点が持ち点を下回る古い設定はオカが負になるので揃える
+    const retPt = Math.max(lg.rules?.startPoints ?? 25000, lg.rules?.returnPoints ?? 30000);
+    const minG = leagueMinGames(lg);
     const rows = lg.members.map(name => ({
-      name, games: 0, pt: 0, rankSum: 0, ranks: [0, 0, 0, 0],
+      name, games: 0, pt: 0, rankSum: 0, ranks: [0, 0, 0, 0], sotenSum: 0,
       best: null, worst: null, tobi: 0,
     }));
     const byName = Object.fromEntries(rows.map(r => [r.name, r]));
@@ -512,6 +521,7 @@ export default function MahjongScorer() {
         r.pt += g.pts[i];
         r.rankSum += g.ranks[i];
         r.ranks[g.ranks[i] - 1]++;
+        r.sotenSum += (g.scores[i] - retPt);
         if (r.best === null || g.pts[i] > r.best) r.best = g.pts[i];
         if (r.worst === null || g.pts[i] < r.worst) r.worst = g.pts[i];
         if (g.scores[i] < 0) r.tobi++;
@@ -519,10 +529,51 @@ export default function MahjongScorer() {
     });
     rows.forEach(r => {
       r.avgRank = r.games ? r.rankSum / r.games : 0;
+      r.avgPt = r.games ? r.pt / r.games : 0;
+      r.avgSoten = r.games ? r.sotenSum / r.games : 0;
       r.topRate = r.games ? r.ranks[0] / r.games : 0;
-      r.lastRate = r.games ? r.ranks[(lg.playerCount || 4) - 1] / r.games : 0;
+      r.renRate = r.games ? (r.ranks[0] + r.ranks[1]) / r.games : 0;   // 連対＝1位か2位
+      r.lastRate = r.games ? r.ranks[pcN - 1] / r.games : 0;
+      r.qualified = r.games >= minG;
     });
-    return rows.sort((a, b) => b.pt - a.pt || a.avgRank - b.avgRank);
+    if (leagueScoring(lg) !== "avg") {
+      return rows.sort((a, b) => b.pt - a.pt || a.avgRank - b.avgRank);
+    }
+    // 直接対決＝二人がそろって出た対局のポイント合計。多いほうを上位にする
+    const headToHead = (a, b) => {
+      let pa = 0, pb = 0;
+      (lg.games || []).forEach(g => {
+        const ia = g.players.indexOf(a.name), ib = g.players.indexOf(b.name);
+        if (ia < 0 || ib < 0) return;
+        pa += g.pts[ia]; pb += g.pts[ib];
+      });
+      return pb - pa;
+    };
+    // ① 平均ポイント ② トップ率 ③ 素点平均 ④ 直接対決（規定未満の人は下）
+    return rows.sort((a, b) =>
+      (a.qualified === b.qualified ? 0 : a.qualified ? -1 : 1) ||
+      (b.avgPt - a.avgPt) ||
+      (b.topRate - a.topRate) ||
+      (b.avgSoten - a.avgSoten) ||
+      headToHead(a, b) ||
+      (a.avgRank - b.avgRank)
+    );
+  };
+
+  // 席数より多いメンバーで回すときの「休みの順番」。
+  // 休む人を1戦ごとに1人ずつずらしていくので、全員の出場数がぴったり揃う。
+  // 5〜7人なら、これで全員どうしが必ず一度は同卓する。
+  const restRotation = (members, pc, nth) => {
+    const n = members.length;
+    if (n <= pc) return { play: [...members], rest: [] };
+    const restIdx = [];
+    for (let j = 0; j < n - pc; j++) {
+      restIdx.push((((n - 1 - (nth - 1) - j) % n) + n) % n);
+    }
+    return {
+      play: members.filter((_, i) => !restIdx.includes(i)),
+      rest: restIdx.map(i => members[i]),
+    };
   };
 
   // リーグの進捗
@@ -558,6 +609,33 @@ export default function MahjongScorer() {
       status: "active",
       games: [],
       createdAt: Date.now(),
+    };
+  };
+
+  // ── ポンづけリーグ戦 ──
+  // 人数が5人・6人・7人と増えても運用しやすいおすすめの形。
+  // 30,000点持ち・オカなし・ウマ +30/+10/-10/-30 で、順位は
+  // 「総合ポイント ÷ 半荘数 ＝ 1半荘あたりの平均ポイント」で決める。
+  // ただし規定半荘数に届かない人は順位に入れない（下に回す）。
+  const PONZUKE_MIN_GAMES = 16;
+  const PONZUKE_UMA = [30, 10, -10, -30];
+  const newPonzukeDraft = () => {
+    const d = newLeagueDraft();
+    const dt = new Date();
+    const iso = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
+    return {
+      ...d,
+      preset: "ponzuke",
+      playerCount: 4,
+      scoring: "avg",
+      minGames: PONZUKE_MIN_GAMES,
+      // 半荘数は人によって変わるので、終わり方は期間で決める
+      mode: "period",
+      startDate: iso(dt),
+      endDate: iso(new Date(dt.getTime() + 1000 * 60 * 60 * 24 * 90)),
+      rules: { ...d.rules, startPoints: 30000, returnPoints: 30000 },
+      umaKey: "10-30",
+      uma: [...PONZUKE_UMA],
     };
   };
 
@@ -7441,7 +7519,9 @@ input, select { padding: 10px 14px; }
           </div>
           {leader && (
             <div style={{ fontSize: 12, color: t.gd, marginTop: 6, fontWeight: 700 }}>
-              首位 {leader.name}　{leader.pt > 0 ? "+" : ""}{leader.pt}pt
+              首位 {leader.name}　{leagueScoring(lg) === "avg"
+                ? `平均 ${leader.avgPt > 0 ? "+" : leader.avgPt < 0 ? "−" : ""}${Math.abs(leader.avgPt).toFixed(1)}pt`
+                : `${leader.pt > 0 ? "+" : ""}${leader.pt}pt`}
             </div>
           )}
         </button>
@@ -7454,11 +7534,26 @@ input, select { padding: 10px 14px; }
           同じメンバーで何回か対局し、通算成績を記録します
         </div>
 
+        {/* おすすめのひな形。人数が増えても回しやすい平均ポイント制 */}
+        <button onClick={() => { setLgDraft(newPonzukeDraft()); setView("leagueform"); }} style={{
+          width: "100%", padding: "16px 14px", marginBottom: 8, borderRadius: 13, cursor: "pointer",
+          border: `2px solid ${t.gd}`, background: t.gdS, textAlign: "left",
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: t.gd }}>🏅 ポンづけリーグ戦を作る</div>
+          <div style={{ fontSize: 11, color: t.tx, marginTop: 5, lineHeight: 1.8 }}>
+            30,000点持ち・オカなし・ウマ +30/+10/-10/-30
+          </div>
+          <div style={{ fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.8 }}>
+            順位は1半荘あたりの平均ポイント（規定{PONZUKE_MIN_GAMES}半荘以上）。
+            5人でも10人でも人数を増やせます
+          </div>
+        </button>
+
         <button onClick={() => { setLgDraft(newLeagueDraft()); setView("leagueform"); }} style={{
           width: "100%", padding: "16px", marginBottom: 18, borderRadius: 13, cursor: "pointer",
           border: `2px solid ${t.ac}`, background: t.acS,
           fontSize: 16, fontWeight: 800, color: t.ac,
-        }}>＋ 新しいリーグ戦を作る</button>
+        }}>＋ 自分で設定して作る</button>
 
         {active.length > 0 && (
           <>
@@ -7501,9 +7596,22 @@ input, select { padding: 10px 14px; }
 
     return (
       <div style={body}>
-        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>
-          {leagues.some(l => l.id === d.id) ? "リーグ戦の設定" : "新しいリーグ戦"}
+        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: d.preset === "ponzuke" ? 8 : 16 }}>
+          {leagues.some(l => l.id === d.id) ? "リーグ戦の設定"
+            : d.preset === "ponzuke" ? "新しいポンづけリーグ戦" : "新しいリーグ戦"}
         </div>
+        {d.preset === "ponzuke" && !leagues.some(l => l.id === d.id) && (
+          <div style={{
+            padding: "11px 13px", marginBottom: 16, borderRadius: 11,
+            background: t.gdS, border: `1px solid ${t.gd}55`,
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: t.gd, marginBottom: 4 }}>🏅 おすすめの設定を入れてあります</div>
+            <div style={{ fontSize: 11, color: t.tx, lineHeight: 1.9 }}>
+              30,000点持ち・オカなし・ウマ +30/+10/-10/-30・平均ポイント制（規定{PONZUKE_MIN_GAMES}半荘）。
+              名前とメンバーを決めれば始められます。下の設定はあとから変えられます
+            </div>
+          </div>
+        )}
 
         {/* 人数 */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
@@ -7617,16 +7725,62 @@ input, select { padding: 10px 14px; }
               </div>
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 10 }}>
-              <div style={{ flex: 1 }}>
+            /* 日付の入力欄は中身の最小幅が大きいので、狭い画面では縦に積む */
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 150px", minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>開始</div>
                 <input type="date" value={d.startDate} onChange={e => set({ startDate: e.target.value })}
-                  style={{ ...inputStyle, colorScheme: "dark", fontSize: 13 }} />
+                  style={{ ...inputStyle, colorScheme: "dark", fontSize: 13, minWidth: 0, padding: "10px 8px" }} />
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: "1 1 150px", minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>終了</div>
                 <input type="date" value={d.endDate} onChange={e => set({ endDate: e.target.value })}
-                  style={{ ...inputStyle, colorScheme: "dark", fontSize: 13 }} />
+                  style={{ ...inputStyle, colorScheme: "dark", fontSize: 13, minWidth: 0, padding: "10px 8px" }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 順位の決め方 */}
+        <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>4. 順位の決め方</div>
+          <div style={{ fontSize: 11, color: t.dm, marginBottom: 10 }}>成績表で誰を上位にするか</div>
+          {[
+            { key: "total", label: "総合ポイント", desc: "ポイントの合計が多い人が上位。全員が同じ回数打つときはこちら" },
+            { key: "avg",   label: "平均ポイント", desc: "総合ポイント ÷ 半荘数。打った回数がちがっても比べられる" },
+          ].map(o => {
+            const on = (d.scoring === "avg" ? "avg" : "total") === o.key;
+            return (
+              <button key={o.key} onClick={() => set({ scoring: o.key, minGames: o.key === "avg" ? (d.minGames ?? PONZUKE_MIN_GAMES) : 0 })} style={{
+                width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 9,
+                padding: "11px 12px", marginBottom: 7, borderRadius: 10, cursor: "pointer",
+                border: `2px solid ${on ? t.ac : t.bd}`, background: on ? t.acS : "transparent",
+              }}>
+                <span style={{
+                  width: 16, height: 16, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                  border: `2px solid ${on ? t.ac : t.bd}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>{on && <span style={{ width: 7, height: 7, borderRadius: "50%", background: t.ac }} />}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: on ? t.ac : t.tx }}>{o.label}</span>
+                  <span style={{ display: "block", fontSize: 10, color: t.dm, marginTop: 3, lineHeight: 1.7 }}>{o.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+          {d.scoring === "avg" && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>規定半荘数（これに届くまで順位に入れない）</div>
+              <select value={d.minGames ?? PONZUKE_MIN_GAMES}
+                onChange={e => set({ minGames: parseInt(e.target.value, 10) })}
+                style={{ ...selectStyle, fontSize: 16, fontWeight: 800, padding: "13px 12px", textAlign: "center" }}>
+                {[0, 4, 8, 12, 16, 20, 24, 30, 40, 50].map(n => (
+                  <option key={n} value={n}>{n === 0 ? "なし（1半荘から）" : `${n} 半荘以上`}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.8 }}>
+                例）20半荘 +160P なら平均 +8.0、16半荘 +144P なら平均 +9.0 で後者が上位。
+                同じ平均のときは トップ率 → 素点平均 → 直接対決 の順で決めます
               </div>
             </div>
           )}
@@ -7634,7 +7788,7 @@ input, select { padding: 10px 14px; }
 
         {/* ウマ・オカ */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>4. ウマ・オカ</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. ウマ・オカ</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 10 }}>順位によってやりとりするポイント</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 12 }}>
             {(lgPC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).map(u => {
@@ -7765,7 +7919,7 @@ input, select { padding: 10px 14px; }
 
         {/* 対局ルール */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. 対局ルール</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>6. 対局ルール</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>リーグ中の全対局に適用されます</div>
 
           {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
@@ -7840,14 +7994,21 @@ input, select { padding: 10px 14px; }
             <div key={k} style={{ padding: "9px 0", borderBottom: `1px solid ${t.bd}33` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontSize: 13, color: t.tx }}>{lb}</span>
-              <button onClick={() => set({ rules: { ...d.rules, [k]: !d.rules[k] } })} style={{
-                width: 46, height: 26, borderRadius: 13, border: "none", padding: 0, cursor: "pointer",
-                background: d.rules[k] ? t.ac : t.bd, position: "relative", flexShrink: 0,
+              {/* スイッチの見た目は46×26のまま、指で押せるよう当たり判定だけ縦に広げる */}
+              <button onClick={() => set({ rules: { ...d.rules, [k]: !d.rules[k] } })} aria-label={lb} style={{
+                width: 46, minHeight: 34, padding: 0, border: "none", background: "transparent",
+                cursor: "pointer", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <span style={{
-                  position: "absolute", top: 3, left: d.rules[k] ? 23 : 3,
-                  width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.15s",
-                }} />
+                  width: 46, height: 26, borderRadius: 13, display: "block",
+                  background: d.rules[k] ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
+                }}>
+                  <span style={{
+                    position: "absolute", top: 3, left: d.rules[k] ? 23 : 3,
+                    width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "left 0.15s",
+                  }} />
+                </span>
               </button>
             </div>
             {hint && <div style={{ fontSize: 10, color: t.dm, marginTop: 3 }}>{hint}</div>}
@@ -7917,8 +8078,10 @@ input, select { padding: 10px 14px; }
             setLgPick(lg.members.length === (lg.playerCount || 4) ? [...lg.members] : []);
             setLgMatchType("hanchan"); setView("leaguestart");
           }} style={{
-            width: "100%", padding: "16px", marginBottom: 16, borderRadius: 13, cursor: "pointer",
-            border: "none", background: t.ac, color: "#fff", fontSize: 16, fontWeight: 800,
+            width: "100%", padding: "16px 8px", marginBottom: 16, borderRadius: 13, cursor: "pointer",
+            border: "none", background: t.ac, color: "#fff", fontWeight: 800,
+            // 280px幅で「対局を始/める」と折り返さないよう画面幅に追従させる
+            fontSize: "clamp(13px, 4.6vw, 16px)", whiteSpace: "nowrap",
           }}>▶ このリーグで対局を始める</button>
         )}
 
@@ -7935,47 +8098,112 @@ input, select { padding: 10px 14px; }
         </div>
 
         {/* 成績表 */}
-        {leagueTab === "stand" && (
+        {leagueTab === "stand" && (() => {
+          const isAvg = leagueScoring(lg) === "avg";
+          const minG = leagueMinGames(lg);
+          const sgn = (v, dg = 0) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dg)}`;
+          const pct = (v) => `${Math.round(v * 100)}%`;
+          const ptColor = (v) => v > 0 ? t.gn : v < 0 ? t.rd : t.tx;
+          // 数字は名前を書いた行の下にまとめて置く（狭い画面でも折り返せるように）
+          const stat = (label, value, color) => (
+            <div key={label} style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 10, color: t.dm, whiteSpace: "nowrap" }}>{label}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: color || t.tx }}>{value}</div>
+            </div>
+          );
+          return (
           <div style={{ ...card, padding: 14 }}>
             {pr.played === 0 ? (
               <div style={{ fontSize: 13, color: t.dm, textAlign: "center", padding: "20px 0" }}>
                 まだ対局がありません
               </div>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                  <thead>
-                    <tr style={{ color: t.dm }}>
-                      <th style={{ textAlign: "left", padding: "6px 4px", fontWeight: 600 }}>順</th>
-                      <th style={{ textAlign: "left", padding: "6px 4px", fontWeight: 600 }}>名前</th>
-                      <th style={{ textAlign: "right", padding: "6px 4px", fontWeight: 600 }}>pt</th>
-                      <th style={{ textAlign: "right", padding: "6px 4px", fontWeight: 600 }}>回数</th>
-                      <th style={{ textAlign: "right", padding: "6px 4px", fontWeight: 600 }}>平均</th>
-                      <th style={{ textAlign: "right", padding: "6px 4px", fontWeight: 600 }}>1-2-3-4</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {st.map((r, i) => (
-                      <tr key={r.name} style={{ borderTop: `1px solid ${t.bd}55` }}>
-                        <td style={{ padding: "9px 4px", color: i === 0 ? t.gd : t.dm, fontWeight: 800 }}>{i + 1}</td>
-                        <td style={{ padding: "9px 4px", color: t.tx, fontWeight: 700, maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</td>
-                        <td style={{ padding: "9px 4px", textAlign: "right", fontWeight: 900, fontVariantNumeric: "tabular-nums", color: r.pt > 0 ? t.gn : r.pt < 0 ? t.rd : t.tx }}>
-                          {r.pt > 0 ? "+" : ""}{r.pt}
-                        </td>
-                        <td style={{ padding: "9px 4px", textAlign: "right", color: t.dm }}>{r.games}</td>
-                        <td style={{ padding: "9px 4px", textAlign: "right", color: t.dm }}>{r.games ? r.avgRank.toFixed(2) : "—"}</td>
-                        <td style={{ padding: "9px 4px", textAlign: "right", color: t.dm, fontVariantNumeric: "tabular-nums" }}>{r.ranks.join("-")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div style={{ fontSize: 10, color: t.dm, marginTop: 10, lineHeight: 1.8 }}>
-                  平均 = 平均順位。1-2-3-4 = 各順位の回数。同点は平均順位が良いほうを上位にしています。
+              <>
+                <div style={{ fontSize: 11, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
+                  {isAvg
+                    ? `順位は1半荘あたりの平均ポイントで決めます${minG > 0 ? `（規定 ${minG}半荘以上）` : ""}`
+                    : "順位は総合ポイントで決めます"}
                 </div>
-              </div>
+                {st.map((r, i) => {
+                  const head = isAvg ? r.avgPt : r.pt;
+                  const ranked = r.games > 0 && (!isAvg || r.qualified);
+                  // 規定に届いていない人は下にまとめる。見出しは切り替わる最初の1回だけ
+                  const prev = st[i - 1];
+                  const showRefHdr = isAvg && !ranked && r.games > 0 && (i === 0 || (prev.qualified && prev.games > 0));
+                  return (
+                    <React.Fragment key={r.name}>
+                    {showRefHdr && (
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: t.gd,
+                        marginTop: i === 0 ? 0 : 6, marginBottom: 6, lineHeight: 1.8,
+                      }}>
+                        {/* 280px幅で「（参考順/位）」と折り返さないよう意味の切れ目で区切る */}
+                        {[`規定${minG}半荘に`, "届いていない人", "（参考順位）"].map((x, k) => (
+                          <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{
+                      padding: "11px 12px", marginBottom: 8, borderRadius: 11,
+                      background: t.sf, border: `1px solid ${ranked && i === 0 ? t.gd + "77" : t.bd}`,
+                      opacity: r.games > 0 ? 1 : 0.5,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                        <span style={{
+                          width: 24, flexShrink: 0, fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                          color: ranked && i === 0 ? t.gd : t.dm, opacity: ranked ? 1 : 0.7,
+                        }}>{r.games > 0 ? i + 1 : "—"}</span>
+                        <span style={{
+                          flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: t.tx,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>{r.name}</span>
+                        <span style={{ display: "flex", alignItems: "baseline", gap: 4, flexShrink: 0 }}>
+                          <span style={{ fontSize: 10, color: t.dm, whiteSpace: "nowrap" }}>{isAvg ? "平均" : "総合"}</span>
+                          <span style={{
+                            fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                            whiteSpace: "nowrap", color: r.games ? ptColor(head) : t.dm,
+                          }}>{r.games ? sgn(head, isAvg ? 1 : 0) : "—"}</span>
+                        </span>
+                      </div>
+                      {isAvg && r.games > 0 && !r.qualified && (
+                        <div style={{ fontSize: 10, color: t.gd, marginTop: 4, marginLeft: 33, lineHeight: 1.7 }}>
+                          規定{minG}半荘まで あと{minG - r.games}半荘
+                        </div>
+                      )}
+                      {r.games === 0 && (
+                        <div style={{ fontSize: 10, color: t.dm, marginTop: 4, marginLeft: 33 }}>まだ出場していません</div>
+                      )}
+                      {r.games > 0 && (
+                        <div style={{
+                          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))",
+                          gap: "7px 8px", marginTop: 9, marginLeft: 33,
+                        }}>
+                          {isAvg
+                            ? stat("総合ポイント", sgn(r.pt), ptColor(r.pt))
+                            : stat("平均ポイント", sgn(r.avgPt, 1), ptColor(r.avgPt))}
+                          {stat("トップ率", pct(r.topRate), t.gd)}
+                          {stat("連対率", pct(r.renRate))}
+                          {stat("ラス率", pct(r.lastRate), r.lastRate > 0 ? t.rd : t.tx)}
+                          {stat("平均順位", r.avgRank.toFixed(2))}
+                          {stat("対戦数", `${r.games}半荘`)}
+                        </div>
+                      )}
+                    </div>
+                    </React.Fragment>
+                  );
+                })}
+                <div style={{ fontSize: 10, color: t.dm, marginTop: 12, lineHeight: 1.9, borderTop: `1px solid ${t.bd}55`, paddingTop: 10 }}>
+                  {isAvg
+                    ? "同じ平均ポイントのときは トップ率 → 素点平均 → 直接対決 の順で決めます。"
+                    : "同じポイントのときは平均順位が良いほうを上位にしています。"}
+                  <br />
+                  連対率 = 1位か2位だった割合。ラス率 = 最下位だった割合。
+                </div>
+              </>
             )}
           </div>
-        )}
+          );
+        })()}
 
         {/* 対局一覧 */}
         {leagueTab === "games" && (
@@ -8029,6 +8257,10 @@ input, select { padding: 10px 14px; }
               <div><span style={{ color: t.dm }}>メンバー: </span>{lg.members.join("、")}</div>
               <div><span style={{ color: t.dm }}>終わり方: </span>
                 {lg.mode === "count" ? `${lg.targetCount}回で終了` : `${lg.startDate} 〜 ${lg.endDate}`}</div>
+              <div><span style={{ color: t.dm }}>順位の決め方: </span>
+                {leagueScoring(lg) === "avg"
+                  ? `平均ポイント${leagueMinGames(lg) > 0 ? `（規定 ${leagueMinGames(lg)}半荘以上）` : "（規定なし）"}`
+                  : "総合ポイント"}</div>
               <div><span style={{ color: t.dm }}>ウマ: </span>{lg.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")}</div>
               <div><span style={{ color: t.dm }}>持ち点 / 返し点: </span>
                 {lg.rules.startPoints.toLocaleString()} / {lg.rules.returnPoints.toLocaleString()}</div>
@@ -8048,6 +8280,31 @@ input, select { padding: 10px 14px; }
                   lg.rules.tobiEnd !== false ? "トビで終了" : "トビでも続行",
                 ].join(" ・ ")}</div>
             </div>
+
+            {/* 席数より多いメンバーのときの回し方 */}
+            {lg.members.length > (lg.playerCount || 4) && (() => {
+              const pcN = lg.playerCount || 4;
+              const done = (lg.games || []).length;
+              const cycle = lg.members.length;   // 全員が同じ回数休むまでの目安
+              const rows = Array.from({ length: Math.min(cycle, 8) }, (_, k) =>
+                ({ nth: done + 1 + k, ...restRotation(lg.members, pcN, done + 1 + k) }));
+              return (
+                <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${t.bd}55` }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginBottom: 4 }}>休みの順番（おすすめ）</div>
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.8 }}>
+                    休む人を1戦ずつずらしていくので、全員が同じ回数だけ打てます。
+                    {lg.members.length <= pcN + 3 && "この人数なら全員どうしが必ず一度は同卓します。"}
+                  </div>
+                  {rows.map(r => (
+                    <div key={r.nth} style={{ padding: "8px 0", borderBottom: `1px solid ${t.bd}33` }}>
+                      <div style={{ fontSize: 11, color: t.dm, marginBottom: 3 }}>第{r.nth}戦</div>
+                      <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.7 }}>{r.play.join("　")}</div>
+                      <div style={{ fontSize: 11, color: t.gd, lineHeight: 1.7 }}>休み: {r.rest.join("、")}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             <button style={{ ...actionBtn(), marginTop: 16 }}
               onClick={() => { setLgDraft({ ...lg }); setView("leagueform"); }}>設定を変更する</button>
@@ -8087,6 +8344,33 @@ input, select { padding: 10px 14px; }
             : `この対局に出る${lgPC}人を選んでください（${lgPick.length}/${lgPC}）`}
         </div>
 
+        {/* 席数より多いメンバーのときは、全員が同じ回数打てる組み合わせをすすめる */}
+        {lg.members.length > lgPC && (() => {
+          const nth = (lg.games || []).length + 1;
+          const rec = restRotation(lg.members, lgPC, nth);
+          const same = rec.play.length === lgPick.length && rec.play.every(nm => lgPick.includes(nm));
+          return (
+            <div style={{
+              padding: "13px 14px", marginBottom: 14, borderRadius: 12,
+              background: t.gdS, border: `1px solid ${t.gd}55`,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: t.gd, marginBottom: 6 }}>
+                第{nth}戦のおすすめの組み合わせ
+              </div>
+              <div style={{ fontSize: 13, color: t.tx, lineHeight: 1.8 }}>{rec.play.join("　")}</div>
+              <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 2 }}>
+                休み: {rec.rest.join("、")}
+              </div>
+              <button onClick={() => setLgPick([...rec.play])} disabled={same} style={{
+                width: "100%", marginTop: 10, padding: "12px 8px", borderRadius: 10,
+                border: `1px solid ${t.gd}`, background: same ? "transparent" : t.gd,
+                color: same ? t.dm : "#1a1a1a", fontSize: 13, fontWeight: 800,
+                cursor: same ? "default" : "pointer", opacity: same ? 0.6 : 1,
+              }}>{same ? "この組み合わせになっています" : "この組み合わせにする"}</button>
+            </div>
+          );
+        })()}
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 20 }}>
           {lg.members.map(nm => {
             const on = lgPick.includes(nm);
@@ -8109,12 +8393,13 @@ input, select { padding: 10px 14px; }
         <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
           {[["tonpu", "東風戦", "東場のみ"], ["hanchan", "半荘戦", "東場＋南場"], ["zenchan", "全荘戦", "東南西北場"]].map(([k, lb, sub]) => (
             <button key={k} onClick={() => setLgMatchType(k)} style={{
-              flex: 1, padding: "15px 8px", borderRadius: 12, cursor: "pointer",
+              flex: 1, minWidth: 0, padding: "15px 4px", borderRadius: 12, cursor: "pointer",
               border: `2px solid ${lgMatchType === k ? t.ac : t.bd}`,
               background: lgMatchType === k ? t.acS : "transparent",
             }}>
-              <div style={{ fontSize: 15, fontWeight: 800, color: lgMatchType === k ? t.ac : t.tx }}>{lb}</div>
-              <div style={{ fontSize: 11, color: t.dm, marginTop: 3 }}>{sub}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: lgMatchType === k ? t.ac : t.tx, whiteSpace: "nowrap" }}>{lb}</div>
+              {/* 280px幅で「東場＋南/場」と折り返さないよう画面幅に追従させる */}
+              <div style={{ fontSize: "clamp(10px, 3vw, 11px)", color: t.dm, marginTop: 3, whiteSpace: "nowrap" }}>{sub}</div>
             </button>
           ))}
         </div>

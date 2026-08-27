@@ -712,14 +712,20 @@ function MahjongScorer() {
     });
     return out;
   };
+  const leagueScoring = lg => lg && lg.scoring === "avg" ? "avg" : "total";
+  const leagueMinGames = lg => leagueScoring(lg) === "avg" ? lg.minGames ?? PONZUKE_MIN_GAMES : 0;
   const leagueStandings = lg => {
     if (!lg) return [];
+    const pcN = lg.playerCount || 4;
+    const retPt = Math.max(lg.rules?.startPoints ?? 25000, lg.rules?.returnPoints ?? 30000);
+    const minG = leagueMinGames(lg);
     const rows = lg.members.map(name => ({
       name,
       games: 0,
       pt: 0,
       rankSum: 0,
       ranks: [0, 0, 0, 0],
+      sotenSum: 0,
       best: null,
       worst: null,
       tobi: 0
@@ -733,6 +739,7 @@ function MahjongScorer() {
         r.pt += g.pts[i];
         r.rankSum += g.ranks[i];
         r.ranks[g.ranks[i] - 1]++;
+        r.sotenSum += g.scores[i] - retPt;
         if (r.best === null || g.pts[i] > r.best) r.best = g.pts[i];
         if (r.worst === null || g.pts[i] < r.worst) r.worst = g.pts[i];
         if (g.scores[i] < 0) r.tobi++;
@@ -740,10 +747,44 @@ function MahjongScorer() {
     });
     rows.forEach(r => {
       r.avgRank = r.games ? r.rankSum / r.games : 0;
+      r.avgPt = r.games ? r.pt / r.games : 0;
+      r.avgSoten = r.games ? r.sotenSum / r.games : 0;
       r.topRate = r.games ? r.ranks[0] / r.games : 0;
-      r.lastRate = r.games ? r.ranks[(lg.playerCount || 4) - 1] / r.games : 0;
+      r.renRate = r.games ? (r.ranks[0] + r.ranks[1]) / r.games : 0;
+      r.lastRate = r.games ? r.ranks[pcN - 1] / r.games : 0;
+      r.qualified = r.games >= minG;
     });
-    return rows.sort((a, b) => b.pt - a.pt || a.avgRank - b.avgRank);
+    if (leagueScoring(lg) !== "avg") {
+      return rows.sort((a, b) => b.pt - a.pt || a.avgRank - b.avgRank);
+    }
+    const headToHead = (a, b) => {
+      let pa = 0,
+        pb = 0;
+      (lg.games || []).forEach(g => {
+        const ia = g.players.indexOf(a.name),
+          ib = g.players.indexOf(b.name);
+        if (ia < 0 || ib < 0) return;
+        pa += g.pts[ia];
+        pb += g.pts[ib];
+      });
+      return pb - pa;
+    };
+    return rows.sort((a, b) => (a.qualified === b.qualified ? 0 : a.qualified ? -1 : 1) || b.avgPt - a.avgPt || b.topRate - a.topRate || b.avgSoten - a.avgSoten || headToHead(a, b) || a.avgRank - b.avgRank);
+  };
+  const restRotation = (members, pc, nth) => {
+    const n = members.length;
+    if (n <= pc) return {
+      play: [...members],
+      rest: []
+    };
+    const restIdx = [];
+    for (let j = 0; j < n - pc; j++) {
+      restIdx.push(((n - 1 - (nth - 1) - j) % n + n) % n);
+    }
+    return {
+      play: members.filter((_, i) => !restIdx.includes(i)),
+      rest: restIdx.map(i => members[i])
+    };
   };
   const leagueProgress = lg => {
     const played = (lg.games || []).length;
@@ -789,6 +830,30 @@ function MahjongScorer() {
       status: "active",
       games: [],
       createdAt: Date.now()
+    };
+  };
+  const PONZUKE_MIN_GAMES = 16;
+  const PONZUKE_UMA = [30, 10, -10, -30];
+  const newPonzukeDraft = () => {
+    const d = newLeagueDraft();
+    const dt = new Date();
+    const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    return {
+      ...d,
+      preset: "ponzuke",
+      playerCount: 4,
+      scoring: "avg",
+      minGames: PONZUKE_MIN_GAMES,
+      mode: "period",
+      startDate: iso(dt),
+      endDate: iso(new Date(dt.getTime() + 1000 * 60 * 60 * 24 * 90)),
+      rules: {
+        ...d.rules,
+        startPoints: 30000,
+        returnPoints: 30000
+      },
+      umaKey: "10-30",
+      uma: [...PONZUKE_UMA]
     };
   };
   const FACTORY_RULES = {
@@ -14092,7 +14157,7 @@ input, select { padding: 10px 14px; }
           marginTop: 6,
           fontWeight: 700
         }
-      }, "首位 ", leader.name, "\u3000", leader.pt > 0 ? "+" : "", leader.pt, "pt"));
+      }, "首位 ", leader.name, "\u3000", leagueScoring(lg) === "avg" ? `平均 ${leader.avgPt > 0 ? "+" : leader.avgPt < 0 ? "−" : ""}${Math.abs(leader.avgPt).toFixed(1)}pt` : `${leader.pt > 0 ? "+" : ""}${leader.pt}pt`));
     };
     return React.createElement("div", {
       style: body
@@ -14110,6 +14175,41 @@ input, select { padding: 10px 14px; }
       }
     }, "同じメンバーで何回か対局し、通算成績を記録します"), React.createElement("button", {
       onClick: () => {
+        setLgDraft(newPonzukeDraft());
+        setView("leagueform");
+      },
+      style: {
+        width: "100%",
+        padding: "16px 14px",
+        marginBottom: 8,
+        borderRadius: 13,
+        cursor: "pointer",
+        border: `2px solid ${t.gd}`,
+        background: t.gdS,
+        textAlign: "left"
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 16,
+        fontWeight: 800,
+        color: t.gd
+      }
+    }, "🏅 ポンづけリーグ戦を作る"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.tx,
+        marginTop: 5,
+        lineHeight: 1.8
+      }
+    }, "30,000点持ち・オカなし・ウマ +30/+10/-10/-30"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginTop: 2,
+        lineHeight: 1.8
+      }
+    }, "順位は1半荘あたりの平均ポイント（規定", PONZUKE_MIN_GAMES, "半荘以上）。 5人でも10人でも人数を増やせます")), React.createElement("button", {
+      onClick: () => {
         setLgDraft(newLeagueDraft());
         setView("leagueform");
       },
@@ -14125,7 +14225,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 800,
         color: t.ac
       }
-    }, "＋ 新しいリーグ戦を作る"), active.length > 0 && React.createElement(React.Fragment, null, React.createElement("div", {
+    }, "＋ 自分で設定して作る"), active.length > 0 && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         fontSize: 12,
         fontWeight: 700,
@@ -14184,9 +14284,30 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 20,
         fontWeight: 800,
-        marginBottom: 16
+        marginBottom: d.preset === "ponzuke" ? 8 : 16
       }
-    }, leagues.some(l => l.id === d.id) ? "リーグ戦の設定" : "新しいリーグ戦"), React.createElement("div", {
+    }, leagues.some(l => l.id === d.id) ? "リーグ戦の設定" : d.preset === "ponzuke" ? "新しいポンづけリーグ戦" : "新しいリーグ戦"), d.preset === "ponzuke" && !leagues.some(l => l.id === d.id) && React.createElement("div", {
+      style: {
+        padding: "11px 13px",
+        marginBottom: 16,
+        borderRadius: 11,
+        background: t.gdS,
+        border: `1px solid ${t.gd}55`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 800,
+        color: t.gd,
+        marginBottom: 4
+      }
+    }, "🏅 おすすめの設定を入れてあります"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.tx,
+        lineHeight: 1.9
+      }
+    }, "30,000点持ち・オカなし・ウマ +30/+10/-10/-30・平均ポイント制（規定", PONZUKE_MIN_GAMES, "半荘）。 名前とメンバーを決めれば始められます。下の設定はあとから変えられます")), React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -14435,11 +14556,13 @@ input, select { padding: 10px 14px; }
     }, "この回数に達すると自動で終了になります")) : React.createElement("div", {
       style: {
         display: "flex",
-        gap: 10
+        gap: 10,
+        flexWrap: "wrap"
       }
     }, React.createElement("div", {
       style: {
-        flex: 1
+        flex: "1 1 150px",
+        minWidth: 0
       }
     }, React.createElement("div", {
       style: {
@@ -14456,11 +14579,14 @@ input, select { padding: 10px 14px; }
       style: {
         ...inputStyle,
         colorScheme: "dark",
-        fontSize: 13
+        fontSize: 13,
+        minWidth: 0,
+        padding: "10px 8px"
       }
     })), React.createElement("div", {
       style: {
-        flex: 1
+        flex: "1 1 150px",
+        minWidth: 0
       }
     }, React.createElement("div", {
       style: {
@@ -14477,7 +14603,9 @@ input, select { padding: 10px 14px; }
       style: {
         ...inputStyle,
         colorScheme: "dark",
-        fontSize: 13
+        fontSize: 13,
+        minWidth: 0,
+        padding: "10px 8px"
       }
     })))), React.createElement("div", {
       style: {
@@ -14491,7 +14619,125 @@ input, select { padding: 10px 14px; }
         fontWeight: 700,
         marginBottom: 4
       }
-    }, "4. ウマ・オカ"), React.createElement("div", {
+    }, "4. 順位の決め方"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 10
+      }
+    }, "成績表で誰を上位にするか"), [{
+      key: "total",
+      label: "総合ポイント",
+      desc: "ポイントの合計が多い人が上位。全員が同じ回数打つときはこちら"
+    }, {
+      key: "avg",
+      label: "平均ポイント",
+      desc: "総合ポイント ÷ 半荘数。打った回数がちがっても比べられる"
+    }].map(o => {
+      const on = (d.scoring === "avg" ? "avg" : "total") === o.key;
+      return React.createElement("button", {
+        key: o.key,
+        onClick: () => set({
+          scoring: o.key,
+          minGames: o.key === "avg" ? d.minGames ?? PONZUKE_MIN_GAMES : 0
+        }),
+        style: {
+          width: "100%",
+          textAlign: "left",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 9,
+          padding: "11px 12px",
+          marginBottom: 7,
+          borderRadius: 10,
+          cursor: "pointer",
+          border: `2px solid ${on ? t.ac : t.bd}`,
+          background: on ? t.acS : "transparent"
+        }
+      }, React.createElement("span", {
+        style: {
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          flexShrink: 0,
+          marginTop: 2,
+          border: `2px solid ${on ? t.ac : t.bd}`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      }, on && React.createElement("span", {
+        style: {
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: t.ac
+        }
+      })), React.createElement("span", {
+        style: {
+          minWidth: 0
+        }
+      }, React.createElement("span", {
+        style: {
+          display: "block",
+          fontSize: 13,
+          fontWeight: 700,
+          color: on ? t.ac : t.tx
+        }
+      }, o.label), React.createElement("span", {
+        style: {
+          display: "block",
+          fontSize: 10,
+          color: t.dm,
+          marginTop: 3,
+          lineHeight: 1.7
+        }
+      }, o.desc)));
+    }), d.scoring === "avg" && React.createElement("div", {
+      style: {
+        marginTop: 10
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 6
+      }
+    }, "規定半荘数（これに届くまで順位に入れない）"), React.createElement("select", {
+      value: d.minGames ?? PONZUKE_MIN_GAMES,
+      onChange: e => set({
+        minGames: parseInt(e.target.value, 10)
+      }),
+      style: {
+        ...selectStyle,
+        fontSize: 16,
+        fontWeight: 800,
+        padding: "13px 12px",
+        textAlign: "center"
+      }
+    }, [0, 4, 8, 12, 16, 20, 24, 30, 40, 50].map(n => React.createElement("option", {
+      key: n,
+      value: n
+    }, n === 0 ? "なし（1半荘から）" : `${n} 半荘以上`))), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        marginTop: 8,
+        lineHeight: 1.8
+      }
+    }, "例）20半荘 +160P なら平均 +8.0、16半荘 +144P なら平均 +9.0 で後者が上位。 同じ平均のときは トップ率 → 素点平均 → 直接対決 の順で決めます"))), React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        marginBottom: 4
+      }
+    }, "5. ウマ・オカ"), React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
@@ -14759,7 +15005,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 700,
         marginBottom: 4
       }
-    }, "5. 対局ルール"), React.createElement("div", {
+    }, "6. 対局ルール"), React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.dm,
@@ -14951,16 +15197,28 @@ input, select { padding: 10px 14px; }
           [k]: !d.rules[k]
         }
       }),
+      "aria-label": lb,
+      style: {
+        width: 46,
+        minHeight: 34,
+        padding: 0,
+        border: "none",
+        background: "transparent",
+        cursor: "pointer",
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, React.createElement("span", {
       style: {
         width: 46,
         height: 26,
         borderRadius: 13,
-        border: "none",
-        padding: 0,
-        cursor: "pointer",
+        display: "block",
         background: d.rules[k] ? t.ac : t.bd,
         position: "relative",
-        flexShrink: 0
+        transition: "background 0.2s"
       }
     }, React.createElement("span", {
       style: {
@@ -14973,7 +15231,7 @@ input, select { padding: 10px 14px; }
         background: "#fff",
         transition: "left 0.15s"
       }
-    }))), hint && React.createElement("div", {
+    })))), hint && React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -15067,15 +15325,16 @@ input, select { padding: 10px 14px; }
       },
       style: {
         width: "100%",
-        padding: "16px",
+        padding: "16px 8px",
         marginBottom: 16,
         borderRadius: 13,
         cursor: "pointer",
         border: "none",
         background: t.ac,
         color: "#fff",
-        fontSize: 16,
-        fontWeight: 800
+        fontWeight: 800,
+        fontSize: "clamp(13px, 4.6vw, 16px)",
+        whiteSpace: "nowrap"
       }
     }, "▶ このリーグで対局を始める"), React.createElement("div", {
       style: {
@@ -15097,124 +15356,164 @@ input, select { padding: 10px 14px; }
         fontSize: 13,
         fontWeight: 700
       }
-    }, lb))), leagueTab === "stand" && React.createElement("div", {
-      style: {
-        ...card,
-        padding: 14
-      }
-    }, pr.played === 0 ? React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: t.dm,
-        textAlign: "center",
-        padding: "20px 0"
-      }
-    }, "まだ対局がありません") : React.createElement("div", {
-      style: {
-        overflowX: "auto"
-      }
-    }, React.createElement("table", {
-      style: {
-        width: "100%",
-        borderCollapse: "collapse",
-        fontSize: 12
-      }
-    }, React.createElement("thead", null, React.createElement("tr", {
-      style: {
-        color: t.dm
-      }
-    }, React.createElement("th", {
-      style: {
-        textAlign: "left",
-        padding: "6px 4px",
-        fontWeight: 600
-      }
-    }, "順"), React.createElement("th", {
-      style: {
-        textAlign: "left",
-        padding: "6px 4px",
-        fontWeight: 600
-      }
-    }, "名前"), React.createElement("th", {
-      style: {
-        textAlign: "right",
-        padding: "6px 4px",
-        fontWeight: 600
-      }
-    }, "pt"), React.createElement("th", {
-      style: {
-        textAlign: "right",
-        padding: "6px 4px",
-        fontWeight: 600
-      }
-    }, "回数"), React.createElement("th", {
-      style: {
-        textAlign: "right",
-        padding: "6px 4px",
-        fontWeight: 600
-      }
-    }, "平均"), React.createElement("th", {
-      style: {
-        textAlign: "right",
-        padding: "6px 4px",
-        fontWeight: 600
-      }
-    }, "1-2-3-4"))), React.createElement("tbody", null, st.map((r, i) => React.createElement("tr", {
-      key: r.name,
-      style: {
-        borderTop: `1px solid ${t.bd}55`
-      }
-    }, React.createElement("td", {
-      style: {
-        padding: "9px 4px",
-        color: i === 0 ? t.gd : t.dm,
-        fontWeight: 800
-      }
-    }, i + 1), React.createElement("td", {
-      style: {
-        padding: "9px 4px",
-        color: t.tx,
-        fontWeight: 700,
-        maxWidth: 90,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      }
-    }, r.name), React.createElement("td", {
-      style: {
-        padding: "9px 4px",
-        textAlign: "right",
-        fontWeight: 900,
-        fontVariantNumeric: "tabular-nums",
-        color: r.pt > 0 ? t.gn : r.pt < 0 ? t.rd : t.tx
-      }
-    }, r.pt > 0 ? "+" : "", r.pt), React.createElement("td", {
-      style: {
-        padding: "9px 4px",
-        textAlign: "right",
-        color: t.dm
-      }
-    }, r.games), React.createElement("td", {
-      style: {
-        padding: "9px 4px",
-        textAlign: "right",
-        color: t.dm
-      }
-    }, r.games ? r.avgRank.toFixed(2) : "—"), React.createElement("td", {
-      style: {
-        padding: "9px 4px",
-        textAlign: "right",
-        color: t.dm,
-        fontVariantNumeric: "tabular-nums"
-      }
-    }, r.ranks.join("-")))))), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 10,
-        lineHeight: 1.8
-      }
-    }, "平均 = 平均順位。1-2-3-4 = 各順位の回数。同点は平均順位が良いほうを上位にしています。"))), leagueTab === "games" && React.createElement("div", null, (lg.games || []).length === 0 ? React.createElement("div", {
+    }, lb))), leagueTab === "stand" && (() => {
+      const isAvg = leagueScoring(lg) === "avg";
+      const minG = leagueMinGames(lg);
+      const sgn = (v, dg = 0) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(dg)}`;
+      const pct = v => `${Math.round(v * 100)}%`;
+      const ptColor = v => v > 0 ? t.gn : v < 0 ? t.rd : t.tx;
+      const stat = (label, value, color) => React.createElement("div", {
+        key: label,
+        style: {
+          minWidth: 0
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: t.dm,
+          whiteSpace: "nowrap"
+        }
+      }, label), React.createElement("div", {
+        style: {
+          fontSize: 12,
+          fontWeight: 800,
+          whiteSpace: "nowrap",
+          fontVariantNumeric: "tabular-nums",
+          color: color || t.tx
+        }
+      }, value));
+      return React.createElement("div", {
+        style: {
+          ...card,
+          padding: 14
+        }
+      }, pr.played === 0 ? React.createElement("div", {
+        style: {
+          fontSize: 13,
+          color: t.dm,
+          textAlign: "center",
+          padding: "20px 0"
+        }
+      }, "まだ対局がありません") : React.createElement(React.Fragment, null, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          marginBottom: 12,
+          lineHeight: 1.8
+        }
+      }, isAvg ? `順位は1半荘あたりの平均ポイントで決めます${minG > 0 ? `（規定 ${minG}半荘以上）` : ""}` : "順位は総合ポイントで決めます"), st.map((r, i) => {
+        const head = isAvg ? r.avgPt : r.pt;
+        const ranked = r.games > 0 && (!isAvg || r.qualified);
+        const prev = st[i - 1];
+        const showRefHdr = isAvg && !ranked && r.games > 0 && (i === 0 || prev.qualified && prev.games > 0);
+        return React.createElement(React.Fragment, {
+          key: r.name
+        }, showRefHdr && React.createElement("div", {
+          style: {
+            fontSize: 11,
+            fontWeight: 700,
+            color: t.gd,
+            marginTop: i === 0 ? 0 : 6,
+            marginBottom: 6,
+            lineHeight: 1.8
+          }
+        }, [`規定${minG}半荘に`, "届いていない人", "（参考順位）"].map((x, k) => React.createElement("span", {
+          key: k,
+          style: {
+            display: "inline-block"
+          }
+        }, x))), React.createElement("div", {
+          style: {
+            padding: "11px 12px",
+            marginBottom: 8,
+            borderRadius: 11,
+            background: t.sf,
+            border: `1px solid ${ranked && i === 0 ? t.gd + "77" : t.bd}`,
+            opacity: r.games > 0 ? 1 : 0.5
+          }
+        }, React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 9
+          }
+        }, React.createElement("span", {
+          style: {
+            width: 24,
+            flexShrink: 0,
+            fontSize: 15,
+            fontWeight: 900,
+            fontVariantNumeric: "tabular-nums",
+            color: ranked && i === 0 ? t.gd : t.dm,
+            opacity: ranked ? 1 : 0.7
+          }
+        }, r.games > 0 ? i + 1 : "—"), React.createElement("span", {
+          style: {
+            flex: 1,
+            minWidth: 0,
+            fontSize: 14,
+            fontWeight: 800,
+            color: t.tx,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap"
+          }
+        }, r.name), React.createElement("span", {
+          style: {
+            display: "flex",
+            alignItems: "baseline",
+            gap: 4,
+            flexShrink: 0
+          }
+        }, React.createElement("span", {
+          style: {
+            fontSize: 10,
+            color: t.dm,
+            whiteSpace: "nowrap"
+          }
+        }, isAvg ? "平均" : "総合"), React.createElement("span", {
+          style: {
+            fontSize: 17,
+            fontWeight: 900,
+            fontVariantNumeric: "tabular-nums",
+            whiteSpace: "nowrap",
+            color: r.games ? ptColor(head) : t.dm
+          }
+        }, r.games ? sgn(head, isAvg ? 1 : 0) : "—"))), isAvg && r.games > 0 && !r.qualified && React.createElement("div", {
+          style: {
+            fontSize: 10,
+            color: t.gd,
+            marginTop: 4,
+            marginLeft: 33,
+            lineHeight: 1.7
+          }
+        }, "規定", minG, "半荘まで あと", minG - r.games, "半荘"), r.games === 0 && React.createElement("div", {
+          style: {
+            fontSize: 10,
+            color: t.dm,
+            marginTop: 4,
+            marginLeft: 33
+          }
+        }, "まだ出場していません"), r.games > 0 && React.createElement("div", {
+          style: {
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(72px, 1fr))",
+            gap: "7px 8px",
+            marginTop: 9,
+            marginLeft: 33
+          }
+        }, isAvg ? stat("総合ポイント", sgn(r.pt), ptColor(r.pt)) : stat("平均ポイント", sgn(r.avgPt, 1), ptColor(r.avgPt)), stat("トップ率", pct(r.topRate), t.gd), stat("連対率", pct(r.renRate)), stat("ラス率", pct(r.lastRate), r.lastRate > 0 ? t.rd : t.tx), stat("平均順位", r.avgRank.toFixed(2)), stat("対戦数", `${r.games}半荘`))));
+      }), React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: t.dm,
+          marginTop: 12,
+          lineHeight: 1.9,
+          borderTop: `1px solid ${t.bd}55`,
+          paddingTop: 10
+        }
+      }, isAvg ? "同じ平均ポイントのときは トップ率 → 素点平均 → 直接対決 の順で決めます。" : "同じポイントのときは平均順位が良いほうを上位にしています。", React.createElement("br", null), "連対率 = 1位か2位だった割合。ラス率 = 最下位だった割合。")));
+    })(), leagueTab === "games" && React.createElement("div", null, (lg.games || []).length === 0 ? React.createElement("div", {
       style: {
         ...card,
         padding: 20,
@@ -15319,6 +15618,10 @@ input, select { padding: 10px 14px; }
       style: {
         color: t.dm
       }
+    }, "順位の決め方: "), leagueScoring(lg) === "avg" ? `平均ポイント${leagueMinGames(lg) > 0 ? `（規定 ${leagueMinGames(lg)}半荘以上）` : "（規定なし）"}` : "総合ポイント"), React.createElement("div", null, React.createElement("span", {
+      style: {
+        color: t.dm
+      }
     }, "ウマ: "), lg.uma.map(u => (u > 0 ? "+" : "") + u).join(" / ")), React.createElement("div", null, React.createElement("span", {
       style: {
         color: t.dm
@@ -15339,7 +15642,62 @@ input, select { padding: 10px 14px; }
       style: {
         color: t.dm
       }
-    }, "その他: "), [lg.rules.kuitan ? "食いタンあり" : "食いタンなし", lg.rules.atozuke ? "後付けあり" : "後付けなし", lg.rules.kiriage ? "切り上げ満貫あり" : "切り上げ満貫なし", lg.rules.doubleYakuman ? "ダブル役満あり" : "ダブル役満なし", lg.rules.orasYame !== false ? "オーラス親トップで終了" : "オーラスやめなし", lg.rules.tobiEnd !== false ? "トビで終了" : "トビでも続行"].join(" ・ "))), React.createElement("button", {
+    }, "その他: "), [lg.rules.kuitan ? "食いタンあり" : "食いタンなし", lg.rules.atozuke ? "後付けあり" : "後付けなし", lg.rules.kiriage ? "切り上げ満貫あり" : "切り上げ満貫なし", lg.rules.doubleYakuman ? "ダブル役満あり" : "ダブル役満なし", lg.rules.orasYame !== false ? "オーラス親トップで終了" : "オーラスやめなし", lg.rules.tobiEnd !== false ? "トビで終了" : "トビでも続行"].join(" ・ "))), lg.members.length > (lg.playerCount || 4) && (() => {
+      const pcN = lg.playerCount || 4;
+      const done = (lg.games || []).length;
+      const cycle = lg.members.length;
+      const rows = Array.from({
+        length: Math.min(cycle, 8)
+      }, (_, k) => ({
+        nth: done + 1 + k,
+        ...restRotation(lg.members, pcN, done + 1 + k)
+      }));
+      return React.createElement("div", {
+        style: {
+          marginTop: 18,
+          paddingTop: 14,
+          borderTop: `1px solid ${t.bd}55`
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 13,
+          fontWeight: 700,
+          color: t.tx,
+          marginBottom: 4
+        }
+      }, "休みの順番（おすすめ）"), React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          marginBottom: 10,
+          lineHeight: 1.8
+        }
+      }, "休む人を1戦ずつずらしていくので、全員が同じ回数だけ打てます。", lg.members.length <= pcN + 3 && "この人数なら全員どうしが必ず一度は同卓します。"), rows.map(r => React.createElement("div", {
+        key: r.nth,
+        style: {
+          padding: "8px 0",
+          borderBottom: `1px solid ${t.bd}33`
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          marginBottom: 3
+        }
+      }, "第", r.nth, "戦"), React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: t.tx,
+          lineHeight: 1.7
+        }
+      }, r.play.join("　")), React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.gd,
+          lineHeight: 1.7
+        }
+      }, "休み: ", r.rest.join("、")))));
+    })(), React.createElement("button", {
       style: {
         ...actionBtn(),
         marginTop: 16
@@ -15398,7 +15756,56 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         marginBottom: 16
       }
-    }, lg.members.length === lgPC ? `メンバーは${lgPC}人なので全員が出場します` : `この対局に出る${lgPC}人を選んでください（${lgPick.length}/${lgPC}）`), React.createElement("div", {
+    }, lg.members.length === lgPC ? `メンバーは${lgPC}人なので全員が出場します` : `この対局に出る${lgPC}人を選んでください（${lgPick.length}/${lgPC}）`), lg.members.length > lgPC && (() => {
+      const nth = (lg.games || []).length + 1;
+      const rec = restRotation(lg.members, lgPC, nth);
+      const same = rec.play.length === lgPick.length && rec.play.every(nm => lgPick.includes(nm));
+      return React.createElement("div", {
+        style: {
+          padding: "13px 14px",
+          marginBottom: 14,
+          borderRadius: 12,
+          background: t.gdS,
+          border: `1px solid ${t.gd}55`
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 12,
+          fontWeight: 800,
+          color: t.gd,
+          marginBottom: 6
+        }
+      }, "第", nth, "戦のおすすめの組み合わせ"), React.createElement("div", {
+        style: {
+          fontSize: 13,
+          color: t.tx,
+          lineHeight: 1.8
+        }
+      }, rec.play.join("　")), React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          lineHeight: 1.8,
+          marginTop: 2
+        }
+      }, "休み: ", rec.rest.join("、")), React.createElement("button", {
+        onClick: () => setLgPick([...rec.play]),
+        disabled: same,
+        style: {
+          width: "100%",
+          marginTop: 10,
+          padding: "12px 8px",
+          borderRadius: 10,
+          border: `1px solid ${t.gd}`,
+          background: same ? "transparent" : t.gd,
+          color: same ? t.dm : "#1a1a1a",
+          fontSize: 13,
+          fontWeight: 800,
+          cursor: same ? "default" : "pointer",
+          opacity: same ? 0.6 : 1
+        }
+      }, same ? "この組み合わせになっています" : "この組み合わせにする"));
+    })(), React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -15443,7 +15850,8 @@ input, select { padding: 10px 14px; }
       onClick: () => setLgMatchType(k),
       style: {
         flex: 1,
-        padding: "15px 8px",
+        minWidth: 0,
+        padding: "15px 4px",
         borderRadius: 12,
         cursor: "pointer",
         border: `2px solid ${lgMatchType === k ? t.ac : t.bd}`,
@@ -15453,13 +15861,15 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 15,
         fontWeight: 800,
-        color: lgMatchType === k ? t.ac : t.tx
+        color: lgMatchType === k ? t.ac : t.tx,
+        whiteSpace: "nowrap"
       }
     }, lb), React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: "clamp(10px, 3vw, 11px)",
         color: t.dm,
-        marginTop: 3
+        marginTop: 3,
+        whiteSpace: "nowrap"
       }
     }, sub)))), React.createElement("button", {
       style: {
