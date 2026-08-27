@@ -9156,7 +9156,9 @@ input, select { padding: 10px 14px; }
                   fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px",
                   animation: "oyaBlink 1.1s ease-in-out infinite",
                 }}>
-                  {players[newDealer]} さん
+                  {/* 名前の途中や「さん」だけで折り返さないようにする */}
+                  <span style={{ display: "inline-block" }}>{players[newDealer]}</span>{" "}
+                  <span style={{ display: "inline-block" }}>さん</span>
                 </div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>が起家（親）です</div>
                 {newDealer > 0 && (
@@ -9167,15 +9169,17 @@ input, select { padding: 10px 14px; }
               </div>
             ) : (
               <>
+                {/* まだ決まっていない「仮親」は青。決まった起家は金にして見分けられるようにする */}
                 <div style={{
                   padding: "14px 12px", borderRadius: 14, marginBottom: 12, textAlign: "center",
-                  background: t.gdS, border: `2px solid ${t.gd}66`,
+                  background: t.acS, border: `2px solid ${t.ac}66`,
                 }}>
                   <div style={{ fontSize: 12, color: t.dm, fontWeight: 700, letterSpacing: "0.08em" }}>仮親</div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: t.gd, lineHeight: 1.3, margin: "2px 0 6px" }}>
-                    {players[0]} さん
+                  <div style={{ fontSize: 28, fontWeight: 900, color: t.ac, lineHeight: 1.3, margin: "2px 0 6px" }}>
+                    <span style={{ display: "inline-block" }}>{players[0]}</span>{" "}
+                    <span style={{ display: "inline-block" }}>さん</span>
                   </div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: t.tx }}>サイコロを振ってください</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: t.tx, textWrap: "balance" }}>サイコロを振ってください</div>
                 </div>
                 <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginBottom: 12, lineHeight: 1.7 }}>
                   仮親から反時計回りに数えて、出た目の席の人が起家（最初の親）になります
@@ -9200,7 +9204,10 @@ input, select { padding: 10px 14px; }
             <button style={{ ...actionBtn("p"), opacity: oyaDice?.sum > 0 ? 1 : 0.4 }}
               disabled={!(oyaDice?.sum > 0)} onClick={applyOya}>次へ</button>
             <button style={actionBtn()} onClick={() => setSetupStep(nextStep)}>
-              サイコロを使わない（今の東が親）
+              {/* 最終行に数文字だけ残らないよう意味の切れ目で区切る */}
+              {["サイコロを使わない", "（今の東が親）"].map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}
             </button>
           </div>
         );
