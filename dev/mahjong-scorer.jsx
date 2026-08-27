@@ -621,18 +621,15 @@ export default function MahjongScorer() {
   const PONZUKE_UMA = [30, 10, -10, -30];
   const newPonzukeDraft = () => {
     const d = newLeagueDraft();
-    const dt = new Date();
-    const iso = (x) => `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
     return {
       ...d,
       preset: "ponzuke",
       playerCount: 4,
       scoring: "avg",
       minGames: PONZUKE_MIN_GAMES,
-      // 半荘数は人によって変わるので、終わり方は期間で決める
-      mode: "period",
-      startDate: iso(dt),
-      endDate: iso(new Date(dt.getTime() + 1000 * 60 * 60 * 24 * 90)),
+      // 5人が規定16半荘に届く回数（5×16÷4）を初期値にする
+      mode: "count",
+      targetCount: 20,
       rules: { ...d.rules, startPoints: 30000, returnPoints: 30000 },
       umaKey: "10-30",
       uma: [...PONZUKE_UMA],
@@ -7695,50 +7692,32 @@ input, select { padding: 10px 14px; }
           }}>👤 名前を追加・編集する</button>
         </div>
 
-        {/* 期間 or 回数 */}
+        {/* 終わり方（回数のみ。期間で終わる方式は使わない） */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>3. 終わり方</div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            {[["count", "回数で決める"], ["period", "期間で決める"]].map(([k, lb]) => (
-              <button key={k} onClick={() => set({ mode: k })} style={{
-                flex: 1, padding: "12px 6px", borderRadius: 10, cursor: "pointer",
-                border: `2px solid ${d.mode === k ? t.ac : t.bd}`,
-                background: d.mode === k ? t.acS : "transparent",
-                color: d.mode === k ? t.ac : t.tx, fontSize: 13, fontWeight: 700,
-              }}>{lb}</button>
+          <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>何回で終わりにしますか（2〜100）</div>
+          <select
+            value={d.targetCount}
+            onChange={e => set({ targetCount: parseInt(e.target.value, 10) })}
+            style={{ ...selectStyle, fontSize: 17, fontWeight: 800, padding: "14px 12px", textAlign: "center" }}
+          >
+            {Array.from({ length: 99 }, (_, i) => i + 2).map(n => (
+              <option key={n} value={n}>{n} 回</option>
             ))}
+          </select>
+          <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
+            この回数に達すると自動で終了になります
           </div>
-          {d.mode === "count" ? (
-            <div>
-              <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>何回で終わりにしますか（2〜100）</div>
-              <select
-                value={d.targetCount}
-                onChange={e => set({ targetCount: parseInt(e.target.value, 10) })}
-                style={{ ...selectStyle, fontSize: 17, fontWeight: 800, padding: "14px 12px", textAlign: "center" }}
-              >
-                {Array.from({ length: 99 }, (_, i) => i + 2).map(n => (
-                  <option key={n} value={n}>{n} 回</option>
-                ))}
-              </select>
-              <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>
-                この回数に達すると自動で終了になります
+          {/* 規定半荘に全員を届かせるのに必要な回数の目安 */}
+          {d.scoring === "avg" && (d.minGames ?? 0) > 0 && d.members.length >= lgPC && (() => {
+            const need = Math.ceil(d.members.length * d.minGames / lgPC);
+            return (
+              <div style={{ fontSize: 10, color: need > d.targetCount ? t.gd : t.dm, marginTop: 6, lineHeight: 1.8 }}>
+                {`全員が規定${d.minGames}半荘に届くには ${need}回 くらい必要です`}
+                {`（${d.members.length}人 × ${d.minGames}半荘 ÷ ${lgPC}人）`}
               </div>
-            </div>
-          ) : (
-            /* 日付の入力欄は中身の最小幅が大きいので、狭い画面では縦に積む */
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 150px", minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>開始</div>
-                <input type="date" value={d.startDate} onChange={e => set({ startDate: e.target.value })}
-                  style={{ ...inputStyle, colorScheme: "dark", fontSize: 13, minWidth: 0, padding: "10px 8px" }} />
-              </div>
-              <div style={{ flex: "1 1 150px", minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>終了</div>
-                <input type="date" value={d.endDate} onChange={e => set({ endDate: e.target.value })}
-                  style={{ ...inputStyle, colorScheme: "dark", fontSize: 13, minWidth: 0, padding: "10px 8px" }} />
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* 順位の決め方 */}
@@ -8307,7 +8286,11 @@ input, select { padding: 10px 14px; }
             })()}
 
             <button style={{ ...actionBtn(), marginTop: 16 }}
-              onClick={() => { setLgDraft({ ...lg }); setView("leagueform"); }}>設定を変更する</button>
+              onClick={() => {
+                // 期間で終わる方式はやめたので、古い記録も回数に揃えてから開く
+                setLgDraft({ ...lg, mode: "count", targetCount: lg.targetCount || Math.max(2, (lg.games || []).length + 10) });
+                setView("leagueform");
+              }}>設定を変更する</button>
 
             <button style={{ ...actionBtn(), color: lg.status === "active" ? t.gd : t.gn }}
               onClick={() => saveLeagues(leagues.map(l => l.id === lg.id

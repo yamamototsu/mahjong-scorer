@@ -836,17 +836,14 @@ function MahjongScorer() {
   const PONZUKE_UMA = [30, 10, -10, -30];
   const newPonzukeDraft = () => {
     const d = newLeagueDraft();
-    const dt = new Date();
-    const iso = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
     return {
       ...d,
       preset: "ponzuke",
       playerCount: 4,
       scoring: "avg",
       minGames: PONZUKE_MIN_GAMES,
-      mode: "period",
-      startDate: iso(dt),
-      endDate: iso(new Date(dt.getTime() + 1000 * 60 * 60 * 24 * 90)),
+      mode: "count",
+      targetCount: 20,
       rules: {
         ...d.rules,
         startPoints: 30000,
@@ -14504,28 +14501,6 @@ input, select { padding: 10px 14px; }
       }
     }, "3. 終わり方"), React.createElement("div", {
       style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 12
-      }
-    }, [["count", "回数で決める"], ["period", "期間で決める"]].map(([k, lb]) => React.createElement("button", {
-      key: k,
-      onClick: () => set({
-        mode: k
-      }),
-      style: {
-        flex: 1,
-        padding: "12px 6px",
-        borderRadius: 10,
-        cursor: "pointer",
-        border: `2px solid ${d.mode === k ? t.ac : t.bd}`,
-        background: d.mode === k ? t.acS : "transparent",
-        color: d.mode === k ? t.ac : t.tx,
-        fontSize: 13,
-        fontWeight: 700
-      }
-    }, lb))), d.mode === "count" ? React.createElement("div", null, React.createElement("div", {
-      style: {
         fontSize: 11,
         color: t.dm,
         marginBottom: 6
@@ -14551,63 +14526,20 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 10,
         color: t.dm,
-        marginTop: 6
+        marginTop: 6,
+        lineHeight: 1.8
       }
-    }, "この回数に達すると自動で終了になります")) : React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        flexWrap: "wrap"
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: "1 1 150px",
-        minWidth: 0
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        marginBottom: 5
-      }
-    }, "開始"), React.createElement("input", {
-      type: "date",
-      value: d.startDate,
-      onChange: e => set({
-        startDate: e.target.value
-      }),
-      style: {
-        ...inputStyle,
-        colorScheme: "dark",
-        fontSize: 13,
-        minWidth: 0,
-        padding: "10px 8px"
-      }
-    })), React.createElement("div", {
-      style: {
-        flex: "1 1 150px",
-        minWidth: 0
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        marginBottom: 5
-      }
-    }, "終了"), React.createElement("input", {
-      type: "date",
-      value: d.endDate,
-      onChange: e => set({
-        endDate: e.target.value
-      }),
-      style: {
-        ...inputStyle,
-        colorScheme: "dark",
-        fontSize: 13,
-        minWidth: 0,
-        padding: "10px 8px"
-      }
-    })))), React.createElement("div", {
+    }, "この回数に達すると自動で終了になります"), d.scoring === "avg" && (d.minGames ?? 0) > 0 && d.members.length >= lgPC && (() => {
+      const need = Math.ceil(d.members.length * d.minGames / lgPC);
+      return React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: need > d.targetCount ? t.gd : t.dm,
+          marginTop: 6,
+          lineHeight: 1.8
+        }
+      }, `全員が規定${d.minGames}半荘に届くには ${need}回 くらい必要です`, `（${d.members.length}人 × ${d.minGames}半荘 ÷ ${lgPC}人）`);
+    })()), React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -15704,7 +15636,9 @@ input, select { padding: 10px 14px; }
       },
       onClick: () => {
         setLgDraft({
-          ...lg
+          ...lg,
+          mode: "count",
+          targetCount: lg.targetCount || Math.max(2, (lg.games || []).length + 10)
         });
         setView("leagueform");
       }
