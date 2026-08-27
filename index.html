@@ -2090,7 +2090,12 @@ function MahjongScorer() {
         fontSize: 15,
         fontWeight: 700
       }
-    }, "それぞれのルールの説明を見る"), open && React.createElement("div", {
+    }, ["それぞれの", "ルールの説明を見る"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), open && React.createElement("div", {
       onClick: () => setOpen(false),
       style: {
         position: "fixed",
@@ -2514,38 +2519,53 @@ function MahjongScorer() {
     }
   }, React.createElement("span", {
     style: {
-      fontSize: 14
+      fontSize: 14,
+      textWrap: "balance"
     }
   }, label), React.createElement("button", {
     onClick: onToggle,
+    "aria-label": label,
+    style: {
+      width: 48,
+      minHeight: 34,
+      padding: 0,
+      border: "none",
+      background: "transparent",
+      cursor: "pointer",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, React.createElement("span", {
     style: {
       width: 48,
       height: 26,
       borderRadius: 13,
-      border: "none",
-      cursor: "pointer",
-      flexShrink: 0,
+      display: "block",
       background: on ? t.ac : t.bd,
       position: "relative",
       transition: "background 0.2s"
     }
-  }, React.createElement("div", {
+  }, React.createElement("span", {
     style: {
       width: 20,
       height: 20,
       borderRadius: "50%",
       background: "#fff",
+      display: "block",
       position: "absolute",
       top: 3,
       left: on ? 25 : 3,
       transition: "left 0.2s"
     }
-  }))), desc && React.createElement("div", {
+  })))), desc && React.createElement("div", {
     style: {
       fontSize: 10,
       color: t.dm,
       lineHeight: 1.7,
-      marginTop: 4
+      marginTop: 4,
+      textWrap: "balance"
     }
   }, desc));
   const Dots = ({
@@ -8009,15 +8029,25 @@ input, select { padding: 10px 14px; }
       onClick: () => onChange(on ? 0 : 0.1),
       style: {
         width: 48,
-        height: 28,
-        borderRadius: 14,
+        minHeight: 34,
         border: "none",
         padding: 0,
         cursor: "pointer",
+        background: "transparent",
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, React.createElement("span", {
+      style: {
+        width: 48,
+        height: 28,
+        borderRadius: 14,
+        display: "block",
         background: on ? t.gd : t.bd,
         position: "relative",
-        transition: "background 0.15s",
-        flexShrink: 0
+        transition: "background 0.15s"
       }
     }, React.createElement("span", {
       style: {
@@ -8030,7 +8060,7 @@ input, select { padding: 10px 14px; }
         background: "#fff",
         transition: "left 0.15s"
       }
-    }))), on && React.createElement(React.Fragment, null, React.createElement("div", {
+    })))), on && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         marginBottom: 12,
         padding: 10,
@@ -10177,9 +10207,10 @@ input, select { padding: 10px 14px; }
   const [rankPeek, setRankPeek] = useState(null);
   const [rankPeekGold, setRankPeekGold] = useState(false);
   const [setOpen, setSetOpen] = useState(null);
-  const secHdr = (id, icon, title, sub) => React.createElement("button", {
+  const [gsOpen, setGsOpen] = useState(null);
+  const secHdrBase = (openId, setOpenId, id, icon, title, sub) => React.createElement("button", {
     key: "sec-" + id,
-    onClick: () => setSetOpen(v => v === id ? null : id),
+    onClick: () => setOpenId(v => v === id ? null : id),
     style: {
       ...card,
       width: "100%",
@@ -10190,7 +10221,7 @@ input, select { padding: 10px 14px; }
       gap: 10,
       cursor: "pointer",
       textAlign: "left",
-      border: `1px solid ${setOpen === id ? t.ac : t.bd}`
+      border: `1px solid ${openId === id ? t.ac : t.bd}`
     }
   }, React.createElement("span", {
     style: {
@@ -10214,24 +10245,28 @@ input, select { padding: 10px 14px; }
       display: "block",
       fontSize: 15,
       fontWeight: 700,
-      color: t.tx
+      color: t.tx,
+      textWrap: "balance"
     }
   }, title), React.createElement("span", {
     style: {
       display: "block",
       fontSize: 11,
       color: t.dm,
-      marginTop: 2
+      marginTop: 2,
+      textWrap: "balance"
     }
   }, sub)), React.createElement("span", {
     style: {
-      color: setOpen === id ? t.ac : t.dm,
+      color: openId === id ? t.ac : t.dm,
       fontSize: 13,
       flexShrink: 0,
-      transform: setOpen === id ? "rotate(180deg)" : "none",
+      transform: openId === id ? "rotate(180deg)" : "none",
       transition: "transform 0.2s"
     }
   }, "▼"));
+  const secHdr = (id, icon, title, sub) => secHdrBase(setOpen, setSetOpen, id, icon, title, sub);
+  const gsHdr = (id, icon, title, sub) => secHdrBase(gsOpen, setGsOpen, id, icon, title, sub);
   const [showPayView, setShowPayView] = useState(false);
   const [yakuInfo, setYakuInfo] = useState(null);
   const [startSplash, setStartSplash] = useState(null);
@@ -11230,15 +11265,25 @@ input, select { padding: 10px 14px; }
     onClick: () => row.save(!row.on),
     style: {
       width: 48,
-      height: 28,
-      borderRadius: 14,
+      minHeight: 34,
       border: "none",
       padding: 0,
       cursor: "pointer",
+      background: "transparent",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 48,
+      height: 28,
+      borderRadius: 14,
+      display: "block",
       background: row.on ? t.ac : t.bd,
       position: "relative",
-      transition: "background 0.15s",
-      flexShrink: 0
+      transition: "background 0.15s"
     }
   }, React.createElement("span", {
     style: {
@@ -11251,7 +11296,7 @@ input, select { padding: 10px 14px; }
       background: "#fff",
       transition: "left 0.15s"
     }
-  }))))), React.createElement("div", {
+  })))))), React.createElement("div", {
     style: {
       fontSize: 10,
       color: t.dm,
@@ -11487,15 +11532,25 @@ input, select { padding: 10px 14px; }
         onClick: onToggle,
         style: {
           width: 48,
-          height: 28,
-          borderRadius: 14,
+          minHeight: 34,
           border: "none",
           padding: 0,
           cursor: "pointer",
+          background: "transparent",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      }, React.createElement("span", {
+        style: {
+          width: 48,
+          height: 28,
+          borderRadius: 14,
+          display: "block",
           background: on ? t.ac : t.bd,
           position: "relative",
-          transition: "background 0.15s",
-          flexShrink: 0
+          transition: "background 0.15s"
         }
       }, React.createElement("span", {
         style: {
@@ -11508,7 +11563,7 @@ input, select { padding: 10px 14px; }
           background: "#fff",
           transition: "left 0.15s"
         }
-      }))), hint && React.createElement("div", {
+      })))), hint && React.createElement("div", {
         style: {
           fontSize: 11,
           color: "#b9c6d8",
@@ -13583,7 +13638,8 @@ input, select { padding: 10px 14px; }
     }, "ルールの初期値"), React.createElement("div", {
       style: {
         fontSize: 11,
-        color: t.dm
+        color: t.dm,
+        textWrap: "balance"
       }
     }, "新しい対局を始める時の初期設定"))), RuleHelp(), React.createElement("div", {
       style: {
@@ -13751,23 +13807,35 @@ input, select { padding: 10px 14px; }
       }, React.createElement("span", {
         style: {
           fontSize: 14,
-          color: t.tx
+          color: t.tx,
+          textWrap: "balance"
         }
       }, label), React.createElement("button", {
         onClick: () => editDraft({
           [key]: !on
         }),
+        "aria-label": label,
+        style: {
+          width: 48,
+          minHeight: 34,
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          background: "transparent",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      }, React.createElement("span", {
         style: {
           width: 48,
           height: 28,
           borderRadius: 14,
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
+          display: "block",
           background: on ? t.ac : t.bd,
           position: "relative",
-          transition: "background 0.15s",
-          flexShrink: 0
+          transition: "background 0.15s"
         }
       }, React.createElement("span", {
         style: {
@@ -13780,7 +13848,7 @@ input, select { padding: 10px 14px; }
           background: "#fff",
           transition: "left 0.15s"
         }
-      }))), hint && React.createElement("div", {
+      })))), hint && React.createElement("div", {
         style: {
           fontSize: 10,
           color: t.dm,
@@ -17643,7 +17711,13 @@ input, select { padding: 10px 14px; }
       transform: rulesOpen ? "rotate(180deg)" : "none",
       transition: "transform 0.2s"
     }
-  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, RuleHelp(), React.createElement("div", {
+  }, "▼")), rulesOpen && React.createElement(React.Fragment, null, gsHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値"), gsOpen === "rules" && React.createElement("div", {
+    style: {
+      ...card,
+      padding: "16px clamp(9px, 4vw, 16px)",
+      marginTop: 4
+    }
+  }, RuleHelp(), React.createElement("div", {
     style: {
       marginBottom: 8,
       marginTop: 16
@@ -17716,7 +17790,11 @@ input, select { padding: 10px 14px; }
         borderRadius: "50%",
         background: t.ac
       }
-    })), React.createElement("span", null, React.createElement("span", {
+    })), React.createElement("span", {
+      style: {
+        textWrap: "balance"
+      }
+    }, React.createElement("span", {
       style: {
         display: "block",
         fontSize: 14,
@@ -17810,7 +17888,11 @@ input, select { padding: 10px 14px; }
         borderRadius: "50%",
         background: t.ac
       }
-    })), React.createElement("span", null, React.createElement("span", {
+    })), React.createElement("span", {
+      style: {
+        textWrap: "balance"
+      }
+    }, React.createElement("span", {
       style: {
         display: "block",
         fontSize: 14,
@@ -17883,10 +17965,11 @@ input, select { padding: 10px 14px; }
   })), "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます"), toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({
     ...r,
     tobiEnd: r.tobiEnd === false
-  })), "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")), React.createElement("div", {
+  })), "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）"))), gsHdr("uma", "🏅", "ウマ・オカ設定", "順位点・持ち点・返し点"), gsOpen === "uma" && React.createElement("div", {
     style: {
-      marginTop: 18,
-      marginBottom: 8
+      ...card,
+      padding: 16,
+      marginTop: 4
     }
   }, React.createElement(UmaOkaSettings, {
     rules: rules,
@@ -17894,7 +17977,13 @@ input, select { padding: 10px 14px; }
       ...r,
       ...patch
     }))
-  }), React.createElement(RateSetting, {
+  })), gsHdr("rate", "💰", "レート設定", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${rules.rateUnit || "G"}` : "レート計算なし"), gsOpen === "rate" && React.createElement("div", {
+    style: {
+      ...card,
+      padding: 16,
+      marginTop: 4
+    }
+  }, React.createElement(RateSetting, {
     rate: rules.rate || 0,
     onChange: v => setRules(r => ({
       ...r,
@@ -17905,7 +17994,7 @@ input, select { padding: 10px 14px; }
       ...r,
       rateUnit: u
     }))
-  }))), rulesOpen && React.createElement("div", {
+  })), gsHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), gsOpen === "dice" && dicePanelCard(), gsHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`), gsOpen === "voice" && voicePanelCard(), gsHdr("screen", "💡", "画面設定", "対局中のスリープ防止"), gsOpen === "screen" && screenPanelCard()), rulesOpen && React.createElement("div", {
     style: {
       marginTop: 16
     }
@@ -17919,7 +18008,12 @@ input, select { padding: 10px 14px; }
       setRulesOpen(false);
       setSetupStep(0);
     }
-  }, "ルール確定・メンバー選択へ"), !matchType && React.createElement("div", {
+  }, ["ルール確定・", "メンバー選択へ"].map((x, k) => React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-block"
+    }
+  }, x))), !matchType && React.createElement("div", {
     style: {
       fontSize: 11,
       color: t.dm,

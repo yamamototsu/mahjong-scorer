@@ -1515,7 +1515,10 @@ export default function MahjongScorer() {
           width: "100%", padding: "13px 8px", borderRadius: 9, cursor: "pointer",
           border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
           fontSize: 15, fontWeight: 700,
-        }}>それぞれのルールの説明を見る</button>
+        }}>{/* 最終行に数文字だけ残らないよう意味の切れ目で区切る */
+          ["それぞれの", "ルールの説明を見る"].map((x, k) => (
+            <span key={k} style={{ display: "inline-block" }}>{x}</span>
+          ))}</button>
 
         {open && (
           <div onClick={() => setOpen(false)} style={{
@@ -1742,18 +1745,26 @@ export default function MahjongScorer() {
   const toggleRow = (label, on, onToggle, desc) => (
     <div style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 14 }}>{label}</span>
-        <button onClick={onToggle} style={{
-          width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer", flexShrink: 0,
-          background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
+        <span style={{ fontSize: 14, textWrap: "balance" }}>{label}</span>
+        {/* スイッチの見た目は48×26のまま、指で押せるよう当たり判定だけ縦に広げる */}
+        <button onClick={onToggle} aria-label={label} style={{
+          width: 48, minHeight: 34, padding: 0, border: "none", background: "transparent",
+          cursor: "pointer", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <div style={{
-            width: 20, height: 20, borderRadius: "50%", background: "#fff",
-            position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
-          }} />
+          <span style={{
+            width: 48, height: 26, borderRadius: 13, display: "block",
+            background: on ? t.ac : t.bd, position: "relative", transition: "background 0.2s",
+          }}>
+            <span style={{
+              width: 20, height: 20, borderRadius: "50%", background: "#fff", display: "block",
+              position: "absolute", top: 3, left: on ? 25 : 3, transition: "left 0.2s",
+            }} />
+          </span>
         </button>
       </div>
-      {desc && <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 4 }}>{desc}</div>}
+      {/* 最終行に数文字だけ残る折り返しを避ける */}
+      {desc && <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 4, textWrap: "balance" }}>{desc}</div>}
     </div>
   );
 
@@ -4058,10 +4069,17 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>点数を違うレート単位で表示します。</div>
           </div>
           <button onClick={() => onChange(on ? 0 : 0.1)} style={{
-            width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-            background: on ? t.gd : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+            // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
+            width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
+            background: "transparent", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+            <span style={{
+              width: 48, height: 28, borderRadius: 14, display: "block",
+              background: on ? t.gd : t.bd, position: "relative", transition: "background 0.15s",
+            }}>
+              <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+            </span>
           </button>
         </div>
 
@@ -5156,26 +5174,31 @@ input, select { padding: 10px 14px; }
   const [rankPeek, setRankPeek] = useState(null);         // 長押しで順位・点差を表示するプレイヤーのindex
   const [rankPeekGold, setRankPeekGold] = useState(false); // 順位ビューでレート換算を表示
   const [setOpen, setSetOpen] = useState(null); // 設定画面のアコーディオン（開いている項目）
-  const secHdr = (id, icon, title, sub) => (
-    <button key={"sec-" + id} onClick={() => setSetOpen(v => (v === id ? null : id))} style={{
+  const [gsOpen, setGsOpen] = useState(null);   // 対局開始のルール設定のアコーディオン
+  // 折りたたみ見出し。設定画面と、対局開始のルール設定で同じ見た目を使う
+  const secHdrBase = (openId, setOpenId, id, icon, title, sub) => (
+    <button key={"sec-" + id} onClick={() => setOpenId(v => (v === id ? null : id))} style={{
       ...card, width: "100%", padding: 14, marginTop: 4,
       display: "flex", alignItems: "center", gap: 10, cursor: "pointer", textAlign: "left",
-      border: `1px solid ${setOpen === id ? t.ac : t.bd}`,
+      border: `1px solid ${openId === id ? t.ac : t.bd}`,
     }}>
       <span style={{
         fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
         display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
       }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: t.tx }}>{title}</span>
-        <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2 }}>{sub}</span>
+        <span style={{ display: "block", fontSize: 15, fontWeight: 700, color: t.tx, textWrap: "balance" }}>{title}</span>
+        <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, textWrap: "balance" }}>{sub}</span>
       </span>
       <span style={{
-        color: setOpen === id ? t.ac : t.dm, fontSize: 13, flexShrink: 0,
-        transform: setOpen === id ? "rotate(180deg)" : "none", transition: "transform 0.2s",
+        color: openId === id ? t.ac : t.dm, fontSize: 13, flexShrink: 0,
+        transform: openId === id ? "rotate(180deg)" : "none", transition: "transform 0.2s",
       }}>▼</span>
     </button>
   );
+  const secHdr = (id, icon, title, sub) => secHdrBase(setOpen, setSetOpen, id, icon, title, sub);
+  // 対局開始のルール設定用（設定画面とは別に開閉を持つ）
+  const gsHdr = (id, icon, title, sub) => secHdrBase(gsOpen, setGsOpen, id, icon, title, sub);
   const [showPayView, setShowPayView] = useState(false);  // 卓上表示（点数の受け渡しを矢印で表示）
   const [yakuInfo, setYakuInfo] = useState(null);         // 長押しで説明を出す役
   const [startSplash, setStartSplash] = useState(null);   // 対局開始の演出 { league, gameNo, matchType, date, seats }
@@ -5783,10 +5806,17 @@ input, select { padding: 10px 14px; }
               fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
             }}>▶ 試聴</button>
             <button onClick={() => row.save(!row.on)} style={{
-              width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-              background: row.on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+              // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
+              width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
+              background: "transparent", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+              <span style={{
+                width: 48, height: 28, borderRadius: 14, display: "block",
+                background: row.on ? t.ac : t.bd, position: "relative", transition: "background 0.15s",
+              }}>
+                <span style={{ position: "absolute", top: 3, left: row.on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+              </span>
             </button>
           </div>
         </div>
@@ -5949,10 +5979,17 @@ input, select { padding: 10px 14px; }
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: t.tx }}>{label}</span>
                   <button onClick={onToggle} style={{
-                    width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-                    background: on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+                    // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
+                    width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
+                    background: "transparent", flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
-                    <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+                    <span style={{
+                      width: 48, height: 28, borderRadius: 14, display: "block",
+                      background: on ? t.ac : t.bd, position: "relative", transition: "background 0.15s",
+                    }}>
+                      <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+                    </span>
                   </button>
                 </div>
                 {hint && <div style={{ fontSize: 11, color: "#b9c6d8", marginTop: 4, lineHeight: 1.6 }}>{hint}</div>}
@@ -7132,7 +7169,7 @@ input, select { padding: 10px 14px; }
                 }}>📏</span>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>ルールの初期値</div>
-                  <div style={{ fontSize: 11, color: t.dm }}>新しい対局を始める時の初期設定</div>
+                  <div style={{ fontSize: 11, color: t.dm, textWrap: "balance" }}>新しい対局を始める時の初期設定</div>
                 </div>
               </div>
 
@@ -7215,16 +7252,23 @@ input, select { padding: 10px 14px; }
                 return (
                 <div key={key} style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontSize: 14, color: t.tx }}>{label}</span>
-                    <button onClick={() => editDraft({ [key]: !on })} style={{
-                      width: 48, height: 28, borderRadius: 14, border: "none", padding: 0, cursor: "pointer",
-                      background: on ? t.ac : t.bd, position: "relative", transition: "background 0.15s", flexShrink: 0,
+                    <span style={{ fontSize: 14, color: t.tx, textWrap: "balance" }}>{label}</span>
+                    <button onClick={() => editDraft({ [key]: !on })} aria-label={label} style={{
+                      // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
+                      width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
+                      background: "transparent", flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <span style={{
-                        position: "absolute", top: 3, left: on ? 23 : 3,
-                        width: 22, height: 22, borderRadius: "50%", background: "#fff",
-                        transition: "left 0.15s",
-                      }} />
+                        width: 48, height: 28, borderRadius: 14, display: "block",
+                        background: on ? t.ac : t.bd, position: "relative", transition: "background 0.15s",
+                      }}>
+                        <span style={{
+                          position: "absolute", top: 3, left: on ? 23 : 3,
+                          width: 22, height: 22, borderRadius: "50%", background: "#fff",
+                          transition: "left 0.15s",
+                        }} />
+                      </span>
                     </button>
                   </div>
                   {hint && <div style={{ fontSize: 10, color: t.dm, marginTop: 3 }}>{hint}</div>}
@@ -9272,115 +9316,144 @@ input, select { padding: 10px 14px; }
           </button>
 
           {rulesOpen && (<>
-          {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
-          {RuleHelp()}
+          {/* 設定画面（ルール初期値）と同じ折りたたみ方にそろえる。
+              プレーヤー名・グループは対局開始時には不要なので置かない */}
+          {gsHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値")}
+          {gsOpen === "rules" && (
+            // 狭い画面では左右の余白を詰めて、説明文が細切れに折り返さないようにする
+            <div style={{ ...card, padding: "16px clamp(9px, 4vw, 16px)", marginTop: 4 }}>
+            {/* 各ルールの説明は、設定を触る前に読めるよう先頭に置く */}
+            {RuleHelp()}
 
-          <div style={{ marginBottom: 8, marginTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>流局したときの親</div>
-            <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>誰もアガらずに流局した場合、親を続けるかどうか</div>
-            {[
-              { key: "agari",  label: "あがり連荘",   desc: "流局したら親は必ず流れる（一般的）" },
-              { key: "tenpai", label: "テンパイ連荘", desc: "親がテンパイなら続行、ノーテンなら流れる" },
-              { key: "always", label: "無条件連荘",   desc: "流局したら親は必ず続行（ノーテンでも）" },
-            ].map(o => {
-              const cur = rules.agariRenchan ? "agari" : rules.tenpaiRenchan ? "tenpai" : "always";
-              const on = cur === o.key;
-              return (
-                <button key={o.key} onClick={() => setRules(r => ({
-                  ...r,
-                  agariRenchan: o.key === "agari",
-                  tenpaiRenchan: o.key === "tenpai",
-                }))} style={{
-                  width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 10,
-                  padding: "11px 12px", marginBottom: 6, borderRadius: 10, cursor: "pointer",
-                  border: `2px solid ${on ? t.ac : t.bd}`,
-                  background: on ? t.acS : "transparent",
-                }}>
-                  <span style={{
-                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+            <div style={{ marginBottom: 8, marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>流局したときの親</div>
+              <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>誰もアガらずに流局した場合、親を続けるかどうか</div>
+              {[
+                { key: "agari",  label: "あがり連荘",   desc: "流局したら親は必ず流れる（一般的）" },
+                { key: "tenpai", label: "テンパイ連荘", desc: "親がテンパイなら続行、ノーテンなら流れる" },
+                { key: "always", label: "無条件連荘",   desc: "流局したら親は必ず続行（ノーテンでも）" },
+              ].map(o => {
+                const cur = rules.agariRenchan ? "agari" : rules.tenpaiRenchan ? "tenpai" : "always";
+                const on = cur === o.key;
+                return (
+                  <button key={o.key} onClick={() => setRules(r => ({
+                    ...r,
+                    agariRenchan: o.key === "agari",
+                    tenpaiRenchan: o.key === "tenpai",
+                  }))} style={{
+                    width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 10,
+                    padding: "11px 12px", marginBottom: 6, borderRadius: 10, cursor: "pointer",
                     border: `2px solid ${on ? t.ac : t.bd}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: on ? t.acS : "transparent",
                   }}>
-                    {on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.ac }} />}
-                  </span>
-                  <span>
-                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: on ? t.ac : t.tx }}>{o.label}</span>
-                    <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.5 }}>{o.desc}</span>
-                  </span>
-                </button>
-              );
-            })}
-            <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
-              ※ どのルールでも、ノーテン罰符3,000点のやりとりと本場の加算は行われます
+                    <span style={{
+                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                      border: `2px solid ${on ? t.ac : t.bd}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.ac }} />}
+                    </span>
+                    {/* 最終行に数文字だけ残る折り返しを避ける */}
+                    <span style={{ textWrap: "balance" }}>
+                      <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: on ? t.ac : t.tx }}>{o.label}</span>
+                      <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.5 }}>{o.desc}</span>
+                    </span>
+                  </button>
+                );
+              })}
+              <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
+                ※ どのルールでも、ノーテン罰符3,000点のやりとりと本場の加算は行われます
+              </div>
             </div>
-          </div>
 
-          <div style={{ marginBottom: 8, marginTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>複数人が同時にロン</div>
-            <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>1つの捨て牌に2人以上がロンを宣言したときの扱い</div>
-            {[
-              { key: "atamahane", label: "頭ハネ（アタマハネ）", desc: "放銃者に近い1人だけがアガリ。他は無効" },
-              { key: "double",    label: "ダブロンあり",         desc: "2人まで同時にアガれる" },
-              { key: "triple",    label: "トリプルロンあり",     desc: "3人同時のアガリも認める" },
-            ].map(o => {
-              const on = (rules.multiRon || "atamahane") === o.key;
-              return (
-                <button key={o.key} onClick={() => setRules(r => ({ ...r, multiRon: o.key }))} style={{
-                  width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 10,
-                  padding: "11px 12px", marginBottom: 6, borderRadius: 10, cursor: "pointer",
-                  border: `2px solid ${on ? t.ac : t.bd}`,
-                  background: on ? t.acS : "transparent",
-                }}>
-                  <span style={{
-                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+            <div style={{ marginBottom: 8, marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>複数人が同時にロン</div>
+              <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>1つの捨て牌に2人以上がロンを宣言したときの扱い</div>
+              {[
+                { key: "atamahane", label: "頭ハネ（アタマハネ）", desc: "放銃者に近い1人だけがアガリ。他は無効" },
+                { key: "double",    label: "ダブロンあり",         desc: "2人まで同時にアガれる" },
+                { key: "triple",    label: "トリプルロンあり",     desc: "3人同時のアガリも認める" },
+              ].map(o => {
+                const on = (rules.multiRon || "atamahane") === o.key;
+                return (
+                  <button key={o.key} onClick={() => setRules(r => ({ ...r, multiRon: o.key }))} style={{
+                    width: "100%", textAlign: "left", display: "flex", alignItems: "flex-start", gap: 10,
+                    padding: "11px 12px", marginBottom: 6, borderRadius: 10, cursor: "pointer",
                     border: `2px solid ${on ? t.ac : t.bd}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: on ? t.acS : "transparent",
                   }}>
-                    {on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.ac }} />}
-                  </span>
-                  <span>
-                    <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: on ? t.ac : t.tx }}>{o.label}</span>
-                    <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.5 }}>{o.desc}</span>
-                  </span>
-                </button>
-              );
-            })}
-            <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
-              ※ 本場と供託は、放銃者から反時計回りに最も近い人が受け取ります
+                    <span style={{
+                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                      border: `2px solid ${on ? t.ac : t.bd}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {on && <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.ac }} />}
+                    </span>
+                    {/* 最終行に数文字だけ残る折り返しを避ける */}
+                    <span style={{ textWrap: "balance" }}>
+                      <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: on ? t.ac : t.tx }}>{o.label}</span>
+                      <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.5 }}>{o.desc}</span>
+                    </span>
+                  </button>
+                );
+              })}
+              <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
+                ※ 本場と供託は、放銃者から反時計回りに最も近い人が受け取ります
+              </div>
             </div>
-          </div>
 
-          <div style={{ marginBottom: 8, marginTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>オーラス（最終局）</div>
-            <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>
-              {matchType === "tonpu" ? "東4局" : matchType === "zenchan" ? "北4局" : "南4局"}で親がアガった、または流局で親が続く場合の扱い
+            <div style={{ marginBottom: 8, marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4, letterSpacing: "0.05em" }}>オーラス（最終局）</div>
+              <div style={{ fontSize: 10, color: t.dm, marginBottom: 8 }}>
+                {matchType === "tonpu" ? "東4局" : matchType === "zenchan" ? "北4局" : "南4局"}で親がアガった、または流局で親が続く場合の扱い
+              </div>
+              {/* 説明文は toggleRow に渡す（外に置くと区切り線が文字の上を横切る） */}
+              {toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({ ...r, orasYame: r.orasYame === false })),
+                rules.orasYame !== false
+                  ? "ON：親がトップの状態でアガる／テンパイで流局すると、そこで対局終了（アガリやめ・テンパイやめ）。トップでなければ連荘して続行します。"
+                  : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。")}
             </div>
-            {/* 説明文は toggleRow に渡す（外に置くと区切り線が文字の上を横切る） */}
-            {toggleRow("親がトップなら終了", rules.orasYame !== false, () => setRules(r => ({ ...r, orasYame: r.orasYame === false })),
-              rules.orasYame !== false
-                ? "ON：親がトップの状態でアガる／テンパイで流局すると、そこで対局終了（アガリやめ・テンパイやめ）。トップでなければ連荘して続行します。"
-                : "OFF：親がトップでも連荘して続行します。子がアガるか、親が流れるまで終わりません。")}
-          </div>
 
-          <div style={{ marginBottom: 8, marginTop: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8, letterSpacing: "0.05em" }}>その他</div>
-            {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })),
-              "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます")}
-            {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })),
-              "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け")}
-            {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })),
-              "ONにすると4翻30符・3翻60符を満貫扱い")}
-            {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })),
-              "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます")}
-            {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })),
-              "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")}
-          </div>
+            <div style={{ marginBottom: 8, marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8, letterSpacing: "0.05em" }}>その他</div>
+              {toggleRow("食いタンあり", rules.kuitan, () => setRules(r => ({ ...r, kuitan: !r.kuitan })),
+                "鳴いたタンヤオを認めるか。OFFだと鳴くと役なしになる場面が増えます")}
+              {toggleRow("後付けあり", rules.atozuke, () => setRules(r => ({ ...r, atozuke: !r.atozuke })),
+                "役が未確定のまま鳴き、あとから役を確定させてよいか。OFFは完全先付け")}
+              {toggleRow("切り上げ満貫", rules.kiriage, () => setRules(r => ({ ...r, kiriage: !r.kiriage })),
+                "ONにすると4翻30符・3翻60符を満貫扱い")}
+              {toggleRow("ダブル役満あり", rules.doubleYakuman, () => setRules(r => ({ ...r, doubleYakuman: !r.doubleYakuman })),
+                "役満の複合（大三元＋字一色など）を2倍・3倍で計算。役の選択画面から適用されます")}
+              {toggleRow("トビで終了", rules.tobiEnd !== false, () => setRules(r => ({ ...r, tobiEnd: r.tobiEnd === false })),
+                "誰かの持ち点が0未満になった時点で終局（ハコ下・ドボン）")}
+            </div>
+            </div>
+          )}
 
-          <div style={{ marginTop: 18, marginBottom: 8 }}>
-            <UmaOkaSettings rules={rules} onChange={(patch) => setRules(r => ({ ...r, ...patch }))} />
-            <RateSetting rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
-              unit={rules.rateUnit} onUnitChange={(u) => setRules(r => ({ ...r, rateUnit: u }))} />
-          </div>
+          {gsHdr("uma", "🏅", "ウマ・オカ設定", "順位点・持ち点・返し点")}
+          {gsOpen === "uma" && (
+            <div style={{ ...card, padding: 16, marginTop: 4 }}>
+              <UmaOkaSettings rules={rules} onChange={(patch) => setRules(r => ({ ...r, ...patch }))} />
+            </div>
+          )}
+
+          {gsHdr("rate", "💰", "レート設定", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${rules.rateUnit || "G"}` : "レート計算なし")}
+          {gsOpen === "rate" && (
+            <div style={{ ...card, padding: 16, marginTop: 4 }}>
+              <RateSetting rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
+                unit={rules.rateUnit} onUnitChange={(u) => setRules(r => ({ ...r, rateUnit: u }))} />
+            </div>
+          )}
+
+          {gsHdr("dice", "🎲", "サイコロ設定", "結果の表示時間")}
+          {gsOpen === "dice" && dicePanelCard()}
+
+          {gsHdr("voice", "🔊", "音の設定",
+            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
+          {gsOpen === "voice" && voicePanelCard()}
+
+          {gsHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
+          {gsOpen === "screen" && screenPanelCard()}
           </>)}
 
 
@@ -9389,7 +9462,10 @@ input, select { padding: 10px 14px; }
           {rulesOpen && (
             <div style={{ marginTop: 16 }}>
               <button style={{ ...actionBtn("p"), opacity: matchType ? 1 : 0.4 }} disabled={!matchType}
-                onClick={() => { setRulesOpen(false); setSetupStep(0); }}>ルール確定・メンバー選択へ</button>
+                onClick={() => { setRulesOpen(false); setSetupStep(0); }}>{/* 最終行に数文字だけ残らないよう意味の切れ目で区切る */
+              ["ルール確定・", "メンバー選択へ"].map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}</button>
               {!matchType && (
                 <div style={{ fontSize: 11, color: t.dm, textAlign: "center", marginTop: 8 }}>試合形式を選んでください</div>
               )}
