@@ -7684,7 +7684,7 @@ input, select { padding: 10px 14px; }
 
         {/* おすすめのひな形。人数が増えても回しやすい平均ポイント制 */}
         <button onClick={() => { setLgDraft(newPonzukeDraft()); setView("leagueform"); }} style={{
-          width: "100%", padding: "16px 14px", marginBottom: 8, borderRadius: 13, cursor: "pointer",
+          width: "100%", padding: "16px 14px", marginBottom: 18, borderRadius: 13, cursor: "pointer",
           border: `2px solid ${t.gd}`, background: t.gdS, textAlign: "left",
         }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: t.gd }}>🏅 ポンづけリーグ戦を作る</div>
@@ -7693,15 +7693,10 @@ input, select { padding: 10px 14px; }
           </div>
           <div style={{ fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.8 }}>
             順位は1半荘あたりの平均ポイント（規定{PONZUKE_MIN_GAMES}半荘以上）。
-            5人でも10人でも人数を増やせます
+            5人でも10人でも人数を増やせます。次の画面で中身は変えられます
           </div>
         </button>
 
-        <button onClick={() => { setLgDraft(newLeagueDraft()); setView("leagueform"); }} style={{
-          width: "100%", padding: "16px", marginBottom: 18, borderRadius: 13, cursor: "pointer",
-          border: `2px solid ${t.ac}`, background: t.acS,
-          fontSize: 16, fontWeight: 800, color: t.ac,
-        }}>＋ 自分で設定して作る</button>
 
         {active.length > 0 && (
           <>
@@ -7719,7 +7714,7 @@ input, select { padding: 10px 14px; }
           <div style={{ ...card, padding: 20, textAlign: "center" }}>
             <div style={{ fontSize: 13, color: t.dm, lineHeight: 1.9 }}>
               まだリーグ戦がありません。<br />
-              名前・メンバー・回数・ウマを決めて始めましょう。
+              上の「ポンづけリーグ戦を作る」から始めましょう。
             </div>
           </div>
         )}
