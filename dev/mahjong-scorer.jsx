@@ -1093,6 +1093,14 @@ export default function MahjongScorer() {
 
   // ── Calc wizard ──
   const [calcStep, setCalcStep] = useState(0);
+  // 一局計算の人数（4=四人麻雀 / 3=三人麻雀）。次に開いたときも同じ設定にする
+  const [calcPC, setCalcPC] = useState(() => {
+    try { return localStorage.getItem("mj_calc_pc") === "3" ? 3 : 4; } catch { return 4; }
+  });
+  const saveCalcPC = (n) => {
+    setCalcPC(n);
+    try { localStorage.setItem("mj_calc_pc", String(n)); } catch {}
+  };
   const [cTsumo, setCTsumo] = useState(null);
   const [cParent, setCParent] = useState(null);
   const [cHan, setCHan] = useState(null);
@@ -1100,8 +1108,8 @@ export default function MahjongScorer() {
   const resetCalc = useCallback(() => { setCalcStep(0); setCTsumo(null); setCParent(null); setCHan(null); setCFu(null); setGKnownNaki(null); setFuGuide(null); setFuGuideStep(0); }, []);
   const calcResult = useMemo(() => {
     if (cHan === null || cFu === null || cParent === null || cTsumo === null) return null;
-    return calcScore(cFu, cHan, cParent, cTsumo, rules.kiriage);
-  }, [cHan, cFu, cParent, cTsumo, rules.kiriage]);
+    return calcScore(cFu, cHan, cParent, cTsumo, rules.kiriage, calcPC);
+  }, [cHan, cFu, cParent, cTsumo, rules.kiriage, calcPC]);
   const calcLimit = useMemo(() => cHan !== null ? getLimitName(cHan) : null, [cHan]);
 
   // ── Game round wizard ──
@@ -3122,7 +3130,9 @@ export default function MahjongScorer() {
     );
   };
 
-  const ScoreDisplay = ({ han, fu, limit, result, tsumo, parent, extra }) => (
+  const ScoreDisplay = ({ han, fu, limit, result, tsumo, parent, extra, pc }) => {
+    const nPC = pc || PC;   // 一局計算のように対局外から呼ぶときは人数を渡す
+    return (
     <div style={{ background: `linear-gradient(135deg, ${t.card}, ${t.sf})`, borderRadius: 16, padding: 24, textAlign: "center", border: `1px solid ${t.ac}33`, marginBottom: 14 }}>
       {limit && <div style={{ display: "inline-block", padding: "4px 18px", borderRadius: 20, fontSize: 14, fontWeight: 800, background: han >= 13 ? t.gdS : t.acS, color: han >= 13 ? t.gd : t.ac, marginBottom: 12 }}>{limit}</div>}
       <div style={{ fontSize: 13, color: t.dm, marginBottom: 10 }}>
@@ -3130,7 +3140,8 @@ export default function MahjongScorer() {
       </div>
 
       {tsumo ? (
-        parent ? (
+        /* 三人麻雀は子のツモも全員が同額なので、親ツモと同じ見せ方にする */
+        (parent || (result.fromChild != null && result.fromChild === result.fromParent)) ? (
           /* 親ツモ: 全員から同額 */
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10 }}>
@@ -3140,8 +3151,8 @@ export default function MahjongScorer() {
             <div style={{ padding: "12px 0", borderTop: `1px solid ${t.bd}`, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12 }}>
               <span style={{ fontSize: 18, color: t.gd, fontWeight: 800 }}>全員から</span>
               <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1.1 }}>
-                {result.each.toLocaleString()}
-                <span style={{ fontSize: 15, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{PC - 1}</span>
+                {(result.each != null ? result.each : result.fromChild).toLocaleString()}
+                <span style={{ fontSize: 15, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{nPC - 1}</span>
               </span>
             </div>
           </div>
@@ -3156,7 +3167,7 @@ export default function MahjongScorer() {
               <span style={{ fontSize: 18, color: t.ac, fontWeight: 800, width: "min(70px, 20vw)", flexShrink: 0, textAlign: "right" }}>子から</span>
               <span style={{ fontSize: 32, fontWeight: 900, color: t.tx, lineHeight: 1.1, minWidth: "min(110px, 30vw)", textAlign: "left" }}>
                 {result.fromChild.toLocaleString()}
-                {PC - 2 >= 2 && <span style={{ fontSize: 14, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{PC - 2}</span>}
+                {nPC - 2 >= 2 && <span style={{ fontSize: 14, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{nPC - 2}</span>}
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12, padding: "12px 0 0", borderTop: `1px solid ${t.bd}33` }}>
@@ -3174,7 +3185,8 @@ export default function MahjongScorer() {
       )}
       {extra}
     </div>
-  );
+    );
+  };
 
   const body = { padding: "18px 20px 36px", boxSizing: "border-box", maxWidth: "100%", overflowX: "hidden", lineHeight: 1.7 };
 
@@ -9445,6 +9457,33 @@ input, select { padding: 10px 14px; }
   // ══════════════════════════════════
   const renderCalc = () => (
     <div style={body}>
+      {/* 人数はどの段階でも切り替えられる（結果を見てから直せる） */}
+      {!(calcStep === 2 && yakuPickerOpen) && (
+        <div style={{ ...card, padding: 14, marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: t.dm, marginBottom: 8 }}>人数</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {[[4, "四人麻雀", "東南西北"], [3, "三人麻雀", "東南西"]].map(([n, lb, sub]) => (
+              <button key={n} onClick={() => saveCalcPC(n)} style={{
+                flex: 1, minWidth: 0, padding: "12px 4px", borderRadius: 11, cursor: "pointer",
+                border: `2px solid ${calcPC === n ? t.ac : t.bd}`,
+                background: calcPC === n ? t.acS : "transparent",
+                color: calcPC === n ? t.ac : t.dm,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" }}>{lb}</div>
+                <div style={{ fontSize: 10, marginTop: 3, opacity: 0.85, whiteSpace: "nowrap" }}>{sub}</div>
+              </button>
+            ))}
+          </div>
+          {calcPC === 3 && (
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 8, lineHeight: 1.8 }}>
+              {/* 280px幅で途中折り返しさせない */}
+              {["三人麻雀はツモも", "均等払い（親かぶりなし）", "で計算します"].map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {calcStep === 0 && (
         <div style={card}>
           <Dots total={4} cur={0} />
@@ -9544,7 +9583,7 @@ input, select { padding: 10px 14px; }
       )}
       {calcStep === 4 && calcResult && (
         <>
-          <ScoreDisplay han={cHan} fu={cFu} limit={calcLimit} result={calcResult} tsumo={cTsumo} parent={cParent} />
+          <ScoreDisplay han={cHan} fu={cFu} limit={calcLimit} result={calcResult} tsumo={cTsumo} parent={cParent} pc={calcPC} />
           <button style={actionBtn("p")} onClick={resetCalc}>もう一度計算する</button>
           <button style={actionBtn()} onClick={() => setView("home")}>メニューに戻る</button>
         </>

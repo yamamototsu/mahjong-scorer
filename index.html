@@ -1406,6 +1406,19 @@ function MahjongScorer() {
     if (!gameFinished) setKyotakuAward(null);
   }, [gameFinished, riichiBets]);
   const [calcStep, setCalcStep] = useState(0);
+  const [calcPC, setCalcPC] = useState(() => {
+    try {
+      return localStorage.getItem("mj_calc_pc") === "3" ? 3 : 4;
+    } catch {
+      return 4;
+    }
+  });
+  const saveCalcPC = n => {
+    setCalcPC(n);
+    try {
+      localStorage.setItem("mj_calc_pc", String(n));
+    } catch {}
+  };
   const [cTsumo, setCTsumo] = useState(null);
   const [cParent, setCParent] = useState(null);
   const [cHan, setCHan] = useState(null);
@@ -1422,8 +1435,8 @@ function MahjongScorer() {
   }, []);
   const calcResult = useMemo(() => {
     if (cHan === null || cFu === null || cParent === null || cTsumo === null) return null;
-    return calcScore(cFu, cHan, cParent, cTsumo, rules.kiriage);
-  }, [cHan, cFu, cParent, cTsumo, rules.kiriage]);
+    return calcScore(cFu, cHan, cParent, cTsumo, rules.kiriage, calcPC);
+  }, [cHan, cFu, cParent, cTsumo, rules.kiriage, calcPC]);
   const calcLimit = useMemo(() => cHan !== null ? getLimitName(cHan) : null, [cHan]);
   const [gStep, setGStep] = useState(0);
   const [gWinner, setGWinner] = useState(null);
@@ -5293,191 +5306,195 @@ function MahjongScorer() {
     result,
     tsumo,
     parent,
-    extra
-  }) => React.createElement("div", {
-    style: {
-      background: `linear-gradient(135deg, ${t.card}, ${t.sf})`,
-      borderRadius: 16,
-      padding: 24,
-      textAlign: "center",
-      border: `1px solid ${t.ac}33`,
-      marginBottom: 14
-    }
-  }, limit && React.createElement("div", {
-    style: {
-      display: "inline-block",
-      padding: "4px 18px",
-      borderRadius: 20,
-      fontSize: 14,
-      fontWeight: 800,
-      background: han >= 13 ? t.gdS : t.acS,
-      color: han >= 13 ? t.gd : t.ac,
-      marginBottom: 12
-    }
-  }, limit), React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: t.dm,
-      marginBottom: 10
-    }
-  }, han >= 13 ? getLimitName(han) : han >= 5 ? `${han}翻` : `${han}翻 ${fu}符`, " / ", tsumo ? "ツモ" : "ロン", " / ", parent ? "親" : "子"), tsumo ? parent ? React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column",
-      gap: 10
-    }
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "baseline",
-      justifyContent: "center",
-      gap: 10
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 16,
-      color: t.dm,
-      fontWeight: 700
-    }
-  }, "合計"), React.createElement("span", {
-    style: {
-      fontSize: 40,
-      fontWeight: 900,
-      color: t.ac,
-      lineHeight: 1.1
-    }
-  }, result.total.toLocaleString())), React.createElement("div", {
-    style: {
-      padding: "12px 0",
-      borderTop: `1px solid ${t.bd}`,
-      display: "flex",
-      alignItems: "baseline",
-      justifyContent: "center",
-      gap: 12
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 18,
-      color: t.gd,
-      fontWeight: 800
-    }
-  }, "全員から"), React.createElement("span", {
-    style: {
-      fontSize: 34,
-      fontWeight: 900,
-      color: t.gd,
-      lineHeight: 1.1
-    }
-  }, result.each.toLocaleString(), React.createElement("span", {
-    style: {
-      fontSize: 15,
-      fontWeight: 800,
-      color: t.dm,
-      marginLeft: 5
-    }
-  }, "×", PC - 1)))) : React.createElement("div", {
-    style: {
-      display: "flex",
-      flexDirection: "column"
-    }
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "baseline",
-      justifyContent: "center",
-      gap: 10,
-      paddingBottom: 12
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 16,
-      color: t.dm,
-      fontWeight: 700
-    }
-  }, "合計"), React.createElement("span", {
-    style: {
-      fontSize: 40,
-      fontWeight: 900,
-      color: t.ac,
-      lineHeight: 1.1
-    }
-  }, result.total.toLocaleString())), React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "baseline",
-      justifyContent: "center",
-      gap: 12,
-      padding: "12px 0 10px",
-      marginBottom: 2,
-      borderTop: `1px solid ${t.bd}`
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 18,
-      color: t.ac,
-      fontWeight: 800,
-      width: "min(70px, 20vw)",
-      flexShrink: 0,
-      textAlign: "right"
-    }
-  }, "子から"), React.createElement("span", {
-    style: {
-      fontSize: 32,
-      fontWeight: 900,
-      color: t.tx,
-      lineHeight: 1.1,
-      minWidth: "min(110px, 30vw)",
-      textAlign: "left"
-    }
-  }, result.fromChild.toLocaleString(), PC - 2 >= 2 && React.createElement("span", {
-    style: {
-      fontSize: 14,
-      fontWeight: 800,
-      color: t.dm,
-      marginLeft: 5
-    }
-  }, "×", PC - 2))), React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "baseline",
-      justifyContent: "center",
-      gap: 12,
-      padding: "12px 0 0",
-      borderTop: `1px solid ${t.bd}33`
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 18,
-      color: t.gd,
-      fontWeight: 800,
-      width: "min(70px, 20vw)",
-      flexShrink: 0,
-      textAlign: "right"
-    }
-  }, "親から"), React.createElement("span", {
-    style: {
-      fontSize: 32,
-      fontWeight: 900,
-      color: t.tx,
-      lineHeight: 1.1,
-      minWidth: "min(110px, 30vw)",
-      textAlign: "left"
-    }
-  }, result.fromParent.toLocaleString()))) : React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontSize: 48,
-      fontWeight: 900,
-      color: t.ac,
-      lineHeight: 1.1
-    }
-  }, result.total.toLocaleString()), React.createElement("div", {
-    style: {
-      fontSize: 15,
-      color: t.dm,
-      marginTop: 8,
-      fontWeight: 600
-    }
-  }, "放銃者から受け取る")), extra);
+    extra,
+    pc
+  }) => {
+    const nPC = pc || PC;
+    return React.createElement("div", {
+      style: {
+        background: `linear-gradient(135deg, ${t.card}, ${t.sf})`,
+        borderRadius: 16,
+        padding: 24,
+        textAlign: "center",
+        border: `1px solid ${t.ac}33`,
+        marginBottom: 14
+      }
+    }, limit && React.createElement("div", {
+      style: {
+        display: "inline-block",
+        padding: "4px 18px",
+        borderRadius: 20,
+        fontSize: 14,
+        fontWeight: 800,
+        background: han >= 13 ? t.gdS : t.acS,
+        color: han >= 13 ? t.gd : t.ac,
+        marginBottom: 12
+      }
+    }, limit), React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: t.dm,
+        marginBottom: 10
+      }
+    }, han >= 13 ? getLimitName(han) : han >= 5 ? `${han}翻` : `${han}翻 ${fu}符`, " / ", tsumo ? "ツモ" : "ロン", " / ", parent ? "親" : "子"), tsumo ? (parent || result.fromChild != null && result.fromChild === result.fromParent ? React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 10
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "center",
+        gap: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        color: t.dm,
+        fontWeight: 700
+      }
+    }, "合計"), React.createElement("span", {
+      style: {
+        fontSize: 40,
+        fontWeight: 900,
+        color: t.ac,
+        lineHeight: 1.1
+      }
+    }, result.total.toLocaleString())), React.createElement("div", {
+      style: {
+        padding: "12px 0",
+        borderTop: `1px solid ${t.bd}`,
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "center",
+        gap: 12
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 18,
+        color: t.gd,
+        fontWeight: 800
+      }
+    }, "全員から"), React.createElement("span", {
+      style: {
+        fontSize: 34,
+        fontWeight: 900,
+        color: t.gd,
+        lineHeight: 1.1
+      }
+    }, (result.each != null ? result.each : result.fromChild).toLocaleString(), React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 800,
+        color: t.dm,
+        marginLeft: 5
+      }
+    }, "×", nPC - 1)))) : React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column"
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "center",
+        gap: 10,
+        paddingBottom: 12
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        color: t.dm,
+        fontWeight: 700
+      }
+    }, "合計"), React.createElement("span", {
+      style: {
+        fontSize: 40,
+        fontWeight: 900,
+        color: t.ac,
+        lineHeight: 1.1
+      }
+    }, result.total.toLocaleString())), React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "center",
+        gap: 12,
+        padding: "12px 0 10px",
+        marginBottom: 2,
+        borderTop: `1px solid ${t.bd}`
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 18,
+        color: t.ac,
+        fontWeight: 800,
+        width: "min(70px, 20vw)",
+        flexShrink: 0,
+        textAlign: "right"
+      }
+    }, "子から"), React.createElement("span", {
+      style: {
+        fontSize: 32,
+        fontWeight: 900,
+        color: t.tx,
+        lineHeight: 1.1,
+        minWidth: "min(110px, 30vw)",
+        textAlign: "left"
+      }
+    }, result.fromChild.toLocaleString(), nPC - 2 >= 2 && React.createElement("span", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        color: t.dm,
+        marginLeft: 5
+      }
+    }, "×", nPC - 2))), React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "center",
+        gap: 12,
+        padding: "12px 0 0",
+        borderTop: `1px solid ${t.bd}33`
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 18,
+        color: t.gd,
+        fontWeight: 800,
+        width: "min(70px, 20vw)",
+        flexShrink: 0,
+        textAlign: "right"
+      }
+    }, "親から"), React.createElement("span", {
+      style: {
+        fontSize: 32,
+        fontWeight: 900,
+        color: t.tx,
+        lineHeight: 1.1,
+        minWidth: "min(110px, 30vw)",
+        textAlign: "left"
+      }
+    }, result.fromParent.toLocaleString())))) : React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 48,
+        fontWeight: 900,
+        color: t.ac,
+        lineHeight: 1.1
+      }
+    }, result.total.toLocaleString()), React.createElement("div", {
+      style: {
+        fontSize: 15,
+        color: t.dm,
+        marginTop: 8,
+        fontWeight: 600
+      }
+    }, "放銃者から受け取る")), extra);
+  };
   const body = {
     padding: "18px 20px 36px",
     boxSizing: "border-box",
@@ -17702,7 +17719,62 @@ input, select { padding: 10px 14px; }
   };
   const renderCalc = () => React.createElement("div", {
     style: body
-  }, calcStep === 0 && React.createElement("div", {
+  }, !(calcStep === 2 && yakuPickerOpen) && React.createElement("div", {
+    style: {
+      ...card,
+      padding: 14,
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: t.dm,
+      marginBottom: 8
+    }
+  }, "人数"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8
+    }
+  }, [[4, "四人麻雀", "東南西北"], [3, "三人麻雀", "東南西"]].map(([n, lb, sub]) => React.createElement("button", {
+    key: n,
+    onClick: () => saveCalcPC(n),
+    style: {
+      flex: 1,
+      minWidth: 0,
+      padding: "12px 4px",
+      borderRadius: 11,
+      cursor: "pointer",
+      border: `2px solid ${calcPC === n ? t.ac : t.bd}`,
+      background: calcPC === n ? t.acS : "transparent",
+      color: calcPC === n ? t.ac : t.dm
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 800,
+      whiteSpace: "nowrap"
+    }
+  }, lb), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      marginTop: 3,
+      opacity: 0.85,
+      whiteSpace: "nowrap"
+    }
+  }, sub)))), calcPC === 3 && React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginTop: 8,
+      lineHeight: 1.8
+    }
+  }, ["三人麻雀はツモも", "均等払い（親かぶりなし）", "で計算します"].map((x, k) => React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-block"
+    }
+  }, x)))), calcStep === 0 && React.createElement("div", {
     style: card
   }, React.createElement(Dots, {
     total: 4,
@@ -17931,7 +18003,8 @@ input, select { padding: 10px 14px; }
     limit: calcLimit,
     result: calcResult,
     tsumo: cTsumo,
-    parent: cParent
+    parent: cParent,
+    pc: calcPC
   }), React.createElement("button", {
     style: actionBtn("p"),
     onClick: resetCalc
