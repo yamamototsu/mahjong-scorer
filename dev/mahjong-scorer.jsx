@@ -819,6 +819,7 @@ export default function MahjongScorer() {
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
   const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
   const [voiceSeatOn, setVoiceSeatOn] = useState(() => loadVoicePref("mj_voice_seat"));
+  const [voiceYakuOn, setVoiceYakuOn] = useState(() => loadVoicePref("mj_voice_yaku"));
   const saveVoicePref = (key, setter) => (on) => {
     setter(on);
     try { localStorage.setItem(key, on ? "1" : "0"); } catch {}
@@ -828,6 +829,7 @@ export default function MahjongScorer() {
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
   const saveVoiceSeat = saveVoicePref("mj_voice_seat", setVoiceSeatOn);
+  const saveVoiceYaku = saveVoicePref("mj_voice_yaku", setVoiceYakuOn);
   const voiceOnFor = (text) =>
     text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   // 収録した掛け声。再生できない端末では音声合成にフォールバックする
@@ -969,6 +971,23 @@ export default function MahjongScorer() {
     } catch {}
   };
   const speakRound = (wind, dealer, honba2) => speakJa(roundKana(wind, dealer, honba2));
+
+  // 役の読み上げ（役を選んで確定したとき）。YAKU_DATA の yomi を使うので
+  // 「一盃口」を「いちはいくち」と読まれることがない
+  const yakuYomi = (name) => {
+    const y = YAKU_DATA.find(x => x.name === name);
+    if (y && y.yomi && y.yomi[0]) return y.yomi[0];
+    return String(name).replace(/[（(][^）)]*[）)]/g, "");
+  };
+  const speakYaku = (names, totalHan, force) => {
+    if (!force && !voiceYakuOn) return;
+    const parts = (names || []).map(yakuYomi).filter(Boolean);
+    if (pickerDora > 0) parts.push(`どら${pickerDora}`);
+    if (pickerUra > 0) parts.push(`うらどら${pickerUra}`);
+    if (parts.length === 0) return;
+    const tail = totalHan >= 13 ? YAKUMAN_LABEL(totalHan) : `ごうけい${totalHan}はん`;
+    speakJa(parts.join("、") + "、" + tail);
+  };
 
   // 局の読み上げの収録音声（東・南・西・北／1〜4局／オーラス／1〜10本場）。
   // 部品をつないで「なん・にきょく・いっぽんば」のように順に再生する
@@ -2870,7 +2889,7 @@ export default function MahjongScorer() {
               flexShrink: 0, minWidth: 74, textAlign: "center", padding: "6px 8px", borderRadius: 10,
               background: total >= 13 ? t.gdS : t.acS, border: `1px solid ${total >= 13 ? t.gd : t.ac}`,
             }}>
-              <div style={{ fontSize: 9, color: t.dm, fontWeight: 700 }}>合計</div>
+              <div style={{ fontSize: 10, color: t.dm, fontWeight: 700, lineHeight: 1.2 }}>合計</div>
               <div style={{ fontSize: total >= 13 ? 15 : 20, fontWeight: 900, color: total >= 13 ? t.gd : t.ac, lineHeight: 1.2 }}>
                 {total >= 13 ? YAKUMAN_LABEL(total) : `${total}翻`}
               </div>
@@ -2922,10 +2941,10 @@ export default function MahjongScorer() {
         </div>
 
         {/* 合計 ＋ ドラ・裏ドラ */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "stretch" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "stretch", flexWrap: "wrap" }}>
           {/* 合計 */}
           <div style={{
-            flex: "0 0 32%", background: total >= 13 ? t.gdS : t.acS, borderRadius: 10,
+            flex: "0 1 110px", minWidth: 0, background: total >= 13 ? t.gdS : t.acS, borderRadius: 10,
             padding: "8px 6px", textAlign: "center",
             border: `1px solid ${total >= 13 ? t.gd : t.ac}44`,
             display: "flex", flexDirection: "column", justifyContent: "center",
@@ -2937,7 +2956,7 @@ export default function MahjongScorer() {
           </div>
 
           {/* ドラ・裏ドラ（裏ドラはリーチ時のみ） */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ flex: "1 1 150px", minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
             {[
               { label: "ドラ", val: pickerDora, set: setPickerDora, lock: false },
               { label: "裏ドラ", val: pickerUra, set: setPickerUra, lock: !riichiOn },
@@ -2948,25 +2967,39 @@ export default function MahjongScorer() {
                 border: `1px solid ${row.val > 0 ? t.gd + "55" : t.bd}`,
                 opacity: row.lock ? 0.35 : 1,
               }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: t.tx, flexShrink: 0 }}>{row.label}{row.lock ? " (リーチ時のみ)" : ""}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                {/* 縮まないラベルだと280px幅で ＋ボタンが画面の外へ出る */}
+                <span style={{
+                  fontSize: "clamp(10px, 3.4vw, 12px)", fontWeight: 800, color: t.tx,
+                  minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>{row.label}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
                   <button disabled={row.lock} onClick={() => row.set(v => Math.max(0, v - 1))} style={{
-                    width: 32, height: 32, borderRadius: 8, border: `1.5px solid ${row.val > 0 ? t.gd : t.bd}`,
+                    width: 32, height: 32, borderRadius: 8, boxSizing: "border-box",
+                    border: `1.5px solid ${row.val > 0 ? t.gd : t.bd}`,
                     background: t.card, color: row.val > 0 ? t.gd : t.dm, fontSize: 19, fontWeight: 700,
-                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0,
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0, flexShrink: 0,
                   }}>−</button>
                   <span style={{
                     fontSize: 20, fontWeight: 900, width: 22, textAlign: "center",
-                    color: row.val > 0 ? t.gd : t.dm, fontVariantNumeric: "tabular-nums",
+                    color: row.val > 0 ? t.gd : t.dm, fontVariantNumeric: "tabular-nums", flexShrink: 0,
                   }}>{row.val}</span>
                   <button disabled={row.lock} onClick={() => row.set(v => v + 1)} style={{
-                    width: 32, height: 32, borderRadius: 8, border: `1.5px solid ${t.gd}`,
+                    width: 32, height: 32, borderRadius: 8, boxSizing: "border-box",
+                    border: `1.5px solid ${t.gd}`,
                     background: t.gdS, color: t.gd, fontSize: 19, fontWeight: 700,
-                    cursor: row.lock ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0,
+                    cursor: row.lock ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0, flexShrink: 0,
                   }}>+</button>
                 </div>
               </div>
             ))}
+            {!riichiOn && (
+              <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.6 }}>
+                {/* 320px幅で「入れられま/す」と途中で折り返さないよう意味の切れ目で区切る */}
+                {["裏ドラはリーチの", "ときだけ入れられます"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -5976,6 +6009,9 @@ input, select { padding: 10px 14px; }
           on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
         { label: "🀫 席決めの牌の声", desc: "めくった牌に応じて「トン」など",
           on: voiceSeatOn, save: saveVoiceSeat, preview: () => playWindVoice("東", true) },
+        { label: "📖 役の読み上げ", desc: "役を選んで確定したときに「りーち、たんやお、ごうけい2はん」",
+          on: voiceYakuOn, save: saveVoiceYaku,
+          preview: () => speakYaku(["リーチ（立直）", "断么九（タンヤオ）"], 2, true) },
       ].map((row, i) => (
         <div key={i} style={{
           // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
@@ -5985,7 +6021,7 @@ input, select { padding: 10px 14px; }
         }}>
           <div style={{ flex: "1 1 150px", minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>{row.label}</div>
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.6 }}>{row.desc}</div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.6, textWrap: "balance" }}>{row.desc}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
             <button onClick={row.preview} style={{
@@ -6235,7 +6271,7 @@ input, select { padding: 10px 14px; }
               </div>
               {[
                 ["voice", "🔊", "音の設定",
-                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`],
+                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`],
                 ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`],
                 ["screen", "💡", "画面設定", "対局中のスリープ防止"],
               ].map(([id, icon, title, sub]) => (
@@ -7507,7 +7543,7 @@ input, select { padding: 10px 14px; }
             {setOpen === "dice" && dicePanelCard()}
 
             {secHdr("voice", "🔊", "音の設定",
-              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
+              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
             {setOpen === "voice" && voicePanelCard()}
 
             {secHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
@@ -9433,22 +9469,24 @@ input, select { padding: 10px 14px; }
       {calcStep === 2 && (
         <div style={card}>
           {yakuPickerOpen ? (
-            <YakuPicker
-              isTsumo={cTsumo}
-              isParent={cParent}
-              lockedRiichi={false}
-              onConfirm={(h) => {
+            /* JSX要素にすると再描画のたびに作り直され、スクロール位置が戻る */
+            YakuPicker({
+              isTsumo: cTsumo,
+              isParent: cParent,
+              lockedRiichi: false,
+              onConfirm: (h) => {
                 const pinfu = pickedYaku.includes("平和（ピンフ）");
                 const chiitoi = pickedYaku.includes("七対子（チートイツ）");
                 const naki = pickerNaki === true;
+                speakYaku(pickedYaku, h);
                 setCHan(h); setGKnownNaki(pickerNaki); resetYakuPicker();
                 if (h >= 5) { setCFu(30); setCalcStep(4); }
                 else if (chiitoi) { setCFu(25); setCalcStep(4); }
                 else if (pinfu && !naki) { setCFu(cTsumo ? 20 : 30); setCalcStep(4); }
                 else setCalcStep(3);
-              }}
-              onCancel={() => setYakuPickerOpen(false)}
-            />
+              },
+              onCancel: () => setYakuPickerOpen(false),
+            })
           ) : (
             <>
               <Back onClick={() => setCalcStep(1)} />
@@ -10018,7 +10056,7 @@ input, select { padding: 10px 14px; }
           {gsOpen === "dice" && dicePanelCard()}
 
           {gsHdr("voice", "🔊", "音の設定",
-            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
+            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
           {gsOpen === "voice" && voicePanelCard()}
 
           {gsHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
@@ -11298,23 +11336,25 @@ input, select { padding: 10px 14px; }
             {gStep === 5 && (
               <div style={card}>
                 {yakuPickerOpen ? (
-                  <YakuPicker
-                    isTsumo={gTsumo}
-                    isParent={gParent}
-                    lockedRiichi={gWinner !== null && (declaredRiichi[gWinner] || gRiichi[gWinner])}
-                    onConfirm={(h) => {
+                  /* JSX要素にすると再描画のたびに作り直され、スクロール位置が戻る */
+                  YakuPicker({
+                    isTsumo: gTsumo,
+                    isParent: gParent,
+                    lockedRiichi: gWinner !== null && (declaredRiichi[gWinner] || gRiichi[gWinner]),
+                    onConfirm: (h) => {
                       // 役ピッカーの回答から符が確定できる場合は符ステップを飛ばす
                       const pinfu = pickedYaku.includes("平和（ピンフ）");
                       const chiitoi = pickedYaku.includes("七対子（チートイツ）");
                       const naki = pickerNaki === true;
+                      speakYaku(pickedYaku, h);
                       setGHan(h); setGKnownNaki(pickerNaki); resetYakuPicker();
                       if (h >= 5) { setGFu(30); setGStep(7); }
                       else if (chiitoi) { setGFu(25); setGStep(7); }
                       else if (pinfu && !naki) { setGFu(gTsumo ? 20 : 30); setGStep(7); }
                       else setGStep(6);
-                    }}
-                    onCancel={() => setYakuPickerOpen(false)}
-                  />
+                    },
+                    onCancel: () => setYakuPickerOpen(false),
+                  })
                 ) : (
                   <>
                     <Back onClick={() => {
