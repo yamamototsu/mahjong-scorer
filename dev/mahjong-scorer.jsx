@@ -651,6 +651,20 @@ export default function MahjongScorer() {
   // ただし規定半荘数に届かない人は順位に入れない（下に回す）。
   const PONZUKE_MIN_GAMES = 16;
   const PONZUKE_UMA = [30, 10, -10, -30];
+  // ── 人数ごとのおすすめルール ──
+  // 1人あたり PONZUKE_MIN_GAMES 半荘は打てるように、リーグ全体の半荘数を決める。
+  // 席数ちょうどの人数なら全員が同じ半荘数を打つので、総合ポイントで足りる。
+  const recommendedLeagueRule = (memberCount, pc) => {
+    const per = pc === 3 ? 12 : PONZUKE_MIN_GAMES;   // 1人あたりの目安
+    if (memberCount <= pc) {
+      return { targetCount: per, minGames: 0, scoring: "total", scoringN: 10, per };
+    }
+    return {
+      targetCount: Math.min(100, Math.ceil(memberCount * per / pc)),
+      minGames: per, scoring: "avg", scoringN: 10, per,
+    };
+  };
+
   const newPonzukeDraft = () => {
     const d = newLeagueDraft();
     return {
@@ -7726,6 +7740,52 @@ input, select { padding: 10px 14px; }
           }}>👤 名前を追加・編集する</button>
         </div>
 
+        {/* 人数に合わせたおすすめルール。メンバーを選び直すと中身も変わる */}
+        {d.members.length >= lgPC && (() => {
+          const rec = recommendedLeagueRule(d.members.length, lgPC);
+          const mode = SCORING_MODES.find(m => m.key === rec.scoring);
+          const same = d.targetCount === rec.targetCount
+            && (d.minGames ?? 0) === rec.minGames
+            && (d.scoring || "total") === rec.scoring;
+          const perHead = Math.floor(rec.targetCount * lgPC / d.members.length);
+          const row = (label, value) => (
+            <div key={label} style={{ display: "flex", gap: 10, padding: "5px 0", alignItems: "baseline" }}>
+              <span style={{ flex: "0 0 92px", fontSize: 11, color: t.dm }}>{label}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 800, color: t.tx, lineHeight: 1.7 }}>{value}</span>
+            </div>
+          );
+          return (
+            <div style={{
+              padding: "14px 15px", marginBottom: 12, borderRadius: 13,
+              background: t.gdS, border: `1px solid ${t.gd}55`,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: t.gd, marginBottom: 3 }}>
+                🏅 {d.members.length}人ならこの設定がおすすめ
+              </div>
+              <div style={{ fontSize: 11, color: t.dm, marginBottom: 9, lineHeight: 1.8 }}>
+                {d.members.length === lgPC
+                  ? `メンバーが${lgPC}人なので全員が毎回出ます。打った数が同じなので総合ポイントで足ります`
+                  : `毎回${d.members.length - lgPC}人が休みます。打った数がずれるので平均ポイントで比べます`}
+              </div>
+              <div style={{ borderTop: `1px solid ${t.gd}33`, paddingTop: 4 }}>
+                {row("何半荘やるか", `${rec.targetCount}半荘`)}
+                {row("最低半荘数", rec.minGames > 0 ? `1人 ${rec.minGames}半荘以上` : "なし（全員が同じ数を打つため）")}
+                {row("計算方式", mode.needN ? mode.label.replace("◯", String(rec.scoringN)) : mode.label)}
+                {row("1人あたり", `およそ${perHead}半荘ずつ（${rec.targetCount}半荘 × ${lgPC}人 ÷ ${d.members.length}人）`)}
+              </div>
+              <button onClick={() => set({
+                targetCount: rec.targetCount, minGames: rec.minGames,
+                scoring: rec.scoring, scoringN: rec.scoringN,
+              })} disabled={same} style={{
+                width: "100%", marginTop: 11, padding: "13px 8px", borderRadius: 10,
+                border: `1px solid ${t.gd}`, background: same ? "transparent" : t.gd,
+                color: same ? t.dm : "#1a1a1a", fontSize: 14, fontWeight: 800,
+                cursor: same ? "default" : "pointer", opacity: same ? 0.6 : 1,
+              }}>{same ? "この設定になっています" : "この設定にする"}</button>
+            </div>
+          );
+        })()}
+
         {/* 何半荘やるか（リーグ全体） */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>3. 何半荘やるか</div>
@@ -7740,7 +7800,13 @@ input, select { padding: 10px 14px; }
             ))}
           </select>
           <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
-            この数に達すると自動で終了になります
+            この数に達すると自動で終了になります。
+            {d.members.length >= lgPC && (() => {
+              const per = Math.floor(d.targetCount * lgPC / d.members.length);
+              return d.members.length === lgPC
+                ? `メンバー${lgPC}人なら全員が${d.targetCount}半荘ずつ打ちます`
+                : `メンバー${d.members.length}人なら1人あたり およそ${per}半荘ずつ（${d.targetCount} × ${lgPC} ÷ ${d.members.length}）`;
+            })()}
           </div>
         </div>
 

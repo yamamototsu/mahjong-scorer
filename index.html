@@ -877,6 +877,25 @@ function MahjongScorer() {
   };
   const PONZUKE_MIN_GAMES = 16;
   const PONZUKE_UMA = [30, 10, -10, -30];
+  const recommendedLeagueRule = (memberCount, pc) => {
+    const per = pc === 3 ? 12 : PONZUKE_MIN_GAMES;
+    if (memberCount <= pc) {
+      return {
+        targetCount: per,
+        minGames: 0,
+        scoring: "total",
+        scoringN: 10,
+        per
+      };
+    }
+    return {
+      targetCount: Math.min(100, Math.ceil(memberCount * per / pc)),
+      minGames: per,
+      scoring: "avg",
+      scoringN: 10,
+      per
+    };
+  };
   const newPonzukeDraft = () => {
     const d = newLeagueDraft();
     return {
@@ -14535,7 +14554,85 @@ input, select { padding: 10px 14px; }
         marginTop: 6,
         padding: "9px 10px"
       }
-    }, "👤 名前を追加・編集する")), React.createElement("div", {
+    }, "👤 名前を追加・編集する")), d.members.length >= lgPC && (() => {
+      const rec = recommendedLeagueRule(d.members.length, lgPC);
+      const mode = SCORING_MODES.find(m => m.key === rec.scoring);
+      const same = d.targetCount === rec.targetCount && (d.minGames ?? 0) === rec.minGames && (d.scoring || "total") === rec.scoring;
+      const perHead = Math.floor(rec.targetCount * lgPC / d.members.length);
+      const row = (label, value) => React.createElement("div", {
+        key: label,
+        style: {
+          display: "flex",
+          gap: 10,
+          padding: "5px 0",
+          alignItems: "baseline"
+        }
+      }, React.createElement("span", {
+        style: {
+          flex: "0 0 92px",
+          fontSize: 11,
+          color: t.dm
+        }
+      }, label), React.createElement("span", {
+        style: {
+          flex: 1,
+          minWidth: 0,
+          fontSize: 13,
+          fontWeight: 800,
+          color: t.tx,
+          lineHeight: 1.7
+        }
+      }, value));
+      return React.createElement("div", {
+        style: {
+          padding: "14px 15px",
+          marginBottom: 12,
+          borderRadius: 13,
+          background: t.gdS,
+          border: `1px solid ${t.gd}55`
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 13,
+          fontWeight: 800,
+          color: t.gd,
+          marginBottom: 3
+        }
+      }, "🏅 ", d.members.length, "人ならこの設定がおすすめ"), React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          marginBottom: 9,
+          lineHeight: 1.8
+        }
+      }, d.members.length === lgPC ? `メンバーが${lgPC}人なので全員が毎回出ます。打った数が同じなので総合ポイントで足ります` : `毎回${d.members.length - lgPC}人が休みます。打った数がずれるので平均ポイントで比べます`), React.createElement("div", {
+        style: {
+          borderTop: `1px solid ${t.gd}33`,
+          paddingTop: 4
+        }
+      }, row("何半荘やるか", `${rec.targetCount}半荘`), row("最低半荘数", rec.minGames > 0 ? `1人 ${rec.minGames}半荘以上` : "なし（全員が同じ数を打つため）"), row("計算方式", mode.needN ? mode.label.replace("◯", String(rec.scoringN)) : mode.label), row("1人あたり", `およそ${perHead}半荘ずつ（${rec.targetCount}半荘 × ${lgPC}人 ÷ ${d.members.length}人）`)), React.createElement("button", {
+        onClick: () => set({
+          targetCount: rec.targetCount,
+          minGames: rec.minGames,
+          scoring: rec.scoring,
+          scoringN: rec.scoringN
+        }),
+        disabled: same,
+        style: {
+          width: "100%",
+          marginTop: 11,
+          padding: "13px 8px",
+          borderRadius: 10,
+          border: `1px solid ${t.gd}`,
+          background: same ? "transparent" : t.gd,
+          color: same ? t.dm : "#1a1a1a",
+          fontSize: 14,
+          fontWeight: 800,
+          cursor: same ? "default" : "pointer",
+          opacity: same ? 0.6 : 1
+        }
+      }, same ? "この設定になっています" : "この設定にする"));
+    })(), React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -14577,7 +14674,10 @@ input, select { padding: 10px 14px; }
         marginTop: 6,
         lineHeight: 1.8
       }
-    }, "この数に達すると自動で終了になります")), React.createElement("div", {
+    }, "この数に達すると自動で終了になります。", d.members.length >= lgPC && (() => {
+      const per = Math.floor(d.targetCount * lgPC / d.members.length);
+      return d.members.length === lgPC ? `メンバー${lgPC}人なら全員が${d.targetCount}半荘ずつ打ちます` : `メンバー${d.members.length}人なら1人あたり およそ${per}半荘ずつ（${d.targetCount} × ${lgPC} ÷ ${d.members.length}）`;
+    })())), React.createElement("div", {
       style: {
         ...card,
         padding: 16,
