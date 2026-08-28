@@ -589,6 +589,61 @@ export default function MahjongScorer() {
     );
   };
 
+  // 二人が同じ卓に入った回数（対戦数）
+  const leaguePairCounts = (lg) => {
+    const key = (a, b) => (a < b ? a + "\u0000" + b : b + "\u0000" + a);
+    const c = {};
+    (lg.games || []).forEach(g => {
+      g.players.forEach((a, i) => g.players.slice(i + 1).forEach(b => {
+        const k = key(a, b); c[k] = (c[k] || 0) + 1;
+      }));
+    });
+    return (a, b) => c[key(a, b)] || 0;
+  };
+
+  // 1人ずつの出場数
+  const leagueGameCounts = (lg) => {
+    const c = {};
+    lg.members.forEach(m => { c[m] = 0; });
+    (lg.games || []).forEach(g => g.players.forEach(nm => { if (nm in c) c[nm] += 1; }));
+    return c;
+  };
+
+  // 次に組むのに向いている顔ぶれを、良い順にいくつか返す。
+  // ① 出場数の少ない人が入る組み合わせ ② まだ当たっていない相手が多い組み合わせ
+  const bestLineups = (lg, want = 3) => {
+    const pc = lg.playerCount || 4;
+    const ms = lg.members || [];
+    if (ms.length < pc) return [];
+    if (ms.length === pc) return [{ play: [...ms], rest: [], games: 0, pairs: 0 }];
+    // 人数が多いと組み合わせが増えすぎるので、そのときは順番方式にまかせる
+    if (ms.length > 20) {
+      const r = restRotation(ms, pc, (lg.games || []).length + 1);
+      return [{ ...r, games: 0, pairs: 0 }];
+    }
+    const gc = leagueGameCounts(lg);
+    const pair = leaguePairCounts(lg);
+    const out = [];
+    const pick = [];
+    const walk = (start) => {
+      if (pick.length === pc) {
+        const names = pick.map(i => ms[i]);
+        let games = 0, pairs = 0;
+        names.forEach((a, i) => {
+          games += gc[a] || 0;
+          names.slice(i + 1).forEach(b => { pairs += pair(a, b); });
+        });
+        const set = new Set(names);
+        out.push({ play: names, rest: ms.filter(m => !set.has(m)), games, pairs });
+        return;
+      }
+      for (let i = start; i < ms.length; i++) { pick.push(i); walk(i + 1); pick.pop(); }
+    };
+    walk(0);
+    out.sort((a, b) => (a.games - b.games) || (a.pairs - b.pairs));
+    return out.slice(0, want);
+  };
+
   // 席数より多いメンバーで回すときの「休みの順番」。
   // 休む人を1戦ごとに1人ずつずらしていくので、全員の出場数がぴったり揃う。
   // 5〜7人なら、これで全員どうしが必ず一度は同卓する。
@@ -8315,6 +8370,112 @@ input, select { padding: 10px 14px; }
         {/* 対局一覧 */}
         {leagueTab === "games" && (
           <div>
+            {/* プレーヤー別の対戦数（誰と何半荘打ったか） */}
+            {lg.members.length > 0 && (() => {
+              const pair = leaguePairCounts(lg);
+              const gc = leagueGameCounts(lg);
+              return (
+                <div style={{ ...card, padding: 14, marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginBottom: 3 }}>プレーヤー別の対戦数</div>
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.8 }}>
+                    誰と何半荘 同じ卓に入ったか。いちばん少ない相手を黄色にしています
+                  </div>
+                  {lg.members.map((nm, mi) => {
+                    const others = lg.members.filter(x => x !== nm);
+                    const counts = others.map(o2 => pair(nm, o2));
+                    const min = counts.length ? Math.min(...counts) : 0;
+                    const max = counts.length ? Math.max(...counts) : 0;
+                    return (
+                      <div key={nm} style={{
+                        padding: "10px 12px", marginBottom: 8, borderRadius: 11,
+                        background: t.sf, border: `1px solid ${t.bd}`,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                          <span style={{
+                            flex: 1, minWidth: 0, fontSize: 14, fontWeight: 800, color: t.tx,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>{nm}</span>
+                          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap" }}>出場</span>
+                          <span style={{ fontSize: 15, fontWeight: 900, color: t.tx, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                            {gc[nm] || 0}半荘
+                          </span>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(86px, 1fr))", gap: "6px 7px" }}>
+                          {others.map((o2, k) => {
+                            const c = counts[k];
+                            const few = min !== max && c === min;
+                            return (
+                              <div key={o2} style={{
+                                display: "flex", alignItems: "baseline", gap: 5,
+                                padding: "5px 7px", borderRadius: 8, minWidth: 0,
+                                background: few ? t.gdS : t.card,
+                                border: `1px solid ${few ? t.gd + "66" : t.bd}`,
+                              }}>
+                                <span style={{
+                                  flex: 1, minWidth: 0, fontSize: 11, color: few ? t.gd : t.dm,
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>{o2}</span>
+                                <span style={{
+                                  fontSize: 12, fontWeight: 800, whiteSpace: "nowrap",
+                                  fontVariantNumeric: "tabular-nums", color: few ? t.gd : t.tx,
+                                }}>{c}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* 次に組むとバランスが良くなる顔ぶれ */}
+            {lg.status === "active" && lg.members.length > (lg.playerCount || 4) && (() => {
+              const cands = bestLineups(lg, 3);
+              if (cands.length === 0) return null;
+              return (
+                <div style={{
+                  padding: "14px 15px", marginBottom: 12, borderRadius: 13,
+                  background: t.gdS, border: `1px solid ${t.gd}55`,
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: t.gd, marginBottom: 3 }}>
+                    次のおすすめの組み合わせ
+                  </div>
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.8 }}>
+                    出場数の少ない人と、まだあまり当たっていない相手を優先して選んでいます
+                  </div>
+                  {cands.map((c, ci) => (
+                    <div key={ci} style={{
+                      padding: "11px 12px", marginBottom: 8, borderRadius: 11,
+                      background: t.card, border: `1px solid ${ci === 0 ? t.gd + "77" : t.bd}`,
+                    }}>
+                      <div style={{ fontSize: 10, color: ci === 0 ? t.gd : t.dm, fontWeight: 700, marginBottom: 4 }}>
+                        {ci === 0 ? "いちばんおすすめ" : `ほかの例 ${ci}`}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 6px" }}>
+                        {c.play.map(nm => (
+                          <span key={nm} style={{
+                            fontSize: 13, fontWeight: 800, color: t.tx, lineHeight: 1.6,
+                            maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>{nm}</span>
+                        ))}
+                      </div>
+                      {c.rest.length > 0 && (
+                        <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 2 }}>休み: {c.rest.join("、")}</div>
+                      )}
+                      <button onClick={() => { setLgPick([...c.play]); setLgMatchType("hanchan"); setView("leaguestart"); }} style={{
+                        width: "100%", marginTop: 9, padding: "11px 8px", borderRadius: 9, cursor: "pointer",
+                        border: `1px solid ${ci === 0 ? t.gd : t.bd}`,
+                        background: ci === 0 ? t.gd : "transparent",
+                        color: ci === 0 ? "#1a1a1a" : t.tx, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap",
+                      }}>この{lg.playerCount || 4}人で始める</button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {(lg.games || []).length === 0 ? (
               <div style={{ ...card, padding: 20, textAlign: "center", fontSize: 13, color: t.dm }}>
                 まだ対局がありません
@@ -8401,10 +8562,11 @@ input, select { padding: 10px 14px; }
                 ({ nth: done + 1 + k, ...restRotation(lg.members, pcN, done + 1 + k) }));
               return (
                 <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${t.bd}55` }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginBottom: 4 }}>休みの順番（おすすめ）</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginBottom: 4 }}>休みの順番（先まで見る目安）</div>
                   <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.8 }}>
                     休む人を1戦ずつずらしていくので、全員が同じ回数だけ打てます。
                     {lg.members.length <= pcN + 3 && "この人数なら全員どうしが必ず一度は同卓します。"}
+                    実際の記録に合わせたおすすめは「対局一覧」に出ます
                   </div>
                   {rows.map(r => (
                     <div key={r.nth} style={{ padding: "8px 0", borderBottom: `1px solid ${t.bd}33` }}>
@@ -8462,7 +8624,7 @@ input, select { padding: 10px 14px; }
         {/* 席数より多いメンバーのときは、全員が同じ回数打てる組み合わせをすすめる */}
         {lg.members.length > lgPC && (() => {
           const nth = (lg.games || []).length + 1;
-          const rec = restRotation(lg.members, lgPC, nth);
+          const rec = bestLineups(lg, 1)[0] || restRotation(lg.members, lgPC, nth);
           const same = rec.play.length === lgPick.length && rec.play.every(nm => lgPick.includes(nm));
           return (
             <div style={{
@@ -8475,6 +8637,9 @@ input, select { padding: 10px 14px; }
               <div style={{ fontSize: 13, color: t.tx, lineHeight: 1.8 }}>{rec.play.join("　")}</div>
               <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 2 }}>
                 休み: {rec.rest.join("、")}
+              </div>
+              <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.8, marginTop: 4 }}>
+                出場数の少ない人と、まだあまり当たっていない相手を優先しています
               </div>
               <button onClick={() => setLgPick([...rec.play])} disabled={same} style={{
                 width: "100%", marginTop: 10, padding: "12px 8px", borderRadius: 10,
