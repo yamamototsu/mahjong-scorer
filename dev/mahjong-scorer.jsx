@@ -10908,7 +10908,7 @@ input, select { padding: 10px 14px; }
       fontSize: 13, fontWeight: 700, cursor: "pointer", boxSizing: "border-box", lineHeight: 1.4,
       ...(v === "p" ? { background: t.ac, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }),
     });
-    const actionRow = (flip) => (
+    const actionRow = (flip) => (flip && (reviewing || correctingDrawIdx !== null)) ? null : (
       <div style={{
         transform: flip ? "rotate(180deg)" : "none",
         marginBottom: flip ? 8 : 0, marginTop: flip ? 0 : 10,
@@ -11031,23 +11031,6 @@ input, select { padding: 10px 14px; }
         overflow: "hidden",
         display: "flex", flexDirection: "column", justifyContent: "center",
       }}>
-        {reviewing && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-            <button onClick={finishReviewing} style={{
-              flex: "1.4 1 170px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
-              border: "none", background: t.gn, color: "#fff",
-              fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-            }}>✓ 修正を終えて結果に戻る</button>
-            <button onClick={() => {
-              if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
-              cancelReviewing();
-            }} style={{
-              flex: "1 1 120px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
-              border: `1px solid ${t.rd}66`, background: t.sf, color: t.rd,
-              fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-            }}>↩ 修正をやめる</button>
-          </div>
-        )}
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginBottom: 4, padding: "0 6px" }}>
           {rounds.length > 0 && (
             <button style={{
@@ -11313,6 +11296,23 @@ input, select { padding: 10px 14px; }
         </div>
 
         {actionRow(false)}
+        {reviewing && (
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button onClick={finishReviewing} style={{
+              flex: "1.4 1 170px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
+              border: "none", background: t.gn, color: "#fff",
+              fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+            }}>✓ 修正を終えて結果に戻る</button>
+            <button onClick={() => {
+              if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
+              cancelReviewing();
+            }} style={{
+              flex: "1 1 120px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
+              border: `1px solid ${t.rd}66`, background: t.sf, color: t.rd,
+              fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+            }}>↩ 修正をやめる</button>
+          </div>
+        )}
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
         </div>

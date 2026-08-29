@@ -20285,7 +20285,7 @@ input, select { padding: 10px 14px; }
         border: `1px solid ${t.bd}`
       })
     });
-    const actionRow = flip => React.createElement("div", {
+    const actionRow = flip => flip && (reviewing || correctingDrawIdx !== null) ? null : React.createElement("div", {
       style: {
         transform: flip ? "rotate(180deg)" : "none",
         marginBottom: flip ? 8 : 0,
@@ -20542,47 +20542,7 @@ input, select { padding: 10px 14px; }
         flexDirection: "column",
         justifyContent: "center"
       }
-    }, reviewing && React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 8,
-        flexWrap: "wrap"
-      }
-    }, React.createElement("button", {
-      onClick: finishReviewing,
-      style: {
-        flex: "1.4 1 170px",
-        padding: "13px 6px",
-        borderRadius: 11,
-        minWidth: 0,
-        border: "none",
-        background: t.gn,
-        color: "#fff",
-        fontSize: "clamp(12px, 3.8vw, 15px)",
-        fontWeight: 800,
-        cursor: "pointer",
-        whiteSpace: "nowrap"
-      }
-    }, "✓ 修正を終えて結果に戻る"), React.createElement("button", {
-      onClick: () => {
-        if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
-        cancelReviewing();
-      },
-      style: {
-        flex: "1 1 120px",
-        padding: "13px 6px",
-        borderRadius: 11,
-        minWidth: 0,
-        border: `1px solid ${t.rd}66`,
-        background: t.sf,
-        color: t.rd,
-        fontSize: "clamp(12px, 3.8vw, 15px)",
-        fontWeight: 800,
-        cursor: "pointer",
-        whiteSpace: "nowrap"
-      }
-    }, "↩ 修正をやめる")), React.createElement("div", {
+    }, React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "flex-end",
@@ -20979,7 +20939,47 @@ input, select { padding: 10px 14px; }
           color: t.ac
         }
       }, "供託", riichiBets, "本")));
-    })())))), actionRow(false), React.createElement("div", {
+    })())))), actionRow(false), reviewing && React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginTop: 8,
+        flexWrap: "wrap"
+      }
+    }, React.createElement("button", {
+      onClick: finishReviewing,
+      style: {
+        flex: "1.4 1 170px",
+        padding: "13px 6px",
+        borderRadius: 11,
+        minWidth: 0,
+        border: "none",
+        background: t.gn,
+        color: "#fff",
+        fontSize: "clamp(12px, 3.8vw, 15px)",
+        fontWeight: 800,
+        cursor: "pointer",
+        whiteSpace: "nowrap"
+      }
+    }, "✓ 修正を終えて結果に戻る"), React.createElement("button", {
+      onClick: () => {
+        if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
+        cancelReviewing();
+      },
+      style: {
+        flex: "1 1 120px",
+        padding: "13px 6px",
+        borderRadius: 11,
+        minWidth: 0,
+        border: `1px solid ${t.rd}66`,
+        background: t.sf,
+        color: t.rd,
+        fontSize: "clamp(12px, 3.8vw, 15px)",
+        fontWeight: 800,
+        cursor: "pointer",
+        whiteSpace: "nowrap"
+      }
+    }, "↩ 修正をやめる")), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
