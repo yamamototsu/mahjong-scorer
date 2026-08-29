@@ -12129,9 +12129,32 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 11, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.dm }}>
                   素点 {s.rawScore.toLocaleString()}
                 </div>
+                {/* レートを決めているときは、いくらになるかも出す */}
+                {!!ruleSet.rate && (() => {
+                  const pt = goshaRokunyu(s.finalPt / 1000);
+                  const gold = GOLD(pt, ruleSet.rate);
+                  return (
+                    <div style={{
+                      fontSize: 13, fontWeight: 800, marginTop: 2, fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap", color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm,
+                    }}>
+                      {gold > 0 ? "+" : ""}{GOLD_LABEL(gold)}
+                      <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{ruleSet.rateUnit || "G"}</span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           ))}
+          {!!ruleSet.rate && (
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
+              レート 1点 = {RATE_LABEL(ruleSet.rate)} {ruleSet.rateUnit || "G"}。
+              <span style={{ display: "inline-block" }}>1,000点単位に五捨六入してから掛けています</span>
+              {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (
+                <span style={{ display: "inline-block" }}>（ウマ込みの金額は下の「ポイント」を見てください）</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ウマ込みのポイント（要素数が人数と違うウマは合計が崩れるため適用しない） */}
@@ -12154,16 +12177,16 @@ input, select { padding: 10px 14px; }
               </div>
               {order.map(o => (
                 <div key={o.i} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
                   padding: "11px 14px", borderRadius: 10, marginBottom: 6,
                   background: o.rank === 1 ? t.gdS : "transparent",
                   border: o.rank === 1 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 15, fontWeight: 900, width: 24, color: o.rank === 1 ? t.gd : t.dm }}>{o.rank}</span>
-                    <span style={{ fontSize: 14, fontWeight: 600 }}>{players[o.i]}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
+                    <span style={{ fontSize: 15, fontWeight: 900, width: 24, flexShrink: 0, color: o.rank === 1 ? t.gd : t.dm }}>{o.rank}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{players[o.i]}</span>
                   </div>
-                  <div style={{ textAlign: "right" }}>
+                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
                     <span style={{
                       fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
                       color: o.pt > 0 ? t.gn : o.pt < 0 ? t.rd : t.tx,
@@ -12174,7 +12197,7 @@ input, select { padding: 10px 14px; }
                         color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm,
                       }}>
                         {o.pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate))}
-                        <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>{gameConfig.rules.rateUnit || "G"}</span>
+                        <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{gameConfig.rules.rateUnit || "G"}</span>
                       </div>
                     )}
                   </div>
@@ -12245,7 +12268,7 @@ input, select { padding: 10px 14px; }
                       width: 62, textAlign: "right", fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums",
                       color: res[i].pt > 0 ? t.gd : res[i].pt < 0 ? t.rd : t.dm,
                     }}>{res[i].pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(res[i].pt, lg.rules.rate))}
-                      <span style={{ fontSize: 9, marginLeft: 2, opacity: 0.8 }}>{lg.rules.rateUnit || "G"}</span>
+                      <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{lg.rules.rateUnit || "G"}</span>
                     </span>
                   )}
                 </div>
