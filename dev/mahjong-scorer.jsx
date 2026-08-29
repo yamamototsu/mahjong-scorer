@@ -4359,7 +4359,12 @@ input, select { padding: 10px 14px; }
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: on ? 12 : 0 }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>レート計算</div>
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 2 }}>点数を違うレート単位で表示します。</div>
+            <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
+              {/* 280px幅で「表示しま/す。」と途中で折り返さないよう意味の切れ目で区切る */}
+              {["点数を違うレート単位で", "表示します。"].map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}
+            </div>
           </div>
           <button onClick={() => onChange(on ? 0 : 0.1)} style={{
             // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
@@ -4432,22 +4437,6 @@ input, select { padding: 10px 14px; }
             {rateValid ? "0.001 〜 10 の範囲で入力" : "0.001 〜 10 の範囲で入力してください"}
           </div>
 
-          <div style={{
-            marginTop: 12, padding: "10px 12px", borderRadius: 10,
-            background: t.sf, border: `1px solid ${t.bd}`,
-          }}>
-            <div style={{ fontSize: 11, color: t.dm, fontWeight: 700, marginBottom: 6 }}>
-              点数例（1点 = {RATE_LABEL(rate)}{U}）
-            </div>
-            {[1000, 10000, 30000].map(pts => (
-              <div key={pts} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, lineHeight: 2 }}>
-                <span style={{ color: t.dm }}>{pts.toLocaleString()}点</span>
-                <span style={{ color: t.gd, fontWeight: 800 }}>
-                  {GOLD_LABEL(Math.round(pts * rate * 1000) / 1000)}{U}
-                </span>
-              </div>
-            ))}
-          </div>
         </>)}
       </div>
     );

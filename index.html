@@ -8367,9 +8367,15 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 10,
         color: t.dm,
-        marginTop: 2
+        marginTop: 2,
+        lineHeight: 1.7
       }
-    }, "点数を違うレート単位で表示します。")), React.createElement("button", {
+    }, ["点数を違うレート単位で", "表示します。"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)))), React.createElement("button", {
       onClick: () => onChange(on ? 0 : 0.1),
       style: {
         width: 48,
@@ -8539,39 +8545,7 @@ input, select { padding: 10px 14px; }
         color: rateValid ? t.dm : t.rd,
         marginTop: 6
       }
-    }, rateValid ? "0.001 〜 10 の範囲で入力" : "0.001 〜 10 の範囲で入力してください"), React.createElement("div", {
-      style: {
-        marginTop: 12,
-        padding: "10px 12px",
-        borderRadius: 10,
-        background: t.sf,
-        border: `1px solid ${t.bd}`
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        fontWeight: 700,
-        marginBottom: 6
-      }
-    }, "点数例（1点 = ", RATE_LABEL(rate), U, "）"), [1000, 10000, 30000].map(pts => React.createElement("div", {
-      key: pts,
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        fontSize: 12,
-        lineHeight: 2
-      }
-    }, React.createElement("span", {
-      style: {
-        color: t.dm
-      }
-    }, pts.toLocaleString(), "点"), React.createElement("span", {
-      style: {
-        color: t.gd,
-        fontWeight: 800
-      }
-    }, GOLD_LABEL(Math.round(pts * rate * 1000) / 1000), U))))));
+    }, rateValid ? "0.001 〜 10 の範囲で入力" : "0.001 〜 10 の範囲で入力してください")));
   };
   const TableDiagram = ({
     highlight,
