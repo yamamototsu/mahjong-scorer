@@ -1936,6 +1936,19 @@ export default function MahjongScorer() {
     );
   };
 
+  // 持ち点が0未満（ハコ下）の人に付ける印。トビで終了するルールなら
+  // ここで対局が終わるので、誰がトんだのかが分かるようにする
+  const tobiTag = {
+    fontSize: 10, fontWeight: 800, color: t.rd,
+    border: `1px solid ${t.rd}77`, background: t.rdS,
+    borderRadius: 6, padding: "2px 7px", whiteSpace: "nowrap", flexShrink: 0,
+    marginRight: 6,   // 右どなりの点数とくっつかないように離す
+  };
+  // JSX要素にせず関数で呼ぶ（画面コンポーネントの作り直しを避ける流儀に合わせる）
+  const tobiTagEl = (score, key) => (score < 0
+    ? <span key={key || "tobi"} style={tobiTag}>🔻 トビ</span>
+    : null);
+
   // 「タップで訂正できる」ことを示す小さなタグ
   const editTag = {
     fontSize: 10, fontWeight: 700, color: t.ac,
@@ -8539,7 +8552,9 @@ input, select { padding: 10px 14px; }
                       color: g.ranks[i] === 1 ? t.gd : t.dm,
                     }}>{g.ranks[i]}位</span>
                     <span style={{ flex: 1, fontSize: 13, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nm}</span>
-                    <span style={{ fontSize: 12, color: t.dm, fontVariantNumeric: "tabular-nums" }}>{g.scores[i].toLocaleString()}</span>
+                    <span style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: g.scores[i] < 0 ? t.rd : t.dm }}>
+                      {g.scores[i].toLocaleString()}{g.scores[i] < 0 && " 🔻"}
+                    </span>
                     <span style={{
                       width: 52, textAlign: "right", fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums",
                       color: g.pts[i] > 0 ? t.gn : g.pts[i] < 0 ? t.rd : t.tx,
@@ -10598,7 +10613,7 @@ input, select { padding: 10px 14px; }
                   <div style={{ fontSize: nameFont(players[i], 4.6), fontWeight: 900, color: picked ? t.gd : t.ac, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "95%", lineHeight: 1.35, flexShrink: 0 }}>
                     {players[i]}
                   </div>
-                  <div style={{ fontSize: "2.7cqmin", color: picked ? t.gd : t.dm, whiteSpace: "nowrap", lineHeight: 1.3, flexShrink: 0 }}>
+                  <div style={{ fontSize: "max(10px, 2.7cqmin)", color: picked ? t.gd : t.dm, whiteSpace: "nowrap", lineHeight: 1.3, flexShrink: 0 }}>
                     {picked ? "✓ アガリ" : "タップで選択"}
                   </div>
                 </button>
@@ -10617,7 +10632,7 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: nameFont(players[i], 4.4), fontWeight: 900, color: t.gd, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "95%", lineHeight: 1.35, flexShrink: 0 }}>
                   {players[i]}
                 </div>
-                <div style={{ fontSize: "2.7cqmin", color: t.dm, lineHeight: 1.3, flexShrink: 0, whiteSpace: "nowrap" }}>あがった人</div>
+                <div style={{ fontSize: "max(10px, 2.7cqmin)", color: t.dm, lineHeight: 1.3, flexShrink: 0, whiteSpace: "nowrap" }}>あがった人</div>
               </div>
             ) : (
               /* 放銃者候補 */
@@ -10636,7 +10651,7 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: nameFont(players[i], 4.1), fontWeight: 700, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "95%", lineHeight: 1.35, flexShrink: 0 }}>
                   {players[i]}
                 </div>
-                <div style={{ fontSize: "2.7cqmin", color: sel ? t.rd : t.dm, fontWeight: sel ? 800 : 400, lineHeight: 1.3, flexShrink: 0, whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: "max(10px, 2.7cqmin)", color: sel ? t.rd : t.dm, fontWeight: sel ? 800 : 400, lineHeight: 1.3, flexShrink: 0, whiteSpace: "nowrap" }}>
                   {sel ? "✓ 選択中" : "から出アガリ"}
                 </div>
               </button>
@@ -10680,6 +10695,13 @@ input, select { padding: 10px 14px; }
                     color: score < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums",
                   }}>{score.toLocaleString()}</span>
                 </div>
+                {/* ハコ下（0未満）が卓の上でも分かるようにする */}
+                {score < 0 && (
+                  <div style={{
+                    fontSize: "max(10px, 2.7cqmin)", fontWeight: 900, color: t.rd,
+                    lineHeight: 1.3, marginTop: "0.6cqmin", whiteSpace: "nowrap",
+                  }}>🔻 トビ</div>
+                )}
               </div>
               {/* リーチボタン */}
               <button onClick={(e) => { e.stopPropagation(); toggleDeclaredRiichi(i); }} style={{
@@ -11232,8 +11254,9 @@ input, select { padding: 10px 14px; }
                   border: `1px solid ${isD ? t.gd : t.bd}`,
                   borderRadius: 7, padding: "5px clamp(6px, 2.6vw, 10px)", flexShrink: 0,
                 }}>{sw}</span>
-                <span style={{ fontSize: 18, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
+                <span style={{ fontSize: 18, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p}</span>
               </div>
+              {tobiTagEl(scores[i])}
               <button onClick={() => toggleDeclaredRiichi(i)} style={{
                 // 26pxしかなく指で押しにくかったので高さを32px以上にする
                 padding: "8px clamp(5px, 2vw, 10px)", marginRight: "clamp(4px, 1.6vw, 8px)", borderRadius: 7, cursor: "pointer",
@@ -12043,6 +12066,21 @@ input, select { padding: 10px 14px; }
         {/* Raw scores */}
         <div style={card}>
           <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 10, letterSpacing: "0.05em" }}>最終持ち点</div>
+          {/* ハコ下（0未満）の人がいたら、それが分かるように出す */}
+          {adjusted.some(s => s.rawScore < 0) && (
+            <div style={{
+              marginBottom: 10, padding: "9px 11px", borderRadius: 9,
+              background: t.rdS, border: `1px solid ${t.rd}44`,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: t.rd, lineHeight: 1.8 }}>
+                {ruleSet.tobiEnd !== false ? "🔻 トビで終了しました" : "🔻 ハコ下の人がいます"}
+              </div>
+              <div style={{ fontSize: 11, color: t.tx, lineHeight: 1.9, marginTop: 2 }}>
+                {adjusted.filter(s => s.rawScore < 0).map(s => s.name).join("、")}
+                <span style={{ display: "inline-block" }}> の持ち点が0を下回りました</span>
+              </div>
+            </div>
+          )}
           {kyotakuAward && (
             <div style={{ fontSize: 11, color: t.gd, marginBottom: 10, padding: "7px 10px", borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}33`, lineHeight: 1.7 }}>
               卓上に残った供託リーチ棒 {kyotakuAward.n}本（+{(kyotakuAward.n * 1000).toLocaleString()}点）はトップの {players[kyotakuAward.idx]} さんが受け取りました
@@ -12050,16 +12088,17 @@ input, select { padding: 10px 14px; }
           )}
           {[...adjusted].sort((a, b) => b.rawScore - a.rawScore).map((s, rank) => (
             <div key={s.idx} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
               padding: "10px 14px", borderRadius: 10, marginBottom: 4,
               background: rank === 0 ? t.gdS : "transparent",
               border: rank === 0 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 16, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24 }}>{rank + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
+                <span style={{ fontSize: 16, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24, flexShrink: 0 }}>{rank + 1}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
               </div>
-              <span style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.tx }}>{s.rawScore.toLocaleString()}</span>
+              {tobiTagEl(s.rawScore)}
+              <span style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.tx, flexShrink: 0 }}>{s.rawScore.toLocaleString()}</span>
             </div>
           ))}
         </div>
@@ -12073,16 +12112,17 @@ input, select { padding: 10px 14px; }
           </div>
           {sorted.map((s, rank) => (
             <div key={s.idx} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
               padding: "12px 14px", borderRadius: 10, marginBottom: 6,
               background: rank === 0 ? t.gdS : "transparent",
               border: rank === 0 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 18, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24 }}>{rank + 1}</span>
-                <span style={{ fontSize: 15, fontWeight: 600 }}>{s.name}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
+                <span style={{ fontSize: 18, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24, flexShrink: 0 }}>{rank + 1}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
               </div>
-              <div style={{ textAlign: "right" }}>
+              {tobiTagEl(s.rawScore)}
+              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
                 <span style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.finalPt > 0 ? t.gn : s.finalPt < 0 ? t.rd : t.tx }}>
                   {s.finalPt > 0 ? "+" : ""}{s.finalPt.toLocaleString()}
                 </span>
@@ -12153,12 +12193,13 @@ input, select { padding: 10px 14px; }
         <div style={card}>
           <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8, letterSpacing: "0.05em" }}>局の記録</div>
           {rounds.map((r, idx) => (
-            <div key={idx} style={{ padding: "6px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ color: t.dm }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
+            /* 狭い画面では局名と中身が重なるので、折り返して2行にする */
+            <div key={idx} style={{ padding: "6px 0", borderBottom: `1px solid ${t.bd}33`, fontSize: 12, display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>{r.wind}{r.dealer + 1}局{r.honba > 0 ? ` ${r.honba}本場` : ""}</span>
               {r.chombo ? (
-                <span style={{ color: t.rd, fontWeight: 700 }}>チョンボ {players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
+                <span style={{ color: t.rd, fontWeight: 700, marginLeft: "auto" }}>チョンボ {players[r.offender]}{r.noPay ? "（記録のみ）" : ""}</span>
               ) : r.draw ? (
-                <span style={{ color: t.dm }}>
+                <span style={{ color: t.dm, marginLeft: "auto" }}>
                   流局
                   {r.tenpai && r.tenpai.some(Boolean) && (
                     <span style={{ marginLeft: 4, color: t.gn }}>
@@ -12167,11 +12208,11 @@ input, select { padding: 10px 14px; }
                   )}
                 </span>
               ) : (
-                <span>
-                  <span style={{ color: t.ac, fontWeight: 600 }}>{players[r.winner]}</span>
-                  {" "}<span style={{ color: t.dm }}>{r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`}</span>
-                  {" "}<span style={{ fontWeight: 700 }}>{r.score?.toLocaleString()}</span>
-                  {r.limitName && <span style={{ color: t.gd, marginLeft: 4 }}>{r.limitName}</span>}
+                <span style={{ marginLeft: "auto", textAlign: "right", display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "0 5px" }}>
+                  <span style={{ color: t.ac, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{players[r.winner]}</span>
+                  <span style={{ color: t.dm, whiteSpace: "nowrap" }}>{r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`}</span>
+                  <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{r.score?.toLocaleString()}</span>
+                  {r.limitName && <span style={{ color: t.gd, whiteSpace: "nowrap" }}>{r.limitName}</span>}
                 </span>
               )}
             </div>
@@ -12569,7 +12610,7 @@ input, select { padding: 10px 14px; }
                         fontWeight: si === 0 || s.score < 0 ? 700 : 400,
                         border: `1px solid ${si === 0 ? t.gd + "33" : t.bd}`,
                       }}>
-                        {si === 0 && "🏆 "}{s.name} {s.score.toLocaleString()}
+                        {si === 0 && "🏆 "}{s.name} {s.score.toLocaleString()}{s.score < 0 && " 🔻"}
                       </span>
                     ))}
                   </div>
@@ -12697,16 +12738,17 @@ input, select { padding: 10px 14px; }
                 .sort((a, b) => b.score - a.score)
                 .map((s, rank) => (
                   <div key={s.idx} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
                     padding: "8px 12px", borderRadius: 8, marginBottom: 4,
                     background: rank === 0 ? t.gdS : "transparent",
                     border: rank === 0 ? `1px solid ${t.gd}33` : "1px solid transparent",
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: rank === 0 ? t.gd : t.dm, width: 20 }}>{rank + 1}</span>
-                      <span style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 56, flex: "1 1 100px" }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: rank === 0 ? t.gd : t.dm, width: 20, flexShrink: 0 }}>{rank + 1}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                     </div>
-                    <span style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.score < 0 ? t.rd : t.tx }}>
+                    {tobiTagEl(s.score)}
+                    <span style={{ fontSize: 16, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.score < 0 ? t.rd : t.tx, flexShrink: 0 }}>
                       {s.score.toLocaleString()}
                     </span>
                   </div>

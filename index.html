@@ -2693,6 +2693,22 @@ function MahjongScorer() {
       }
     }, oka, "pt"), oka === 0 ? " — 発生しません" : " がトップへ"));
   };
+  const tobiTag = {
+    fontSize: 10,
+    fontWeight: 800,
+    color: t.rd,
+    border: `1px solid ${t.rd}77`,
+    background: t.rdS,
+    borderRadius: 6,
+    padding: "2px 7px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    marginRight: 6
+  };
+  const tobiTagEl = (score, key) => score < 0 ? React.createElement("span", {
+    key: key || "tobi",
+    style: tobiTag
+  }, "🔻 トビ") : null;
   const editTag = {
     fontSize: 10,
     fontWeight: 700,
@@ -15991,10 +16007,10 @@ input, select { padding: 10px 14px; }
       }, nm), React.createElement("span", {
         style: {
           fontSize: 12,
-          color: t.dm,
-          fontVariantNumeric: "tabular-nums"
+          fontVariantNumeric: "tabular-nums",
+          color: g.scores[i] < 0 ? t.rd : t.dm
         }
-      }, g.scores[i].toLocaleString()), React.createElement("span", {
+      }, g.scores[i].toLocaleString(), g.scores[i] < 0 && " 🔻"), React.createElement("span", {
         style: {
           width: 52,
           textAlign: "right",
@@ -19706,7 +19722,7 @@ input, select { padding: 10px 14px; }
           }
         }, players[i]), React.createElement("div", {
           style: {
-            fontSize: "2.7cqmin",
+            fontSize: "max(10px, 2.7cqmin)",
             color: picked ? t.gd : t.dm,
             whiteSpace: "nowrap",
             lineHeight: 1.3,
@@ -19750,7 +19766,7 @@ input, select { padding: 10px 14px; }
         }
       }, players[i]), React.createElement("div", {
         style: {
-          fontSize: "2.7cqmin",
+          fontSize: "max(10px, 2.7cqmin)",
           color: t.dm,
           lineHeight: 1.3,
           flexShrink: 0,
@@ -19798,7 +19814,7 @@ input, select { padding: 10px 14px; }
           }
         }, players[i]), React.createElement("div", {
           style: {
-            fontSize: "2.7cqmin",
+            fontSize: "max(10px, 2.7cqmin)",
             color: sel ? t.rd : t.dm,
             fontWeight: sel ? 800 : 400,
             lineHeight: 1.3,
@@ -19882,7 +19898,16 @@ input, select { padding: 10px 14px; }
           color: score < 0 ? t.rd : t.tx,
           fontVariantNumeric: "tabular-nums"
         }
-      }, score.toLocaleString()))), React.createElement("button", {
+      }, score.toLocaleString())), score < 0 && React.createElement("div", {
+        style: {
+          fontSize: "max(10px, 2.7cqmin)",
+          fontWeight: 900,
+          color: t.rd,
+          lineHeight: 1.3,
+          marginTop: "0.6cqmin",
+          whiteSpace: "nowrap"
+        }
+      }, "🔻 トビ")), React.createElement("button", {
         onClick: e => {
           e.stopPropagation();
           toggleDeclaredRiichi(i);
@@ -20908,11 +20933,12 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 18,
         fontWeight: 700,
+        minWidth: 0,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap"
       }
-    }, p)), React.createElement("button", {
+    }, p)), tobiTagEl(scores[i]), React.createElement("button", {
       onClick: () => toggleDeclaredRiichi(i),
       style: {
         padding: "8px clamp(5px, 2vw, 10px)",
@@ -22533,7 +22559,33 @@ input, select { padding: 10px 14px; }
         marginBottom: 10,
         letterSpacing: "0.05em"
       }
-    }, "最終持ち点"), kyotakuAward && React.createElement("div", {
+    }, "最終持ち点"), adjusted.some(s => s.rawScore < 0) && React.createElement("div", {
+      style: {
+        marginBottom: 10,
+        padding: "9px 11px",
+        borderRadius: 9,
+        background: t.rdS,
+        border: `1px solid ${t.rd}44`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 800,
+        color: t.rd,
+        lineHeight: 1.8
+      }
+    }, ruleSet.tobiEnd !== false ? "🔻 トビで終了しました" : "🔻 ハコ下の人がいます"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.tx,
+        lineHeight: 1.9,
+        marginTop: 2
+      }
+    }, adjusted.filter(s => s.rawScore < 0).map(s => s.name).join("、"), React.createElement("span", {
+      style: {
+        display: "inline-block"
+      }
+    }, " の持ち点が0を下回りました"))), kyotakuAward && React.createElement("div", {
       style: {
         fontSize: 11,
         color: t.gd,
@@ -22550,6 +22602,8 @@ input, select { padding: 10px 14px; }
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 4,
+        flexWrap: "wrap",
         padding: "10px 14px",
         borderRadius: 10,
         marginBottom: 4,
@@ -22560,26 +22614,34 @@ input, select { padding: 10px 14px; }
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 10
+        gap: 10,
+        minWidth: 60,
+        flex: "1 1 100px"
       }
     }, React.createElement("span", {
       style: {
         fontSize: 16,
         fontWeight: 900,
         color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm,
-        width: 24
+        width: 24,
+        flexShrink: 0
       }
     }, rank + 1), React.createElement("span", {
       style: {
         fontSize: 14,
-        fontWeight: 600
+        fontWeight: 600,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
       }
-    }, s.name)), React.createElement("span", {
+    }, s.name)), tobiTagEl(s.rawScore), React.createElement("span", {
       style: {
         fontSize: 16,
         fontWeight: 800,
         fontVariantNumeric: "tabular-nums",
-        color: s.rawScore < 0 ? t.rd : t.tx
+        color: s.rawScore < 0 ? t.rd : t.tx,
+        flexShrink: 0
       }
     }, s.rawScore.toLocaleString())))), React.createElement("div", {
       style: card
@@ -22603,6 +22665,8 @@ input, select { padding: 10px 14px; }
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        gap: 4,
+        flexWrap: "wrap",
         padding: "12px 14px",
         borderRadius: 10,
         marginBottom: 6,
@@ -22613,23 +22677,32 @@ input, select { padding: 10px 14px; }
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 10
+        gap: 10,
+        minWidth: 60,
+        flex: "1 1 100px"
       }
     }, React.createElement("span", {
       style: {
         fontSize: 18,
         fontWeight: 900,
         color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm,
-        width: 24
+        width: 24,
+        flexShrink: 0
       }
     }, rank + 1), React.createElement("span", {
       style: {
         fontSize: 15,
-        fontWeight: 600
+        fontWeight: 600,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
       }
-    }, s.name)), React.createElement("div", {
+    }, s.name)), tobiTagEl(s.rawScore), React.createElement("div", {
       style: {
-        textAlign: "right"
+        textAlign: "right",
+        flexShrink: 0,
+        marginLeft: 8
       }
     }, React.createElement("span", {
       style: {
@@ -22763,43 +22836,64 @@ input, select { padding: 10px 14px; }
         borderBottom: `1px solid ${t.bd}33`,
         fontSize: 12,
         display: "flex",
-        justifyContent: "space-between"
+        justifyContent: "space-between",
+        gap: 8,
+        flexWrap: "wrap"
       }
     }, React.createElement("span", {
       style: {
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, r.wind, r.dealer + 1, "局", r.honba > 0 ? ` ${r.honba}本場` : ""), r.chombo ? React.createElement("span", {
       style: {
         color: t.rd,
-        fontWeight: 700
+        fontWeight: 700,
+        marginLeft: "auto"
       }
     }, "チョンボ ", players[r.offender], r.noPay ? "（記録のみ）" : "") : r.draw ? React.createElement("span", {
       style: {
-        color: t.dm
+        color: t.dm,
+        marginLeft: "auto"
       }
     }, "流局", r.tenpai && r.tenpai.some(Boolean) && React.createElement("span", {
       style: {
         marginLeft: 4,
         color: t.gn
       }
-    }, "聴", r.tenpai.map((tp, i) => tp ? players[i]?.charAt(0) : null).filter(Boolean).join(""))) : React.createElement("span", null, React.createElement("span", {
+    }, "聴", r.tenpai.map((tp, i) => tp ? players[i]?.charAt(0) : null).filter(Boolean).join(""))) : React.createElement("span", {
+      style: {
+        marginLeft: "auto",
+        textAlign: "right",
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "flex-end",
+        gap: "0 5px"
+      }
+    }, React.createElement("span", {
       style: {
         color: t.ac,
-        fontWeight: 600
+        fontWeight: 600,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        maxWidth: "100%"
       }
-    }, players[r.winner]), " ", React.createElement("span", {
+    }, players[r.winner]), React.createElement("span", {
       style: {
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap"
       }
-    }, r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`), " ", React.createElement("span", {
+    }, r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`), React.createElement("span", {
       style: {
-        fontWeight: 700
+        fontWeight: 700,
+        whiteSpace: "nowrap"
       }
     }, r.score?.toLocaleString()), r.limitName && React.createElement("span", {
       style: {
         color: t.gd,
-        marginLeft: 4
+        whiteSpace: "nowrap"
       }
     }, r.limitName))))), (() => {
       const lg = leagues.find(l => l.id === activeLeagueId);
@@ -23492,7 +23586,7 @@ input, select { padding: 10px 14px; }
         fontWeight: si === 0 || s.score < 0 ? 700 : 400,
         border: `1px solid ${si === 0 ? t.gd + "33" : t.bd}`
       }
-    }, si === 0 && "🏆 ", s.name, " ", s.score.toLocaleString()))), React.createElement("div", {
+    }, si === 0 && "🏆 ", s.name, " ", s.score.toLocaleString(), s.score < 0 && " 🔻"))), React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
@@ -23785,6 +23879,8 @@ input, select { padding: 10px 14px; }
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
+      gap: 4,
+      flexWrap: "wrap",
       padding: "8px 12px",
       borderRadius: 8,
       marginBottom: 4,
@@ -23795,26 +23891,34 @@ input, select { padding: 10px 14px; }
     style: {
       display: "flex",
       alignItems: "center",
-      gap: 8
+      gap: 8,
+      minWidth: 56,
+      flex: "1 1 100px"
     }
   }, React.createElement("span", {
     style: {
       fontSize: 14,
       fontWeight: 800,
       color: rank === 0 ? t.gd : t.dm,
-      width: 20
+      width: 20,
+      flexShrink: 0
     }
   }, rank + 1), React.createElement("span", {
     style: {
       fontSize: 14,
-      fontWeight: 600
+      fontWeight: 600,
+      minWidth: 0,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap"
     }
-  }, s.name)), React.createElement("span", {
+  }, s.name)), tobiTagEl(s.score), React.createElement("span", {
     style: {
       fontSize: 16,
       fontWeight: 800,
       fontVariantNumeric: "tabular-nums",
-      color: s.score < 0 ? t.rd : t.tx
+      color: s.score < 0 ? t.rd : t.tx,
+      flexShrink: 0
     }
   }, s.score.toLocaleString())))), React.createElement("div", {
     style: {
