@@ -1231,38 +1231,53 @@ export default function MahjongScorer() {
 
   // Score correction: which round index is being corrected
   const [correctingIdx, setCorrectingIdx] = useState(null);
+  // いま直している局（局の修正で選んだ局）。入力し直した内容がこの局を置き換える
+  const [fixIdx, setFixIdx] = useState(null);
 
-  // 流局の修正: その局のテンパイ内容を再入力させる（本場・供託は維持）
-  const openDrawCorrection = (idx) => {
+  // ── 局の修正 ──
+  // 直す局を選んだら、ふだんの対局画面に戻って「アガリ入力」「流局」で入力し直す。
+  // 入力した内容がその局を丸ごと置き換える（流局→アガリ、アガリ→流局も直せる）。
+  const startRoundFix = (idx) => {
     const r = rounds[idx];
-    if (!r || !r.draw) return;
-    // 卓上でアガリ入力の途中だったら、その選択は捨てて修正に切り替える
+    if (!r) return;
+    // 入力の途中だったら、その選択は捨てて修正に切り替える
     setTmWinStep(null); setRonPick([]); setRonLoserPick(null);
     setMultiRon(null); setTmCorrectBackup(null); setRonRuleWarn(false);
-    setCorrectingDrawIdx(idx);
-    setDrawTenpai([...(r.tenpai || [false, false, false, false])]);
-    if (tableMode) { setTmDrawMode(true); setShowDrawWiz(false); }
-    else setShowDrawWiz(true);
+    setTmDrawMode(false); setShowDrawWiz(false);
+    resetGW(); resetChombo();
+    setShowRoundEdit(false); setEditingRoundIdx(null);
+    setFixIdx(idx);
   };
-
-  const openCorrectionWizard = (idx) => {
-    const r = rounds[idx];
-    if (!r || r.draw || r.chombo) return;   // チョンボ局はチョンボ修正から
-    // 卓上でアガリ入力の途中だったら、その選択は捨てて修正に切り替える
+  const cancelRoundFix = () => {
+    setFixIdx(null);
     setTmWinStep(null); setRonPick([]); setRonLoserPick(null);
     setMultiRon(null); setTmCorrectBackup(null); setRonRuleWarn(false);
-    setTmDrawMode(false);
-    setGWinner(r.winner);
-    setGTsumo(r.tsumo);
-    setGLoser(r.loser !== undefined ? r.loser : null);
-    setGHan(r.han);
-    setGFu(r.fu || 30);
-    setGRiichi(r.riichi || [false,false,false,false]);
-    setFuGuide(null);
-    setCorrectingIdx(idx);
-    setEditingRoundIdx(null);
-    setShowGW(true);
-    setGStep(7);
+    setTmDrawMode(false); setShowDrawWiz(false);
+    resetGW(); resetChombo();
+  };
+  // 修正中の局の名前（「東1局 3本場」）
+  const fixRoundLabel = () => {
+    const r = fixIdx !== null ? rounds[fixIdx] : null;
+    if (!r) return "";
+    return `${r.wind}${r.dealer + 1}局${r.honba > 0 ? ` ${r.honba}本場` : ""}`;
+  };
+  // 直した内容を入れる先。局名・親・本場・idは元のまま引き継ぐ
+  const fixBase = () => {
+    const r = rounds[fixIdx] || {};
+    return { id: r.id, wind: r.wind, dealer: r.dealer, honba: r.honba };
+  };
+  // ダブロンの局を直すときは、その局のアガリをまとめて1件に置き換える
+  const fixReplace = (rec) => {
+    const g = multiRonGroup(fixIdx);
+    const at = Math.min(...g);
+    const out = rounds.filter((_, i) => !g.includes(i));
+    out.splice(at, 0, rec);
+    return out;
+  };
+  // 修正を反映したら、結果画面から来ていた場合はそのまま結果へ戻す
+  const afterFixApplied = () => {
+    setFixIdx(null);
+    if (reviewing) finishReviewing();
   };
 
   // ── チョンボ ──
@@ -1291,7 +1306,7 @@ export default function MahjongScorer() {
     setChomboWho(i);
     // 選んだ人に合わせて既定額を入れる（画面で変更できる）。
     // 修正モードでは「その局の親」で判定する（現在の親を見ると額を取り違える）
-    const cd = correctingChomboIdx !== null ? (rounds[correctingChomboIdx]?.dealer ?? dealerIdx) : dealerIdx;
+    const cd = fixIdx !== null ? (rounds[fixIdx]?.dealer ?? dealerIdx) : dealerIdx;
     if (i === cd) {
       setChomboToKo(cr.oya);
     } else {
@@ -1329,17 +1344,16 @@ export default function MahjongScorer() {
   const applyChombo = (noPay) => {
     if (chomboWho === null) return;
 
-    // 修正モード: 記録を差し替えて全体を再計算（供託・実況リーチは applyDraw の修正と同じ扱い）
-    if (correctingChomboIdx !== null) {
-      const old = rounds[correctingChomboIdx];
+    // 局の修正: 選んだ局をチョンボの記録で丸ごと置き換える
+    if (fixIdx !== null) {
+      const old = rounds[fixIdx] || {};
       const rec = {
-        ...old, offender: chomboWho, noPay: !!noPay,
+        id: old.id, wind: old.wind, dealer: old.dealer, honba: old.honba,
+        chombo: true, offender: chomboWho, noPay: !!noPay,
         toOya: chomboWho === old.dealer ? null : chomboToOya,
         toKo: chomboToKo,
       };
-      const newRounds = [...rounds];
-      newRounds[correctingChomboIdx] = rec;
-      const recalced = recalcAllRounds(newRounds, gameConfig || {});
+      const recalced = recalcAllRounds(fixReplace(rec), gameConfig || {});
       const newScores = [...recalced.scores];
       let liveCount = 0;
       for (let i = 0; i < PC; i++) { if (declaredRiichi[i]) { newScores[i] -= 1000; liveCount++; } }
@@ -1348,6 +1362,7 @@ export default function MahjongScorer() {
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
       resetChombo();
+      afterFixApplied();
       return;
     }
 
@@ -1504,24 +1519,28 @@ export default function MahjongScorer() {
     // ロンなのに放銃者が空・本人と同じ、という矛盾した記録は作らない
     if (!gTsumo && !multiRon && (gLoser === null || gLoser === gWinner)) return;
 
-    if (correctingIdx !== null) {
-      // CORRECTION MODE: replace the old round and recalculate everything
+    // ── 局の修正: 選んだ局を、入力し直した内容で丸ごと置き換える ──
+    if (fixIdx !== null && !(multiRon && multiRon.queue.length > 0)) {
       const cfg = gameConfig || {};
-      const correctedRound = { ...rounds[correctingIdx], winner: gWinner, loser: gLoser, han: gHan, fu: gHan >= 5 ? null : gFu, score: gResult.total, tsumo: gTsumo, limitName: gLimit, riichi: [...gRiichi] };
-      const newRounds = [...rounds];
-      newRounds[correctingIdx] = correctedRound;
-
-      // 全局を再計算（供託は履歴から導出）
-      const recalced = recalcAllRounds(newRounds, cfg);
+      const old = rounds[fixIdx] || {};
+      const rec = {
+        id: old.id, wind: old.wind, dealer: old.dealer, honba: old.honba,
+        winner: gWinner, loser: gTsumo ? null : gLoser,
+        han: gHan, fu: gHan >= 5 ? null : gFu, score: gResult.total,
+        tsumo: gTsumo, limitName: gLimit,
+        // ウィザードで入れたリーチ棒。卓上で宣言済みの人もリーチ扱い
+        riichi: [0, 1, 2, 3].map(i => !!(gRiichi[i] || declaredRiichi[i])),
+      };
+      const recalced = recalcAllRounds(fixReplace(rec), cfg);
       const newScores = [...recalced.scores];
-      // 現在宣言中の実況リーチ分を復元（宣言時に既に-1000されている状態）
       let liveCount = 0;
       for (let i = 0; i < PC; i++) { if (declaredRiichi[i]) { newScores[i] -= 1000; liveCount++; } }
       for (let i = 0; i < PC; i++) newScores[i] += (manualAdj[i] || 0);   // 直接修正した分を足し直す
       setRounds(recalced.rounds);
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
-      resetGW();
+      resetGW(); setTmWinStep(null); setRonPick([]); setRonLoserPick(null); setMultiRon(null);
+      afterFixApplied();
       return;
     }
 
@@ -1574,20 +1593,22 @@ export default function MahjongScorer() {
     // Advance dealer / check game end
     advanceAfterWin(gWinner === dealerIdx, ns);
     resetGW();
-  }, [gWinner, gLoser, gResult, gTsumo, gParent, gHan, gFu, gLimit, gRiichi, scores, honba, riichiBets, dealerIdx, rounds, roundWind, resetGW, gameConfig, correctingIdx, multiRon, finalizeMultiRon, advanceAfterWin]);
+  }, [gWinner, gLoser, gResult, gTsumo, gParent, gHan, gFu, gLimit, gRiichi, scores, honba, riichiBets, dealerIdx, rounds, roundWind, resetGW, gameConfig, fixIdx, manualAdj, multiRon, finalizeMultiRon, advanceAfterWin]);
 
   // Handle ryuukyoku (draw) - called after tenpai selection
   const applyDraw = useCallback(() => {
     const cfgAll = gameConfig || {};
 
-    // ── 流局の修正モード: テンパイの内容だけ差し替えて全体を再計算 ──
-    if (correctingDrawIdx !== null) {
-      const newRounds = [...rounds];
-      // 本場はそのまま維持し、テンパイだけ上書きする（供託は履歴から再導出）
-      // リーチ＝必ずテンパイなので、その局のリーチ者はノーテンにできない
-      const oldRiichi = newRounds[correctingDrawIdx].riichi || [];
-      newRounds[correctingDrawIdx] = { ...newRounds[correctingDrawIdx], tenpai: drawTenpai.map((v, i) => v || !!oldRiichi[i]) };
-      const recalced = recalcAllRounds(newRounds, cfgAll);
+    // ── 局の修正: 選んだ局を流局の記録で丸ごと置き換える ──
+    if (fixIdx !== null) {
+      const old = rounds[fixIdx] || {};
+      // リーチ＝必ずテンパイなので、リーチした人はノーテンにできない
+      const rr = [0, 1, 2, 3].map(i => !!((old.riichi || [])[i] || declaredRiichi[i]));
+      const rec = {
+        id: old.id, wind: old.wind, dealer: old.dealer, honba: old.honba,
+        draw: true, tenpai: drawTenpai.map((v, i) => v || rr[i]), riichi: rr,
+      };
+      const recalced = recalcAllRounds(fixReplace(rec), cfgAll);
       const newScores = [...recalced.scores];
       let liveCount = 0;
       for (let i = 0; i < PC; i++) { if (declaredRiichi[i]) { newScores[i] -= 1000; liveCount++; } }
@@ -1595,9 +1616,9 @@ export default function MahjongScorer() {
       setRounds(recalced.rounds);
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
-      setCorrectingDrawIdx(null);
       resetDrawWiz();
       setTmDrawMode(false);
+      afterFixApplied();
       return;
     }
 
@@ -1659,7 +1680,7 @@ export default function MahjongScorer() {
     if (ruleSet.tobiEnd !== false && ns.some(s => s < 0)) setGameFinished(true);
 
     resetDrawWiz();
-  }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, correctingDrawIdx, rounds, declaredRiichi]);
+  }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, fixIdx, manualAdj, rounds, declaredRiichi]);
 
   const startGame = useCallback(() => {
     const sp = rules.startPoints || 25000;
@@ -1712,7 +1733,7 @@ export default function MahjongScorer() {
     if (prevRoundKey.current === key) return;
     prevRoundKey.current = key;
     // 過去の局を修正しているときは出さない
-    if (reviewing || correctingIdx !== null || correctingDrawIdx !== null) return;
+    if (reviewing || fixIdx !== null) return;
     setStartSplash({
       league: null, matchType,
       date: gameConfig?.date || gameDate,
@@ -6966,6 +6987,7 @@ input, select { padding: 10px 14px; }
   // 入るときに点数と記録を丸ごと控えておき、「やめる」で元どおりに戻せるようにする
   const reviewExitCleanup = () => {
     // 修正の途中状態をすべて片付ける（開きっぱなしのモーダル・修正対象など）
+    setFixIdx(null);
     setShowRoundEdit(false); setEditingRoundIdx(null);
     resetGW(); setCorrectingDrawIdx(null); resetDrawWiz(); setTmDrawMode(false);
     resetChombo(); setTmWinStep(null); setRonPick([]); setRonLoserPick(null);
@@ -10628,16 +10650,8 @@ input, select { padding: 10px 14px; }
                       <div style={{ padding: "8px 0 12px" }}>
                         {/* 狭い幅では横に2つ並ばないので、折り返して縦に積む */}
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          {r.chombo ? (
-                            <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                              onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openChomboCorrection(idx); }}>✏️ この局を修正</button>
-                          ) : !r.draw ? (
-                            <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                              onClick={() => { setShowRoundEdit(false); openCorrectionWizard(idx); }}>✏️ この局を修正</button>
-                          ) : (
-                            <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                              onClick={() => { setShowRoundEdit(false); setEditingRoundIdx(null); openDrawCorrection(idx); }}>✏️ この局を修正</button>
-                          )}
+                          <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                            onClick={() => startRoundFix(idx)}>✏️ この局を修正</button>
                           <button style={{ flex: "1 1 120px", padding: "10px", borderRadius: 8, border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 12, cursor: "pointer" }}
                             onClick={() => setEditingRoundIdx(null)}>キャンセル</button>
                         </div>
@@ -10658,6 +10672,12 @@ input, select { padding: 10px 14px; }
             </div>
           </div>
   );
+
+  // 修正中に入力を始めるとき、直す局のリーチ棒・テンパイを引き継ぐ
+  const fixSeedRiichi = () => (fixIdx !== null && rounds[fixIdx]?.riichi)
+    ? [...rounds[fixIdx].riichi] : [false, false, false, false];
+  const fixSeedTenpai = () => (fixIdx !== null && rounds[fixIdx]?.tenpai)
+    ? [...rounds[fixIdx].tenpai] : [...declaredRiichi];
 
   const renderTableMode = () => {
     // ルールで許される同時ロンの人数（1=頭ハネ）
@@ -10710,8 +10730,8 @@ input, select { padding: 10px 14px; }
           {tmDrawMode ? (
             /* 流局: テンパイ/ノーテンをトグル。修正中はその局のリーチ者を参照する */
             (() => {
-            const lockR = correctingDrawIdx !== null
-              ? !!(rounds[correctingDrawIdx]?.riichi || [])[i]
+            const lockR = fixIdx !== null
+              ? !!((rounds[fixIdx]?.riichi || [])[i] || declaredRiichi[i])
               : isRiichi;
             return (
             <button disabled={lockR} onClick={() => { if (lockR) return; const n = [...drawTenpai]; n[i] = !n[i]; setDrawTenpai(n); }} style={{
@@ -10915,13 +10935,13 @@ input, select { padding: 10px 14px; }
       }}>
         {tmDrawMode ? (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: correctingDrawIdx !== null ? t.gd : t.gn, textAlign: "center", marginBottom: 4 }}>
-              {correctingDrawIdx !== null
-                ? `✏️ ${rounds[correctingDrawIdx]?.wind}${(rounds[correctingDrawIdx]?.dealer ?? 0) + 1}局の修正 — テンパイの人をタップ`
+            <div style={{ fontSize: 12, fontWeight: 700, color: fixIdx !== null ? t.gd : t.gn, textAlign: "center", marginBottom: 4 }}>
+              {fixIdx !== null
+                ? `✏️ ${fixRoundLabel()} を流局に直す — テンパイの人をタップ`
                 : "流局 — テンパイの人をタップして「確定」"}
             </div>
             <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginBottom: 6 }}>
-              {correctingDrawIdx !== null ? "本場と供託はそのまま、テンパイの内容だけ上書きします" : (() => {
+              {fixIdx !== null ? "局名と本場はそのまま、内容を入れ直します" : (() => {
                 const rs = (gameConfig || {}).rules || {};
                 const dealerTenpai = drawTenpai[dealerIdx];
                 const stays = rs.agariRenchan ? false : rs.tenpaiRenchan ? dealerTenpai : true;
@@ -10930,7 +10950,7 @@ input, select { padding: 10px 14px; }
               })()}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              {correctingDrawIdx === null && (
+              {(
                 <button style={{ ...smallBtn(), flex: 1, color: t.rd, border: `1px solid ${t.rd}55` }} onClick={() => {
                   setTmDrawMode(false); setDrawTenpai([false,false,false,false]);
                   openChombo();
@@ -10980,7 +11000,7 @@ input, select { padding: 10px 14px; }
                   setGStep(b.gStep); setGWinner(b.gWinner); setGTsumo(b.gTsumo); setGLoser(b.gLoser);
                   setGHan(b.gHan); setGFu(b.gFu); setGRiichi(b.gRiichi); setGKnownNaki(b.gKnownNaki);
                   setFuGuide(b.fuGuide); setRonPick(b.ronPick); setMultiRon(b.multiRon);
-                  setShowGW(b.showGW); setCorrectingIdx(b.correctingIdx);
+                  setShowGW(b.showGW);
                   setTmCorrectBackup(null);
                   return;
                 }
@@ -10988,8 +11008,8 @@ input, select { padding: 10px 14px; }
               }}>キャンセル</button>
             </div>
           </>
-        ) : reviewing ? (
-          /* 結果画面から戻ってきた修正モード。対局は終わっているので
+        ) : (reviewing && fixIdx === null) ? (
+          /* 結果画面から戻ってきた直後。まだ直す局を選んでいないので
              「アガリ入力」「流局」は出さない（押すと局が増えてしまう） */
           <div style={{ display: "flex", gap: 8 }}>
             <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
@@ -11011,8 +11031,8 @@ input, select { padding: 10px 14px; }
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
             {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
-            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
-            <button style={{ ...smallBtn(), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai([...declaredRiichi]); setTmDrawMode(true); }}>流局</button>
+            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={{ ...smallBtn(), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
             <button aria-label="席順を回す" style={{
               ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -11041,6 +11061,30 @@ input, select { padding: 10px 14px; }
           )}
         </div>
 
+        {/* いまどの局を直しているか（入力はふだんどおり下のボタンから） */}
+        {fixIdx !== null && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+            padding: "9px 11px", marginBottom: 8, borderRadius: 10,
+            background: t.gdS, border: `1px solid ${t.gd}66`,
+          }}>
+            <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: t.gd, lineHeight: 1.6 }}>
+                ✏️ {fixRoundLabel()} を修正中
+              </div>
+              <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7 }}>
+                {["下の「アガリ入力」か", "「流局」で入力し直すと、", "この局が置き換わります"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => { cancelRoundFix(); setEditingRoundIdx(null); setShowRoundEdit(true); }} style={{
+              flexShrink: 0, padding: "9px 12px", borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: t.sf, color: t.dm,
+              fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", minHeight: 34,
+            }}>局を選び直す</button>
+          </div>
+        )}
         {RuleCheckModal()}
         {RonRuleWarnModal()}
         {actionRow(true)}
@@ -11297,21 +11341,14 @@ input, select { padding: 10px 14px; }
 
         {actionRow(false)}
         {reviewing && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <button onClick={finishReviewing} style={{
-              flex: "1.4 1 170px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
-              border: "none", background: t.gn, color: "#fff",
-              fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-            }}>✓ 修正を終えて結果に戻る</button>
-            <button onClick={() => {
-              if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
-              cancelReviewing();
-            }} style={{
-              flex: "1 1 120px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
-              border: `1px solid ${t.rd}66`, background: t.sf, color: t.rd,
-              fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-            }}>↩ 修正をやめる</button>
-          </div>
+          <button onClick={() => {
+            if (!window.confirm("修正をやめて、修正前の結果に戻しますか？")) return;
+            cancelReviewing();
+          }} style={{
+            width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 11,
+            border: `1px solid ${t.rd}66`, background: t.sf, color: t.rd,
+            fontSize: "clamp(13px, 4vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+          }}>↩ 修正をやめる</button>
         )}
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
           点数を長押しすると順位と点差が見られます
@@ -11331,20 +11368,37 @@ input, select { padding: 10px 14px; }
     <div style={body}>
       {/* 結果画面から修正に来ているとき（卓上モードをオフにしている端末用） */}
       {reviewing && (
-        <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-          <button onClick={finishReviewing} style={{
-            flex: "1.4 1 170px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
-            border: "none", background: t.gn, color: "#fff",
-            fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-          }}>✓ 修正を終えて結果に戻る</button>
-          <button onClick={() => {
-            if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
-            cancelReviewing();
-          }} style={{
-            flex: "1 1 120px", padding: "13px 6px", borderRadius: 11, minWidth: 0,
-            border: `1px solid ${t.rd}66`, background: t.sf, color: t.rd,
-            fontSize: "clamp(12px, 3.8vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
-          }}>↩ 修正をやめる</button>
+        <button onClick={() => {
+          if (!window.confirm("修正をやめて、修正前の結果に戻しますか？")) return;
+          cancelReviewing();
+        }} style={{
+          width: "100%", marginBottom: 10, padding: "13px 8px", borderRadius: 11,
+          border: `1px solid ${t.rd}66`, background: t.sf, color: t.rd,
+          fontSize: "clamp(13px, 4vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
+        }}>↩ 修正をやめる</button>
+      )}
+      {/* いまどの局を直しているか（入力はふだんどおり下のボタンから） */}
+      {fixIdx !== null && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+          padding: "9px 11px", marginBottom: 8, borderRadius: 10,
+          background: t.gdS, border: `1px solid ${t.gd}66`,
+        }}>
+          <div style={{ flex: "1 1 160px", minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: t.gd, lineHeight: 1.6 }}>
+            ✏️ {fixRoundLabel()} を修正中
+            </div>
+            <div style={{ fontSize: 10, color: t.dm, lineHeight: 1.7 }}>
+            {["下の「アガリ入力」か", "「流局」で入力し直すと、", "この局が置き換わります"].map((x, k) => (
+              <span key={k} style={{ display: "inline-block" }}>{x}</span>
+            ))}
+            </div>
+          </div>
+          <button onClick={() => { cancelRoundFix(); setEditingRoundIdx(null); setShowRoundEdit(true); }} style={{
+            flexShrink: 0, padding: "9px 12px", borderRadius: 9, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: t.sf, color: t.dm,
+            fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", minHeight: 34,
+          }}>局を選び直す</button>
         </div>
       )}
       {/* Config summary */}
@@ -11408,15 +11462,15 @@ input, select { padding: 10px 14px; }
       {RuleCheckModal()}
 
       {/* Actions（修正モードでは「アガリ入力」「流局」を出さない。押すと局が増えてしまう） */}
-      {reviewing ? (
+      {(reviewing && fixIdx === null) ? (
         <button style={{ ...actionBtn("p"), marginBottom: 14 }}
           onClick={() => { setEditingRoundIdx(null); setShowRoundEdit(true); }}>✏️ 局を選んで修正</button>
       ) : (
         <>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
-            <button style={{ ...actionBtn("p"), flex: 1, padding: "15px 6px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setShowGW(true); setGStep(1); }}>アガリ入力</button>
-            <button style={{ ...actionBtn(), flex: 1, padding: "15px 6px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai([...declaredRiichi]); setShowDrawWiz(true); }}>流局</button>
+            <button style={{ ...actionBtn("p"), flex: 1, padding: "15px 6px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setShowGW(true); setGStep(1); }}>アガリ入力</button>
+            <button style={{ ...actionBtn(), flex: 1, padding: "15px 6px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai(fixSeedTenpai()); setShowDrawWiz(true); }}>流局</button>
             {/* 左右の余白を詰めて「ルー/ル」と途中で折り返さないようにする */}
             <button style={{ ...actionBtn(), flex: "0 0 92px", padding: "15px 4px", whiteSpace: "nowrap" }}
               onClick={() => setShowRuleCheck(true)}>📋 ルール</button>
@@ -11440,8 +11494,8 @@ input, select { padding: 10px 14px; }
               <button onClick={() => {
                 // 途中の「← 戻る」で入力が空になっていることがあるので、
                 // 局の修正中は元の局の内容をまるごと入れ直してから戻す
-                if (correctingIdx !== null && rounds[correctingIdx]) {
-                  const r = rounds[correctingIdx];
+                if (fixIdx !== null && rounds[fixIdx]) {
+                  const r = rounds[fixIdx];
                   setGWinner(r.winner); setGTsumo(r.tsumo);
                   setGLoser(r.loser !== undefined && r.loser !== null ? r.loser : null);
                   setGHan(r.han); setGFu(r.fu || 30);
@@ -11565,7 +11619,7 @@ input, select { padding: 10px 14px; }
                   <>
                     <Back onClick={() => {
                       // 修正モード中は結果画面（サマリ）に戻る
-                      if (correctingIdx !== null && gHan !== null) { setGStep(7); return; }
+                      if (fixIdx !== null && gHan !== null) { setGStep(7); return; }
                       // 卓上モードはこの画面から入るので、戻る＝入力をやめて卓に戻る
                       if (tableMode) {
                         resetGW(); setRonPick([]); setMultiRon(null); setTmWinStep(null);
@@ -11625,7 +11679,7 @@ input, select { padding: 10px 14px; }
             )}
             {gStep === 6 && (
               <div style={card}>
-                {!fuGuide && <><Back onClick={() => { setGStep(5); if (correctingIdx === null) setGHan(null); resetFuGuide(); }} /><div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>符数</div></>}
+                {!fuGuide && <><Back onClick={() => { setGStep(5); if (fixIdx === null) setGHan(null); resetFuGuide(); }} /><div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>符数</div></>}
 
                 {!fuGuide ? (
                   <>
@@ -11660,13 +11714,13 @@ input, select { padding: 10px 14px; }
                 </div>
                 <button style={actionBtn("p")} onClick={() => setGStep(1)}>最初から入力し直す</button>
                 <button style={{ ...actionBtn(), marginBottom: 0 }} onClick={resetGW}>
-                  {correctingIdx !== null ? "修正をやめて閉じる" : "閉じる"}
+                  {fixIdx !== null ? "修正をやめて閉じる" : "閉じる"}
                 </button>
               </div>
             )}
             {gStep === 7 && gResult && (
               <>
-                {correctingIdx === null && (
+                {fixIdx === null && (
                   <Back onClick={() => {
                     // 一つ前（符 or 翻数）に戻る
                     if (gHan < 5) { setGStep(6); setGFu(null); }
@@ -11674,7 +11728,7 @@ input, select { padding: 10px 14px; }
                     resetFuGuide();
                   }} />
                 )}
-                {correctingIdx !== null && (
+                {fixIdx !== null && (
                   <div style={{ textAlign: "center", padding: "6px 12px", marginBottom: 10, borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}44` }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: t.gd }}>✏️ 修正モード — 変更箇所をタップ</span>
                   </div>
@@ -11701,7 +11755,7 @@ input, select { padding: 10px 14px; }
                       // 選択をキャンセルされたときに、この確認画面へ戻せるよう控えておく
                       setTmCorrectBackup({
                         gStep, gWinner, gTsumo, gLoser, gHan, gFu, gKnownNaki, fuGuide,
-                        gRiichi: [...gRiichi], ronPick: [...ronPick], multiRon, showGW, correctingIdx,
+                        gRiichi: [...gRiichi], ronPick: [...ronPick], multiRon, showGW,
                       });
                       resetGW(); setMultiRon(null);
                       if (step === "winner") setRonPick([]);
@@ -11709,7 +11763,7 @@ input, select { padding: 10px 14px; }
                     };
                     return (
                       <>
-                        <button onClick={() => { setGEditing(true); return (tableMode && correctingIdx === null) ? backToTable("winner") : setGStep(1); }}
+                        <button onClick={() => { setGEditing(true); return (tableMode && fixIdx === null) ? backToTable("winner") : setGStep(1); }}
                           style={{ ...rowStyle, cursor: "pointer" }}>
                           <span style={{ fontSize: 12, color: t.dm }}>あがった人</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -11717,7 +11771,7 @@ input, select { padding: 10px 14px; }
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
-                        <button onClick={() => { setGEditing(true); return (tableMode && correctingIdx === null) ? backToTable("how") : setGStep(2); }}
+                        <button onClick={() => { setGEditing(true); return (tableMode && fixIdx === null) ? backToTable("how") : setGStep(2); }}
                           style={{ ...rowStyle, cursor: "pointer" }}>
                           <span style={{ fontSize: 12, color: t.dm }}>あがり方</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -11725,7 +11779,7 @@ input, select { padding: 10px 14px; }
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
-                        {(tableMode && correctingIdx === null) ? (
+                        {(tableMode && fixIdx === null) ? (
                           <div style={rowStyle}>
                             <span style={{ fontSize: 12, color: t.dm }}>リーチ棒</span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: declaredRiichi.some(Boolean) ? t.gd : t.dm }}>
@@ -11798,9 +11852,9 @@ input, select { padding: 10px 14px; }
                 }}>
                   <div style={{ display: "flex", gap: 8, maxWidth: 400, margin: "0 auto" }}>
                     <button style={{ ...actionBtn(), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
-                      onClick={resetGW}>{correctingIdx !== null ? "キャンセル" : "最初から計算"}</button>
+                      onClick={resetGW}>{fixIdx !== null ? "入力をやめる" : "最初から計算"}</button>
                     <button style={{ ...actionBtn("p"), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}
-                      onClick={applyRound}>{correctingIdx !== null ? "修正を反映" : "スコアに反映"}</button>
+                      onClick={applyRound}>{fixIdx !== null ? "この内容に直す" : "スコアに反映"}</button>
                   </div>
                 </div>
               </>
@@ -11823,8 +11877,8 @@ input, select { padding: 10px 14px; }
                 {players.slice(0, PC).map((p, i) => {
                   const isTenpai = drawTenpai[i];
                   // 修正モードでは「その局でリーチしていた人」をロックする（現在の宣言ではなく）
-                  const lockedRiichi = correctingDrawIdx !== null
-                    ? !!(rounds[correctingDrawIdx]?.riichi || [])[i]
+                  const lockedRiichi = fixIdx !== null
+                    ? !!((rounds[fixIdx]?.riichi || [])[i] || declaredRiichi[i])
                     : declaredRiichi[i];
                   const sw = SEAT_WINDS[(i - dealerIdx + PC) % PC];
                   return (
@@ -11928,15 +11982,13 @@ input, select { padding: 10px 14px; }
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                 <span style={{ fontSize: 12, color: t.rd, fontWeight: 700 }}>
-                  {correctingChomboIdx !== null
-                    ? `✏️ ${rounds[correctingChomboIdx]?.wind}${(rounds[correctingChomboIdx]?.dealer ?? 0) + 1}局のチョンボを修正`
-                    : "⚠️ チョンボ"}
+                  {fixIdx !== null ? `✏️ ${fixRoundLabel()} をチョンボに直す` : "⚠️ チョンボ"}
                 </span>
                 <button style={{ background: "none", border: "none", color: t.dm, fontSize: 18, cursor: "pointer" }} onClick={resetChombo}>✕</button>
               </div>
 
               {chomboStep === "who" && (() => {
-                const cd = correctingChomboIdx !== null ? (rounds[correctingChomboIdx]?.dealer ?? dealerIdx) : dealerIdx;
+                const cd = fixIdx !== null ? (rounds[fixIdx]?.dealer ?? dealerIdx) : dealerIdx;
                 return (
                 <>
                   <div style={question}>誰がチョンボ？</div>
@@ -11960,7 +12012,7 @@ input, select { padding: 10px 14px; }
 
               {chomboStep === "pay" && chomboWho !== null && (() => {
                 const cr = chomboRules();
-                const cd = correctingChomboIdx !== null ? (rounds[correctingChomboIdx]?.dealer ?? dealerIdx) : dealerIdx;
+                const cd = fixIdx !== null ? (rounds[fixIdx]?.dealer ?? dealerIdx) : dealerIdx;
                 const isOya = chomboWho === cd;
                 const amtRow = (label, val, setVal) => (
                   <div style={{ marginBottom: 12 }}>
@@ -12063,22 +12115,10 @@ input, select { padding: 10px 14px; }
               </button>
               {editingRoundIdx === idx && (
                 <div style={{ padding: "8px 0 12px", display: "flex", gap: 8 }}>
-                  {r.chombo ? (
-                    <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => { setEditingRoundIdx(null); openChomboCorrection(idx); }}>
-                      ✏️ この局を修正
-                    </button>
-                  ) : !r.draw ? (
-                    <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => openCorrectionWizard(idx)}>
-                      ✏️ この局を修正
-                    </button>
-                  ) : (
-                    <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-                      onClick={() => { setEditingRoundIdx(null); openDrawCorrection(idx); }}>
-                      ✏️ この局を修正
-                    </button>
-                  )}
+                  <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    onClick={() => startRoundFix(idx)}>
+                    ✏️ この局を修正
+                  </button>
                   <button style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 12, cursor: "pointer" }}
                     onClick={() => setEditingRoundIdx(null)}>キャンセル</button>
                 </div>

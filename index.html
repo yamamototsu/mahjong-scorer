@@ -1624,25 +1624,10 @@ function MahjongScorer() {
     setCorrectingIdx(null);
   }, []);
   const [correctingIdx, setCorrectingIdx] = useState(null);
-  const openDrawCorrection = idx => {
+  const [fixIdx, setFixIdx] = useState(null);
+  const startRoundFix = idx => {
     const r = rounds[idx];
-    if (!r || !r.draw) return;
-    setTmWinStep(null);
-    setRonPick([]);
-    setRonLoserPick(null);
-    setMultiRon(null);
-    setTmCorrectBackup(null);
-    setRonRuleWarn(false);
-    setCorrectingDrawIdx(idx);
-    setDrawTenpai([...(r.tenpai || [false, false, false, false])]);
-    if (tableMode) {
-      setTmDrawMode(true);
-      setShowDrawWiz(false);
-    } else setShowDrawWiz(true);
-  };
-  const openCorrectionWizard = idx => {
-    const r = rounds[idx];
-    if (!r || r.draw || r.chombo) return;
+    if (!r) return;
     setTmWinStep(null);
     setRonPick([]);
     setRonLoserPick(null);
@@ -1650,17 +1635,50 @@ function MahjongScorer() {
     setTmCorrectBackup(null);
     setRonRuleWarn(false);
     setTmDrawMode(false);
-    setGWinner(r.winner);
-    setGTsumo(r.tsumo);
-    setGLoser(r.loser !== undefined ? r.loser : null);
-    setGHan(r.han);
-    setGFu(r.fu || 30);
-    setGRiichi(r.riichi || [false, false, false, false]);
-    setFuGuide(null);
-    setCorrectingIdx(idx);
+    setShowDrawWiz(false);
+    resetGW();
+    resetChombo();
+    setShowRoundEdit(false);
     setEditingRoundIdx(null);
-    setShowGW(true);
-    setGStep(7);
+    setFixIdx(idx);
+  };
+  const cancelRoundFix = () => {
+    setFixIdx(null);
+    setTmWinStep(null);
+    setRonPick([]);
+    setRonLoserPick(null);
+    setMultiRon(null);
+    setTmCorrectBackup(null);
+    setRonRuleWarn(false);
+    setTmDrawMode(false);
+    setShowDrawWiz(false);
+    resetGW();
+    resetChombo();
+  };
+  const fixRoundLabel = () => {
+    const r = fixIdx !== null ? rounds[fixIdx] : null;
+    if (!r) return "";
+    return `${r.wind}${r.dealer + 1}局${r.honba > 0 ? ` ${r.honba}本場` : ""}`;
+  };
+  const fixBase = () => {
+    const r = rounds[fixIdx] || {};
+    return {
+      id: r.id,
+      wind: r.wind,
+      dealer: r.dealer,
+      honba: r.honba
+    };
+  };
+  const fixReplace = rec => {
+    const g = multiRonGroup(fixIdx);
+    const at = Math.min(...g);
+    const out = rounds.filter((_, i) => !g.includes(i));
+    out.splice(at, 0, rec);
+    return out;
+  };
+  const afterFixApplied = () => {
+    setFixIdx(null);
+    if (reviewing) finishReviewing();
   };
   const [chomboStep, setChomboStep] = useState(null);
   const [chomboWho, setChomboWho] = useState(null);
@@ -1689,7 +1707,7 @@ function MahjongScorer() {
   const pickChomboWho = i => {
     const cr = chomboRules();
     setChomboWho(i);
-    const cd = correctingChomboIdx !== null ? rounds[correctingChomboIdx]?.dealer ?? dealerIdx : dealerIdx;
+    const cd = fixIdx !== null ? rounds[fixIdx]?.dealer ?? dealerIdx : dealerIdx;
     if (i === cd) {
       setChomboToKo(cr.oya);
     } else {
@@ -1729,18 +1747,20 @@ function MahjongScorer() {
   };
   const applyChombo = noPay => {
     if (chomboWho === null) return;
-    if (correctingChomboIdx !== null) {
-      const old = rounds[correctingChomboIdx];
+    if (fixIdx !== null) {
+      const old = rounds[fixIdx] || {};
       const rec = {
-        ...old,
+        id: old.id,
+        wind: old.wind,
+        dealer: old.dealer,
+        honba: old.honba,
+        chombo: true,
         offender: chomboWho,
         noPay: !!noPay,
         toOya: chomboWho === old.dealer ? null : chomboToOya,
         toKo: chomboToKo
       };
-      const newRounds = [...rounds];
-      newRounds[correctingChomboIdx] = rec;
-      const recalced = recalcAllRounds(newRounds, gameConfig || {});
+      const recalced = recalcAllRounds(fixReplace(rec), gameConfig || {});
       const newScores = [...recalced.scores];
       let liveCount = 0;
       for (let i = 0; i < PC; i++) {
@@ -1754,6 +1774,7 @@ function MahjongScorer() {
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
       resetChombo();
+      afterFixApplied();
       return;
     }
     const ns = [...scores];
@@ -1938,22 +1959,24 @@ function MahjongScorer() {
   const applyRound = useCallback(() => {
     if (gWinner === null || !gResult) return;
     if (!gTsumo && !multiRon && (gLoser === null || gLoser === gWinner)) return;
-    if (correctingIdx !== null) {
+    if (fixIdx !== null && !(multiRon && multiRon.queue.length > 0)) {
       const cfg = gameConfig || {};
-      const correctedRound = {
-        ...rounds[correctingIdx],
+      const old = rounds[fixIdx] || {};
+      const rec = {
+        id: old.id,
+        wind: old.wind,
+        dealer: old.dealer,
+        honba: old.honba,
         winner: gWinner,
-        loser: gLoser,
+        loser: gTsumo ? null : gLoser,
         han: gHan,
         fu: gHan >= 5 ? null : gFu,
         score: gResult.total,
         tsumo: gTsumo,
         limitName: gLimit,
-        riichi: [...gRiichi]
+        riichi: [0, 1, 2, 3].map(i => !!(gRiichi[i] || declaredRiichi[i]))
       };
-      const newRounds = [...rounds];
-      newRounds[correctingIdx] = correctedRound;
-      const recalced = recalcAllRounds(newRounds, cfg);
+      const recalced = recalcAllRounds(fixReplace(rec), cfg);
       const newScores = [...recalced.scores];
       let liveCount = 0;
       for (let i = 0; i < PC; i++) {
@@ -1967,6 +1990,11 @@ function MahjongScorer() {
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
       resetGW();
+      setTmWinStep(null);
+      setRonPick([]);
+      setRonLoserPick(null);
+      setMultiRon(null);
+      afterFixApplied();
       return;
     }
     if (multiRon && multiRon.queue.length > 0) {
@@ -2043,17 +2071,22 @@ function MahjongScorer() {
     setRounds(newRounds);
     advanceAfterWin(gWinner === dealerIdx, ns);
     resetGW();
-  }, [gWinner, gLoser, gResult, gTsumo, gParent, gHan, gFu, gLimit, gRiichi, scores, honba, riichiBets, dealerIdx, rounds, roundWind, resetGW, gameConfig, correctingIdx, multiRon, finalizeMultiRon, advanceAfterWin]);
+  }, [gWinner, gLoser, gResult, gTsumo, gParent, gHan, gFu, gLimit, gRiichi, scores, honba, riichiBets, dealerIdx, rounds, roundWind, resetGW, gameConfig, fixIdx, manualAdj, multiRon, finalizeMultiRon, advanceAfterWin]);
   const applyDraw = useCallback(() => {
     const cfgAll = gameConfig || {};
-    if (correctingDrawIdx !== null) {
-      const newRounds = [...rounds];
-      const oldRiichi = newRounds[correctingDrawIdx].riichi || [];
-      newRounds[correctingDrawIdx] = {
-        ...newRounds[correctingDrawIdx],
-        tenpai: drawTenpai.map((v, i) => v || !!oldRiichi[i])
+    if (fixIdx !== null) {
+      const old = rounds[fixIdx] || {};
+      const rr = [0, 1, 2, 3].map(i => !!((old.riichi || [])[i] || declaredRiichi[i]));
+      const rec = {
+        id: old.id,
+        wind: old.wind,
+        dealer: old.dealer,
+        honba: old.honba,
+        draw: true,
+        tenpai: drawTenpai.map((v, i) => v || rr[i]),
+        riichi: rr
       };
-      const recalced = recalcAllRounds(newRounds, cfgAll);
+      const recalced = recalcAllRounds(fixReplace(rec), cfgAll);
       const newScores = [...recalced.scores];
       let liveCount = 0;
       for (let i = 0; i < PC; i++) {
@@ -2066,9 +2099,9 @@ function MahjongScorer() {
       setRounds(recalced.rounds);
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
-      setCorrectingDrawIdx(null);
       resetDrawWiz();
       setTmDrawMode(false);
+      afterFixApplied();
       return;
     }
     const ns = [...scores];
@@ -2127,7 +2160,7 @@ function MahjongScorer() {
     }
     if (ruleSet.tobiEnd !== false && ns.some(s => s < 0)) setGameFinished(true);
     resetDrawWiz();
-  }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, correctingDrawIdx, rounds, declaredRiichi]);
+  }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, fixIdx, manualAdj, rounds, declaredRiichi]);
   const startGame = useCallback(() => {
     const sp = rules.startPoints || 25000;
     const useRules = {
@@ -2193,7 +2226,7 @@ function MahjongScorer() {
     }
     if (prevRoundKey.current === key) return;
     prevRoundKey.current = key;
-    if (reviewing || correctingIdx !== null || correctingDrawIdx !== null) return;
+    if (reviewing || fixIdx !== null) return;
     setStartSplash({
       league: null,
       matchType,
@@ -13035,6 +13068,7 @@ input, select { padding: 10px 14px; }
     setEditingRoundIdx(null);
   };
   const reviewExitCleanup = () => {
+    setFixIdx(null);
     setShowRoundEdit(false);
     setEditingRoundIdx(null);
     resetGW();
@@ -19782,7 +19816,7 @@ input, select { padding: 10px 14px; }
       gap: 8,
       flexWrap: "wrap"
     }
-  }, r.chombo ? React.createElement("button", {
+  }, React.createElement("button", {
     style: {
       flex: "1 1 120px",
       padding: "10px",
@@ -19794,44 +19828,7 @@ input, select { padding: 10px 14px; }
       fontWeight: 700,
       cursor: "pointer"
     },
-    onClick: () => {
-      setShowRoundEdit(false);
-      setEditingRoundIdx(null);
-      openChomboCorrection(idx);
-    }
-  }, "✏️ この局を修正") : !r.draw ? React.createElement("button", {
-    style: {
-      flex: "1 1 120px",
-      padding: "10px",
-      borderRadius: 8,
-      border: `1px solid ${t.ac}`,
-      background: t.acS,
-      color: t.ac,
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer"
-    },
-    onClick: () => {
-      setShowRoundEdit(false);
-      openCorrectionWizard(idx);
-    }
-  }, "✏️ この局を修正") : React.createElement("button", {
-    style: {
-      flex: "1 1 120px",
-      padding: "10px",
-      borderRadius: 8,
-      border: `1px solid ${t.ac}`,
-      background: t.acS,
-      color: t.ac,
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer"
-    },
-    onClick: () => {
-      setShowRoundEdit(false);
-      setEditingRoundIdx(null);
-      openDrawCorrection(idx);
-    }
+    onClick: () => startRoundFix(idx)
   }, "✏️ この局を修正"), React.createElement("button", {
     style: {
       flex: "1 1 120px",
@@ -19873,6 +19870,8 @@ input, select { padding: 10px 14px; }
       setEditingRoundIdx(null);
     }
   }, "閉じる"))));
+  const fixSeedRiichi = () => fixIdx !== null && rounds[fixIdx]?.riichi ? [...rounds[fixIdx].riichi] : [false, false, false, false];
+  const fixSeedTenpai = () => fixIdx !== null && rounds[fixIdx]?.tenpai ? [...rounds[fixIdx].tenpai] : [...declaredRiichi];
   const renderTableMode = () => {
     const mrRule = (gameConfig || {}).rules?.multiRon || "atamahane";
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
@@ -19912,7 +19911,7 @@ input, select { padding: 10px 14px; }
           animation: isWallTarget ? "wallBlink 0.9s ease-in-out infinite" : "none"
         }
       }, tmDrawMode ? ((() => {
-        const lockR = correctingDrawIdx !== null ? !!(rounds[correctingDrawIdx]?.riichi || [])[i] : isRiichi;
+        const lockR = fixIdx !== null ? !!((rounds[fixIdx]?.riichi || [])[i] || declaredRiichi[i]) : isRiichi;
         return React.createElement("button", {
           disabled: lockR,
           onClick: () => {
@@ -20295,18 +20294,18 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 12,
         fontWeight: 700,
-        color: correctingDrawIdx !== null ? t.gd : t.gn,
+        color: fixIdx !== null ? t.gd : t.gn,
         textAlign: "center",
         marginBottom: 4
       }
-    }, correctingDrawIdx !== null ? `✏️ ${rounds[correctingDrawIdx]?.wind}${(rounds[correctingDrawIdx]?.dealer ?? 0) + 1}局の修正 — テンパイの人をタップ` : "流局 — テンパイの人をタップして「確定」"), React.createElement("div", {
+    }, fixIdx !== null ? `✏️ ${fixRoundLabel()} を流局に直す — テンパイの人をタップ` : "流局 — テンパイの人をタップして「確定」"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
         textAlign: "center",
         marginBottom: 6
       }
-    }, correctingDrawIdx !== null ? "本場と供託はそのまま、テンパイの内容だけ上書きします" : (() => {
+    }, fixIdx !== null ? "局名と本場はそのまま、内容を入れ直します" : (() => {
       const rs = (gameConfig || {}).rules || {};
       const dealerTenpai = drawTenpai[dealerIdx];
       const stays = rs.agariRenchan ? false : rs.tenpaiRenchan ? dealerTenpai : true;
@@ -20317,7 +20316,7 @@ input, select { padding: 10px 14px; }
         display: "flex",
         gap: 8
       }
-    }, correctingDrawIdx === null && React.createElement("button", {
+    }, React.createElement("button", {
       style: {
         ...smallBtn(),
         flex: 1,
@@ -20409,7 +20408,6 @@ input, select { padding: 10px 14px; }
           setRonPick(b.ronPick);
           setMultiRon(b.multiRon);
           setShowGW(b.showGW);
-          setCorrectingIdx(b.correctingIdx);
           setTmCorrectBackup(null);
           return;
         }
@@ -20417,7 +20415,7 @@ input, select { padding: 10px 14px; }
         setRonPick([]);
         setMultiRon(null);
       }
-    }, "キャンセル"))) : reviewing ? React.createElement("div", {
+    }, "キャンセル"))) : reviewing && fixIdx === null ? React.createElement("div", {
       style: {
         display: "flex",
         gap: 8
@@ -20501,6 +20499,7 @@ input, select { padding: 10px 14px; }
       },
       onClick: () => {
         resetGW();
+        setGRiichi(fixSeedRiichi());
         setRonPick([]);
         setMultiRon(null);
         setRonLoserPick(null);
@@ -20515,7 +20514,7 @@ input, select { padding: 10px 14px; }
         whiteSpace: "nowrap"
       },
       onClick: () => {
-        setDrawTenpai([...declaredRiichi]);
+        setDrawTenpai(fixSeedTenpai());
         setTmDrawMode(true);
       }
     }, "流局"), React.createElement("button", {
@@ -20564,7 +20563,61 @@ input, select { padding: 10px 14px; }
         boxSizing: "border-box"
       },
       onClick: () => setShowRoundEdit(true)
-    }, "📋 局の修正")), RuleCheckModal(), RonRuleWarnModal(), actionRow(true), React.createElement("div", {
+    }, "📋 局の修正")), fixIdx !== null && React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        padding: "9px 11px",
+        marginBottom: 8,
+        borderRadius: 10,
+        background: t.gdS,
+        border: `1px solid ${t.gd}66`
+      }
+    }, React.createElement("div", {
+      style: {
+        flex: "1 1 160px",
+        minWidth: 0
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 800,
+        color: t.gd,
+        lineHeight: 1.6
+      }
+    }, "✏️ ", fixRoundLabel(), " を修正中"), React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: t.dm,
+        lineHeight: 1.7
+      }
+    }, ["下の「アガリ入力」か", "「流局」で入力し直すと、", "この局が置き換わります"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)))), React.createElement("button", {
+      onClick: () => {
+        cancelRoundFix();
+        setEditingRoundIdx(null);
+        setShowRoundEdit(true);
+      },
+      style: {
+        flexShrink: 0,
+        padding: "9px 12px",
+        borderRadius: 9,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.dm,
+        fontSize: 12,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        minHeight: 34
+      }
+    }, "局を選び直す")), RuleCheckModal(), RonRuleWarnModal(), actionRow(true), React.createElement("div", {
       style: {
         flex: "1 1 auto",
         minHeight: 0,
@@ -20939,47 +20992,25 @@ input, select { padding: 10px 14px; }
           color: t.ac
         }
       }, "供託", riichiBets, "本")));
-    })())))), actionRow(false), reviewing && React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginTop: 8,
-        flexWrap: "wrap"
-      }
-    }, React.createElement("button", {
-      onClick: finishReviewing,
-      style: {
-        flex: "1.4 1 170px",
-        padding: "13px 6px",
-        borderRadius: 11,
-        minWidth: 0,
-        border: "none",
-        background: t.gn,
-        color: "#fff",
-        fontSize: "clamp(12px, 3.8vw, 15px)",
-        fontWeight: 800,
-        cursor: "pointer",
-        whiteSpace: "nowrap"
-      }
-    }, "✓ 修正を終えて結果に戻る"), React.createElement("button", {
+    })())))), actionRow(false), reviewing && React.createElement("button", {
       onClick: () => {
-        if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
+        if (!window.confirm("修正をやめて、修正前の結果に戻しますか？")) return;
         cancelReviewing();
       },
       style: {
-        flex: "1 1 120px",
-        padding: "13px 6px",
+        width: "100%",
+        marginTop: 8,
+        padding: "13px 8px",
         borderRadius: 11,
-        minWidth: 0,
         border: `1px solid ${t.rd}66`,
         background: t.sf,
         color: t.rd,
-        fontSize: "clamp(12px, 3.8vw, 15px)",
+        fontSize: "clamp(13px, 4vw, 15px)",
         fontWeight: 800,
         cursor: "pointer",
         whiteSpace: "nowrap"
       }
-    }, "↩ 修正をやめる")), React.createElement("div", {
+    }, "↩ 修正をやめる"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -20990,47 +21021,79 @@ input, select { padding: 10px 14px; }
   };
   const renderGamePlay = () => React.createElement("div", {
     style: body
-  }, reviewing && React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 10,
-      flexWrap: "wrap"
-    }
-  }, React.createElement("button", {
-    onClick: finishReviewing,
-    style: {
-      flex: "1.4 1 170px",
-      padding: "13px 6px",
-      borderRadius: 11,
-      minWidth: 0,
-      border: "none",
-      background: t.gn,
-      color: "#fff",
-      fontSize: "clamp(12px, 3.8vw, 15px)",
-      fontWeight: 800,
-      cursor: "pointer",
-      whiteSpace: "nowrap"
-    }
-  }, "✓ 修正を終えて結果に戻る"), React.createElement("button", {
+  }, reviewing && React.createElement("button", {
     onClick: () => {
-      if (!window.confirm("修正した内容を取り消して、修正前の結果に戻しますか？")) return;
+      if (!window.confirm("修正をやめて、修正前の結果に戻しますか？")) return;
       cancelReviewing();
     },
     style: {
-      flex: "1 1 120px",
-      padding: "13px 6px",
+      width: "100%",
+      marginBottom: 10,
+      padding: "13px 8px",
       borderRadius: 11,
-      minWidth: 0,
       border: `1px solid ${t.rd}66`,
       background: t.sf,
       color: t.rd,
-      fontSize: "clamp(12px, 3.8vw, 15px)",
+      fontSize: "clamp(13px, 4vw, 15px)",
       fontWeight: 800,
       cursor: "pointer",
       whiteSpace: "nowrap"
     }
-  }, "↩ 修正をやめる")), React.createElement("div", {
+  }, "↩ 修正をやめる"), fixIdx !== null && React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+      padding: "9px 11px",
+      marginBottom: 8,
+      borderRadius: 10,
+      background: t.gdS,
+      border: `1px solid ${t.gd}66`
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: "1 1 160px",
+      minWidth: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 800,
+      color: t.gd,
+      lineHeight: 1.6
+    }
+  }, "✏️ ", fixRoundLabel(), " を修正中"), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      lineHeight: 1.7
+    }
+  }, ["下の「アガリ入力」か", "「流局」で入力し直すと、", "この局が置き換わります"].map((x, k) => React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-block"
+    }
+  }, x)))), React.createElement("button", {
+    onClick: () => {
+      cancelRoundFix();
+      setEditingRoundIdx(null);
+      setShowRoundEdit(true);
+    },
+    style: {
+      flexShrink: 0,
+      padding: "9px 12px",
+      borderRadius: 9,
+      cursor: "pointer",
+      border: `1px solid ${t.bd}`,
+      background: t.sf,
+      color: t.dm,
+      fontSize: 12,
+      fontWeight: 700,
+      whiteSpace: "nowrap",
+      minHeight: 34
+    }
+  }, "局を選び直す")), React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -21146,7 +21209,7 @@ input, select { padding: 10px 14px; }
       marginBottom: 10,
       marginTop: -8
     }
-  }, "点数を長押しすると順位と点差が見られます"), RoundEditModal(), StartSplash(), PayTableView(), RankPeekOverlay(), PlayerHistoryModal(), RuleCheckModal(), reviewing ? React.createElement("button", {
+  }, "点数を長押しすると順位と点差が見られます"), RoundEditModal(), StartSplash(), PayTableView(), RankPeekOverlay(), PlayerHistoryModal(), RuleCheckModal(), reviewing && fixIdx === null ? React.createElement("button", {
     style: {
       ...actionBtn("p"),
       marginBottom: 14
@@ -21170,6 +21233,7 @@ input, select { padding: 10px 14px; }
     },
     onClick: () => {
       resetGW();
+      setGRiichi(fixSeedRiichi());
       setShowGW(true);
       setGStep(1);
     }
@@ -21181,7 +21245,7 @@ input, select { padding: 10px 14px; }
       whiteSpace: "nowrap"
     },
     onClick: () => {
-      setDrawTenpai([...declaredRiichi]);
+      setDrawTenpai(fixSeedTenpai());
       setShowDrawWiz(true);
     }
   }, "流局"), React.createElement("button", {
@@ -21228,8 +21292,8 @@ input, select { padding: 10px 14px; }
     }
   }, gEditing && gStep !== 7 && React.createElement("button", {
     onClick: () => {
-      if (correctingIdx !== null && rounds[correctingIdx]) {
-        const r = rounds[correctingIdx];
+      if (fixIdx !== null && rounds[fixIdx]) {
+        const r = rounds[fixIdx];
         setGWinner(r.winner);
         setGTsumo(r.tsumo);
         setGLoser(r.loser !== undefined && r.loser !== null ? r.loser : null);
@@ -21475,7 +21539,7 @@ input, select { padding: 10px 14px; }
     onCancel: () => setYakuPickerOpen(false)
   })) : React.createElement(React.Fragment, null, React.createElement(Back, {
     onClick: () => {
-      if (correctingIdx !== null && gHan !== null) {
+      if (fixIdx !== null && gHan !== null) {
         setGStep(7);
         return;
       }
@@ -21588,7 +21652,7 @@ input, select { padding: 10px 14px; }
   }, !fuGuide && React.createElement(React.Fragment, null, React.createElement(Back, {
     onClick: () => {
       setGStep(5);
-      if (correctingIdx === null) setGHan(null);
+      if (fixIdx === null) setGHan(null);
       resetFuGuide();
     }
   }), React.createElement("div", {
@@ -21689,7 +21753,7 @@ input, select { padding: 10px 14px; }
       marginBottom: 0
     },
     onClick: resetGW
-  }, correctingIdx !== null ? "修正をやめて閉じる" : "閉じる")), gStep === 7 && gResult && React.createElement(React.Fragment, null, correctingIdx === null && React.createElement(Back, {
+  }, fixIdx !== null ? "修正をやめて閉じる" : "閉じる")), gStep === 7 && gResult && React.createElement(React.Fragment, null, fixIdx === null && React.createElement(Back, {
     onClick: () => {
       if (gHan < 5) {
         setGStep(6);
@@ -21700,7 +21764,7 @@ input, select { padding: 10px 14px; }
       }
       resetFuGuide();
     }
-  }), correctingIdx !== null && React.createElement("div", {
+  }), fixIdx !== null && React.createElement("div", {
     style: {
       textAlign: "center",
       padding: "6px 12px",
@@ -21770,8 +21834,7 @@ input, select { padding: 10px 14px; }
         gRiichi: [...gRiichi],
         ronPick: [...ronPick],
         multiRon,
-        showGW,
-        correctingIdx
+        showGW
       });
       resetGW();
       setMultiRon(null);
@@ -21781,7 +21844,7 @@ input, select { padding: 10px 14px; }
     return React.createElement(React.Fragment, null, React.createElement("button", {
       onClick: () => {
         setGEditing(true);
-        return tableMode && correctingIdx === null ? backToTable("winner") : setGStep(1);
+        return tableMode && fixIdx === null ? backToTable("winner") : setGStep(1);
       },
       style: {
         ...rowStyle,
@@ -21809,7 +21872,7 @@ input, select { padding: 10px 14px; }
     }, "訂正"))), React.createElement("button", {
       onClick: () => {
         setGEditing(true);
-        return tableMode && correctingIdx === null ? backToTable("how") : setGStep(2);
+        return tableMode && fixIdx === null ? backToTable("how") : setGStep(2);
       },
       style: {
         ...rowStyle,
@@ -21834,7 +21897,7 @@ input, select { padding: 10px 14px; }
       }
     }, gTsumo ? "ツモ" : "ロン", !gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""), React.createElement("span", {
       style: editTag
-    }, "訂正"))), tableMode && correctingIdx === null ? React.createElement("div", {
+    }, "訂正"))), tableMode && fixIdx === null ? React.createElement("div", {
       style: rowStyle
     }, React.createElement("span", {
       style: {
@@ -22016,7 +22079,7 @@ input, select { padding: 10px 14px; }
       whiteSpace: "nowrap"
     },
     onClick: resetGW
-  }, correctingIdx !== null ? "キャンセル" : "最初から計算"), React.createElement("button", {
+  }, fixIdx !== null ? "入力をやめる" : "最初から計算"), React.createElement("button", {
     style: {
       ...actionBtn("p"),
       marginBottom: 0,
@@ -22026,7 +22089,7 @@ input, select { padding: 10px 14px; }
       whiteSpace: "nowrap"
     },
     onClick: applyRound
-  }, correctingIdx !== null ? "修正を反映" : "スコアに反映")))))), showDrawWiz && React.createElement("div", {
+  }, fixIdx !== null ? "この内容に直す" : "スコアに反映")))))), showDrawWiz && React.createElement("div", {
     style: {
       position: "fixed",
       top: 0,
@@ -22082,7 +22145,7 @@ input, select { padding: 10px 14px; }
     }
   }, players.slice(0, PC).map((p, i) => {
     const isTenpai = drawTenpai[i];
-    const lockedRiichi = correctingDrawIdx !== null ? !!(rounds[correctingDrawIdx]?.riichi || [])[i] : declaredRiichi[i];
+    const lockedRiichi = fixIdx !== null ? !!((rounds[fixIdx]?.riichi || [])[i] || declaredRiichi[i]) : declaredRiichi[i];
     const sw = SEAT_WINDS[(i - dealerIdx + PC) % PC];
     return React.createElement("button", {
       key: i,
@@ -22248,7 +22311,7 @@ input, select { padding: 10px 14px; }
       color: t.rd,
       fontWeight: 700
     }
-  }, correctingChomboIdx !== null ? `✏️ ${rounds[correctingChomboIdx]?.wind}${(rounds[correctingChomboIdx]?.dealer ?? 0) + 1}局のチョンボを修正` : "⚠️ チョンボ"), React.createElement("button", {
+  }, fixIdx !== null ? `✏️ ${fixRoundLabel()} をチョンボに直す` : "⚠️ チョンボ"), React.createElement("button", {
     style: {
       background: "none",
       border: "none",
@@ -22258,7 +22321,7 @@ input, select { padding: 10px 14px; }
     },
     onClick: resetChombo
   }, "✕")), chomboStep === "who" && (() => {
-    const cd = correctingChomboIdx !== null ? rounds[correctingChomboIdx]?.dealer ?? dealerIdx : dealerIdx;
+    const cd = fixIdx !== null ? rounds[fixIdx]?.dealer ?? dealerIdx : dealerIdx;
     return React.createElement(React.Fragment, null, React.createElement("div", {
       style: question
     }, "誰がチョンボ？"), React.createElement("div", {
@@ -22297,7 +22360,7 @@ input, select { padding: 10px 14px; }
     }, "キャンセル"));
   })(), chomboStep === "pay" && chomboWho !== null && (() => {
     const cr = chomboRules();
-    const cd = correctingChomboIdx !== null ? rounds[correctingChomboIdx]?.dealer ?? dealerIdx : dealerIdx;
+    const cd = fixIdx !== null ? rounds[fixIdx]?.dealer ?? dealerIdx : dealerIdx;
     const isOya = chomboWho === cd;
     const amtRow = (label, val, setVal) => React.createElement("div", {
       style: {
@@ -22503,7 +22566,7 @@ input, select { padding: 10px 14px; }
       display: "flex",
       gap: 8
     }
-  }, r.chombo ? React.createElement("button", {
+  }, React.createElement("button", {
     style: {
       flex: 1,
       padding: "10px",
@@ -22515,39 +22578,7 @@ input, select { padding: 10px 14px; }
       fontWeight: 700,
       cursor: "pointer"
     },
-    onClick: () => {
-      setEditingRoundIdx(null);
-      openChomboCorrection(idx);
-    }
-  }, "✏️ この局を修正") : !r.draw ? React.createElement("button", {
-    style: {
-      flex: 1,
-      padding: "10px",
-      borderRadius: 8,
-      border: `1px solid ${t.ac}`,
-      background: t.acS,
-      color: t.ac,
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer"
-    },
-    onClick: () => openCorrectionWizard(idx)
-  }, "✏️ この局を修正") : React.createElement("button", {
-    style: {
-      flex: 1,
-      padding: "10px",
-      borderRadius: 8,
-      border: `1px solid ${t.ac}`,
-      background: t.acS,
-      color: t.ac,
-      fontSize: 12,
-      fontWeight: 700,
-      cursor: "pointer"
-    },
-    onClick: () => {
-      setEditingRoundIdx(null);
-      openDrawCorrection(idx);
-    }
+    onClick: () => startRoundFix(idx)
   }, "✏️ この局を修正"), React.createElement("button", {
     style: {
       flex: 1,
