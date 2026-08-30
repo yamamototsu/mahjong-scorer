@@ -6024,6 +6024,16 @@ input, select { padding: 10px 14px; }
     box-shadow: 0 0 4px rgba(56,189,248,0.15);
   }
 }
+/* 点数を打ち込む欄。ここに入れるのだと気づけるよう、枠と光だけを脈打たせる。
+   文字を薄くすると placeholder が読めなくなるので不透明度は変えない */
+@keyframes inputPrompt {
+  0%, 100% { border-color: #5b9bff; box-shadow: 0 0 0 3px rgba(91,155,255,0.22), 0 0 16px rgba(91,155,255,0.45); }
+  50%      { border-color: rgba(91,155,255,0.45); box-shadow: 0 0 0 1px rgba(91,155,255,0.10), 0 0 4px rgba(91,155,255,0.12); }
+}
+/* 動きを抑える設定の端末では光らせっぱなしにして、点滅させない */
+@media (prefers-reduced-motion: reduce) {
+  .sq-input-prompt { animation: none !important; border-color: #5b9bff !important; box-shadow: 0 0 0 2px rgba(91,155,255,0.22) !important; }
+}
 @keyframes wallLabelBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -7152,6 +7162,7 @@ input, select { padding: 10px 14px; }
     };
   };
   const [sqMode, setSqMode] = useState(null);
+  const [sqLessonBackTo, setSqLessonBackTo] = useState(null);
   const [sqQ, setSqQ] = useState(null);
   const [sqPicked, setSqPicked] = useState(null);
   const [sqIn1, setSqIn1] = useState("");
@@ -16786,7 +16797,8 @@ input, select { padding: 10px 14px; }
         style: {
           fontSize: 15,
           fontWeight: 800,
-          color: t.tx
+          color: t.tx,
+          textWrap: "balance"
         }
       }, title)), React.createElement("div", {
         style: {
@@ -16951,7 +16963,8 @@ input, select { padding: 10px 14px; }
         }
       }, "800"), React.createElement("br", null), "② 子は 800 × 1 = 800 ／ 親は 800 × 2 = 1,600", React.createElement("br", null), "③ どちらも端数なし → ", React.createElement("b", {
         style: {
-          color: t.gn
+          color: t.gn,
+          whiteSpace: "nowrap"
         }
       }, "800 / 1,600"), React.createElement("br", null), React.createElement("span", {
         style: {
@@ -16978,11 +16991,13 @@ input, select { padding: 10px 14px; }
         }
       }, "子・ロン・4翻40符", React.createElement("br", null), "① 40 × 2", React.createElement("sup", null, "(2+4)"), " = 40 × 64 = 2,560", React.createElement("br", null), "\u3000→ 2,000を超えるので ", React.createElement("b", {
         style: {
-          color: t.gd
+          color: t.gd,
+          whiteSpace: "nowrap"
         }
       }, "2,000で頭打ち"), React.createElement("br", null), "② 2,000 × 4 = ", React.createElement("b", {
         style: {
-          color: t.gn
+          color: t.gn,
+          whiteSpace: "nowrap"
         }
       }, "8,000点（満貫）"))), React.createElement("div", {
         style: {
@@ -17029,12 +17044,23 @@ input, select { padding: 10px 14px; }
           marginTop: 10,
           lineHeight: 1.8
         }
-      }, "親はこの1.5倍（1,500 / 2,900 / 5,800 / 11,600）です。3,900と7,700だけは、切り上げの都合でちょうど2倍になりません。")), React.createElement("button", {
+      }, "親はこの1.5倍（1,500 / 2,900 / 5,800 / 11,600）です。3,900と7,700だけは、切り上げの都合でちょうど2倍になりません。")), sqLessonBackTo ? React.createElement("button", {
         style: {
           ...actionBtn("p"),
           marginTop: 16
         },
         onClick: () => {
+          const back = sqLessonBackTo;
+          setSqLessonBackTo(null);
+          setSqMode(back);
+        }
+      }, "← 解いていた問題に戻る") : React.createElement("button", {
+        style: {
+          ...actionBtn("p"),
+          marginTop: 16
+        },
+        onClick: () => {
+          setSqLessonBackTo(null);
           setSqMode("choice");
           setSqScore({
             ok: 0,
@@ -17044,7 +17070,10 @@ input, select { padding: 10px 14px; }
         }
       }, "選択式で練習する"), React.createElement("button", {
         style: actionBtn(),
-        onClick: () => setSqMode(null)
+        onClick: () => {
+          setSqLessonBackTo(null);
+          setSqMode(null);
+        }
       }, "出題方式を選ぶ"));
     }
     if (sqMode === "flash") {
@@ -17292,7 +17321,10 @@ input, select { padding: 10px 14px; }
           marginBottom: 18
         }
       }, "4翻以下の点数を、親子・ロンツモの組み合わせで出題します"), React.createElement("button", {
-        onClick: () => setSqMode("lesson"),
+        onClick: () => {
+          setSqLessonBackTo(null);
+          setSqMode("lesson");
+        },
         style: {
           width: "100%",
           padding: "18px",
@@ -17448,6 +17480,7 @@ input, select { padding: 10px 14px; }
     }, React.createElement("button", {
       style: backBtn,
       onClick: () => {
+        setSqLessonBackTo(null);
         setSqMode(null);
         setSqQ(null);
       }
@@ -17556,74 +17589,87 @@ input, select { padding: 10px 14px; }
           whiteSpace: "nowrap"
         }
       }, ch);
-    })) : React.createElement("div", null, a.kind === "pair" ? React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 10,
-        marginBottom: 12
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        marginBottom: 5
-      }
-    }, "子から"), React.createElement("input", {
-      type: "text",
-      inputMode: "numeric",
-      value: sqIn1,
-      disabled: sqJudged !== null,
-      onChange: e => setSqIn1(e.target.value),
-      placeholder: "0",
-      style: {
-        ...inputStyle,
-        fontSize: 20,
-        fontWeight: 800,
-        textAlign: "center"
-      }
-    })), React.createElement("div", {
-      style: {
-        flex: 1
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        marginBottom: 5
-      }
-    }, "親から"), React.createElement("input", {
-      type: "text",
-      inputMode: "numeric",
-      value: sqIn2,
-      disabled: sqJudged !== null,
-      onChange: e => setSqIn2(e.target.value),
-      placeholder: "0",
-      style: {
-        ...inputStyle,
-        fontSize: 20,
-        fontWeight: 800,
-        textAlign: "center"
-      }
-    }))) : React.createElement("input", {
-      type: "text",
-      inputMode: "numeric",
-      value: sqIn1,
-      disabled: sqJudged !== null,
-      onChange: e => setSqIn1(e.target.value),
-      placeholder: "点数を入力",
-      style: {
-        ...inputStyle,
-        fontSize: 26,
-        fontWeight: 900,
-        textAlign: "center",
-        marginBottom: 12,
-        padding: "14px"
-      }
-    }), sqJudged === null && React.createElement("button", {
+    })) : React.createElement("div", null, (() => {
+      const promptOn = v => sqJudged === null && !v;
+      const promptStyle = v => promptOn(v) ? {
+        animation: "inputPrompt 1.6s ease-in-out infinite"
+      } : null;
+      const promptCls = v => promptOn(v) ? "sq-input-prompt" : undefined;
+      return a.kind === "pair" ? React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 10,
+          marginBottom: 12
+        }
+      }, React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          marginBottom: 5
+        }
+      }, "子から"), React.createElement("input", {
+        type: "text",
+        inputMode: "numeric",
+        value: sqIn1,
+        disabled: sqJudged !== null,
+        onChange: e => setSqIn1(e.target.value),
+        placeholder: "0",
+        className: promptCls(sqIn1),
+        style: {
+          ...inputStyle,
+          fontSize: 20,
+          fontWeight: 800,
+          textAlign: "center",
+          ...promptStyle(sqIn1)
+        }
+      })), React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          marginBottom: 5
+        }
+      }, "親から"), React.createElement("input", {
+        type: "text",
+        inputMode: "numeric",
+        value: sqIn2,
+        disabled: sqJudged !== null,
+        onChange: e => setSqIn2(e.target.value),
+        placeholder: "0",
+        className: promptCls(sqIn2),
+        style: {
+          ...inputStyle,
+          fontSize: 20,
+          fontWeight: 800,
+          textAlign: "center",
+          ...promptStyle(sqIn2)
+        }
+      }))) : React.createElement("input", {
+        type: "text",
+        inputMode: "numeric",
+        value: sqIn1,
+        disabled: sqJudged !== null,
+        onChange: e => setSqIn1(e.target.value),
+        placeholder: "点数を入力",
+        className: promptCls(sqIn1),
+        style: {
+          ...inputStyle,
+          fontSize: 26,
+          fontWeight: 900,
+          textAlign: "center",
+          marginBottom: 12,
+          padding: "14px",
+          ...promptStyle(sqIn1)
+        }
+      });
+    })(), sqJudged === null && React.createElement("button", {
       style: actionBtn("p"),
       onClick: judgeScoreInput,
       disabled: !sqIn1 || a.kind === "pair" && !sqIn2
@@ -17703,7 +17749,10 @@ input, select { padding: 10px 14px; }
         ...actionBtn(),
         marginTop: 12
       },
-      onClick: () => setSqMode("lesson")
+      onClick: () => {
+        setSqLessonBackTo(sqMode);
+        setSqMode("lesson");
+      }
     }, "📘 計算のしかたを見る"), React.createElement("button", {
       style: actionBtn(),
       onClick: () => setView("home")
@@ -23141,7 +23190,7 @@ input, select { padding: 10px 14px; }
       style: card
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 700,
         color: t.dm,
         marginBottom: 10,
@@ -23157,14 +23206,14 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 800,
         color: t.rd,
         lineHeight: 1.8
       }
     }, ruleSet.tobiEnd !== false ? "🔻 トビで終了しました" : "🔻 ハコ下の人がいます"), React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         color: t.tx,
         lineHeight: 1.9,
         marginTop: 2
@@ -23175,14 +23224,14 @@ input, select { padding: 10px 14px; }
       }
     }, " の持ち点が0を下回りました"))), kyotakuAward && React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         color: t.gd,
         marginBottom: 10,
-        padding: "7px 10px",
+        padding: "8px 10px",
         borderRadius: 8,
         background: t.gdS,
         border: `1px solid ${t.gd}33`,
-        lineHeight: 1.7
+        lineHeight: 1.9
       }
     }, "卓上に残った供託リーチ棒 ", kyotakuAward.n, "本（+", (kyotakuAward.n * 1000).toLocaleString(), "点）はトップの ", players[kyotakuAward.idx], " さんが受け取りました"), [...adjusted].sort((a, b) => b.rawScore - a.rawScore).map((s, rank) => React.createElement("div", {
       key: s.idx,
@@ -23235,7 +23284,7 @@ input, select { padding: 10px 14px; }
       style: card
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: 700,
         color: t.dm,
         marginBottom: 6,
@@ -23243,9 +23292,10 @@ input, select { padding: 10px 14px; }
       }
     }, "精算（オカ計算）"), React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 13,
         color: t.dm,
-        marginBottom: 12
+        marginBottom: 12,
+        lineHeight: 1.8
       }
     }, "返し点 ", returnPt.toLocaleString(), " / オカ ", okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし", (ruleSet.uma || []).some(u => u !== 0) && ` / ウマ ${(ruleSet.uma || []).map(u => (u > 0 ? "+" : "") + u).join("/")}`), sorted.map((s, rank) => React.createElement("div", {
       key: s.idx,
@@ -23301,7 +23351,7 @@ input, select { padding: 10px 14px; }
       }
     }, s.finalPt > 0 ? "+" : "", s.finalPt.toLocaleString()), React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         fontVariantNumeric: "tabular-nums",
         color: s.rawScore < 0 ? t.rd : t.dm
       }
@@ -23327,10 +23377,10 @@ input, select { padding: 10px 14px; }
       }, ruleSet.rateUnit || "G"));
     })()))), !!ruleSet.rate && React.createElement("div", {
       style: {
-        fontSize: 10,
+        fontSize: 12,
         color: t.dm,
-        marginTop: 6,
-        lineHeight: 1.8
+        marginTop: 8,
+        lineHeight: 1.9
       }
     }, "レート 1点 = ", RATE_LABEL(ruleSet.rate), " ", ruleSet.rateUnit || "G", "。", React.createElement("span", {
       style: {
@@ -23614,11 +23664,15 @@ input, select { padding: 10px 14px; }
     })(), React.createElement("button", {
       style: {
         ...actionBtn("d"),
-        fontSize: "min(15px, 4.8vw)"
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        flexWrap: "wrap"
       },
       onClick: () => {
         const lgName = leagues.find(l => l.id === activeLeagueId)?.name;
-        if (!window.confirm(lgName ? `この結果を「${lgName}」に記録して対局を終了します。\n記録後は変更できません。よろしいですか？` : "この結果を履歴に記録して対局を終了します。\n記録後は変更できません。よろしいですか？")) return;
+        if (!window.confirm(lgName ? `対局を終了して、この結果を「${lgName}」に記録します。\n記録後は変更できません。よろしいですか？` : "対局を終了して、この結果を履歴に記録します。\n記録後は変更できません。よろしいですか？")) return;
         setReviewing(false);
         setShowScoreFix(false);
         recordGame();
@@ -23632,13 +23686,45 @@ input, select { padding: 10px 14px; }
           setView("leaguedetail");
         } else setView("home");
       }
-    }, activeLeagueId ? "✓ 対局終了・リーグに記録する" : "✓ 対局終了・履歴に記録して終了"), !activeLeagueId && React.createElement("button", {
+    }, React.createElement("span", {
+      style: {
+        width: "100%",
+        fontSize: "min(20px, 6vw)",
+        fontWeight: 900
+      }
+    }, "✓ 終了"), React.createElement("span", {
+      style: {
+        width: "100%",
+        fontSize: "min(12px, 3.6vw)",
+        fontWeight: 600,
+        opacity: 0.9,
+        marginTop: 2
+      }
+    }, activeLeagueId ? "リーグに記録します" : "履歴に記録して対局を終わります")), !activeLeagueId && React.createElement("button", {
       style: {
         ...actionBtn("p"),
-        fontSize: "min(15px, 4.8vw)"
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        flexWrap: "wrap"
       },
       onClick: () => setRematchPick(true)
-    }, "🔁 対局終了・履歴を残して再試合"), rematchPick && React.createElement("div", {
+    }, React.createElement("span", {
+      style: {
+        width: "100%",
+        fontSize: "min(20px, 6vw)",
+        fontWeight: 900
+      }
+    }, "🔁 再試合"), React.createElement("span", {
+      style: {
+        width: "100%",
+        fontSize: "min(12px, 3.6vw)",
+        fontWeight: 600,
+        opacity: 0.9,
+        marginTop: 2
+      }
+    }, "履歴を残して同じメンバーでもう一度")), rematchPick && React.createElement("div", {
       style: {
         position: "fixed",
         top: 0,
@@ -24637,7 +24723,14 @@ input, select { padding: 10px 14px; }
     }
   }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) && !(view === "calc" && calcStep > 0) ? React.createElement("button", {
     onClick: () => {
-      if (view === "names") setView(namesBackTo);else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "scorequiz" && sqMode) setSqMode(null);else setView("home");
+      if (view === "names") setView(namesBackTo);else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
+        const back = sqLessonBackTo;
+        setSqLessonBackTo(null);
+        setSqMode(back);
+      } else if (view === "scorequiz" && sqMode) {
+        setSqLessonBackTo(null);
+        setSqMode(null);
+      } else setView("home");
     },
     style: {
       background: t.card,

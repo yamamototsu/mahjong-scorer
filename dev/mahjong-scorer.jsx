@@ -3512,6 +3512,16 @@ input, select { padding: 10px 14px; }
     box-shadow: 0 0 4px rgba(56,189,248,0.15);
   }
 }
+/* 点数を打ち込む欄。ここに入れるのだと気づけるよう、枠と光だけを脈打たせる。
+   文字を薄くすると placeholder が読めなくなるので不透明度は変えない */
+@keyframes inputPrompt {
+  0%, 100% { border-color: #5b9bff; box-shadow: 0 0 0 3px rgba(91,155,255,0.22), 0 0 16px rgba(91,155,255,0.45); }
+  50%      { border-color: rgba(91,155,255,0.45); box-shadow: 0 0 0 1px rgba(91,155,255,0.10), 0 0 4px rgba(91,155,255,0.12); }
+}
+/* 動きを抑える設定の端末では光らせっぱなしにして、点滅させない */
+@media (prefers-reduced-motion: reduce) {
+  .sq-input-prompt { animation: none !important; border-color: #5b9bff !important; box-shadow: 0 0 0 2px rgba(91,155,255,0.22) !important; }
+}
 @keyframes wallLabelBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -3724,6 +3734,9 @@ input, select { padding: 10px 14px; }
     };
   };
   const [sqMode, setSqMode] = useState(null);     // null | "choice" | "input"
+  // 問題を解いている途中で「計算のしかた」を見に行ったときの戻り先。
+  // 出題方式の選択画面から入ったときは null のままで、戻ると選択画面に戻る
+  const [sqLessonBackTo, setSqLessonBackTo] = useState(null);
   const [sqQ, setSqQ] = useState(null);
   const [sqPicked, setSqPicked] = useState(null); // 選択式で選んだ答え
   const [sqIn1, setSqIn1] = useState("");
@@ -8966,7 +8979,7 @@ input, select { padding: 10px 14px; }
               width: 24, height: 24, borderRadius: "50%", background: t.ac, color: "#fff",
               fontSize: 13, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}>{no}</span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: t.tx }}>{title}</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: t.tx, textWrap: "balance" }}>{title}</span>
           </div>
           <div style={{ fontSize: 13, color: t.tx, lineHeight: 1.95, paddingLeft: 32 }}>{children}</div>
         </div>
@@ -9055,7 +9068,7 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 13, lineHeight: 2, color: t.tx }}>
               ① 100 × 2<sup>(2+1)</sup> = 100 × 8 = <b style={{ color: t.gd }}>800</b><br />
               ② 子は 800 × 1 = 800 ／ 親は 800 × 2 = 1,600<br />
-              ③ どちらも端数なし → <b style={{ color: t.gn }}>800 / 1,600</b><br />
+              ③ どちらも端数なし → <b style={{ color: t.gn, whiteSpace: "nowrap" }}>800 / 1,600</b><br />
               <span style={{ fontSize: 12, color: t.dm }}>合計は 800×2 + 1,600 = 3,200点</span>
             </div>
 
@@ -9065,8 +9078,8 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 13, lineHeight: 2, color: t.tx }}>
               子・ロン・4翻40符<br />
               ① 40 × 2<sup>(2+4)</sup> = 40 × 64 = 2,560<br />
-              　→ 2,000を超えるので <b style={{ color: t.gd }}>2,000で頭打ち</b><br />
-              ② 2,000 × 4 = <b style={{ color: t.gn }}>8,000点（満貫）</b>
+              　→ 2,000を超えるので <b style={{ color: t.gd, whiteSpace: "nowrap" }}>2,000で頭打ち</b><br />
+              ② 2,000 × 4 = <b style={{ color: t.gn, whiteSpace: "nowrap" }}>8,000点（満貫）</b>
             </div>
           </div>
 
@@ -9095,11 +9108,18 @@ input, select { padding: 10px 14px; }
             </div>
           </div>
 
-          <button style={{ ...actionBtn("p"), marginTop: 16 }}
-            onClick={() => { setSqMode("choice"); setSqScore({ ok: 0, total: 0 }); makeScoreQuestion(); }}>
-            選択式で練習する
-          </button>
-          <button style={actionBtn()} onClick={() => setSqMode(null)}>出題方式を選ぶ</button>
+          {sqLessonBackTo ? (
+            <button style={{ ...actionBtn("p"), marginTop: 16 }}
+              onClick={() => { const back = sqLessonBackTo; setSqLessonBackTo(null); setSqMode(back); }}>
+              ← 解いていた問題に戻る
+            </button>
+          ) : (
+            <button style={{ ...actionBtn("p"), marginTop: 16 }}
+              onClick={() => { setSqLessonBackTo(null); setSqMode("choice"); setSqScore({ ok: 0, total: 0 }); makeScoreQuestion(); }}>
+              選択式で練習する
+            </button>
+          )}
+          <button style={actionBtn()} onClick={() => { setSqLessonBackTo(null); setSqMode(null); }}>出題方式を選ぶ</button>
         </div>
       );
     }
@@ -9231,7 +9251,7 @@ input, select { padding: 10px 14px; }
             4翻以下の点数を、親子・ロンツモの組み合わせで出題します
           </div>
 
-          <button onClick={() => setSqMode("lesson")} style={{
+          <button onClick={() => { setSqLessonBackTo(null); setSqMode("lesson"); }} style={{
             width: "100%", padding: "18px", marginBottom: 12, borderRadius: 13, cursor: "pointer",
             border: `2px solid ${t.gn}`, background: t.gnS, textAlign: "left",
           }}>
@@ -9293,7 +9313,7 @@ input, select { padding: 10px 14px; }
 
     return (
       <div style={body}>
-        <button style={backBtn} onClick={() => { setSqMode(null); setSqQ(null); }}>← 出題方式を変える</button>
+        <button style={backBtn} onClick={() => { setSqLessonBackTo(null); setSqMode(null); setSqQ(null); }}>← 出題方式を変える</button>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
           <span style={{ fontSize: 12, color: t.dm }}>
@@ -9356,26 +9376,35 @@ input, select { padding: 10px 14px; }
             </div>
           ) : (
             <div>
-              {a.kind === "pair" ? (
+              {/* まだ何も入っていない欄だけを脈打たせて、ここに打ち込むのだと知らせる。
+                  何か入ったら止める。答え合わせのあと（入力できない状態）も光らせない */}
+              {(() => {
+              const promptOn = (v) => sqJudged === null && !v;
+              const promptStyle = (v) => promptOn(v)
+                ? { animation: "inputPrompt 1.6s ease-in-out infinite" }
+                : null;
+              const promptCls = (v) => promptOn(v) ? "sq-input-prompt" : undefined;
+              return a.kind === "pair" ? (
                 <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>子から</div>
                     <input type="text" inputMode="numeric" value={sqIn1} disabled={sqJudged !== null}
-                      onChange={e => setSqIn1(e.target.value)} placeholder="0"
-                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center" }} />
+                      onChange={e => setSqIn1(e.target.value)} placeholder="0" className={promptCls(sqIn1)}
+                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center", ...promptStyle(sqIn1) }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>親から</div>
                     <input type="text" inputMode="numeric" value={sqIn2} disabled={sqJudged !== null}
-                      onChange={e => setSqIn2(e.target.value)} placeholder="0"
-                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center" }} />
+                      onChange={e => setSqIn2(e.target.value)} placeholder="0" className={promptCls(sqIn2)}
+                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center", ...promptStyle(sqIn2) }} />
                   </div>
                 </div>
               ) : (
                 <input type="text" inputMode="numeric" value={sqIn1} disabled={sqJudged !== null}
-                  onChange={e => setSqIn1(e.target.value)} placeholder="点数を入力"
-                  style={{ ...inputStyle, fontSize: 26, fontWeight: 900, textAlign: "center", marginBottom: 12, padding: "14px" }} />
-              )}
+                  onChange={e => setSqIn1(e.target.value)} placeholder="点数を入力" className={promptCls(sqIn1)}
+                  style={{ ...inputStyle, fontSize: 26, fontWeight: 900, textAlign: "center", marginBottom: 12, padding: "14px", ...promptStyle(sqIn1) }} />
+              );
+              })()}
               {sqJudged === null && (
                 <button style={actionBtn("p")} onClick={judgeScoreInput}
                   disabled={!sqIn1 || (a.kind === "pair" && !sqIn2)}>答え合わせ</button>
@@ -9434,7 +9463,8 @@ input, select { padding: 10px 14px; }
           )}
         </div>
 
-        <button style={{ ...actionBtn(), marginTop: 12 }} onClick={() => setSqMode("lesson")}>📘 計算のしかたを見る</button>
+        <button style={{ ...actionBtn(), marginTop: 12 }}
+          onClick={() => { setSqLessonBackTo(sqMode); setSqMode("lesson"); }}>📘 計算のしかたを見る</button>
         <button style={actionBtn()} onClick={() => setView("home")}>メニューに戻る</button>
       </div>
     );
@@ -12379,24 +12409,24 @@ input, select { padding: 10px 14px; }
 
         {/* Raw scores */}
         <div style={card}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 10, letterSpacing: "0.05em" }}>最終持ち点</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.dm, marginBottom: 10, letterSpacing: "0.05em" }}>最終持ち点</div>
           {/* ハコ下（0未満）の人がいたら、それが分かるように出す */}
           {adjusted.some(s => s.rawScore < 0) && (
             <div style={{
               marginBottom: 10, padding: "9px 11px", borderRadius: 9,
               background: t.rdS, border: `1px solid ${t.rd}44`,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: t.rd, lineHeight: 1.8 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: t.rd, lineHeight: 1.8 }}>
                 {ruleSet.tobiEnd !== false ? "🔻 トビで終了しました" : "🔻 ハコ下の人がいます"}
               </div>
-              <div style={{ fontSize: 11, color: t.tx, lineHeight: 1.9, marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.9, marginTop: 2 }}>
                 {adjusted.filter(s => s.rawScore < 0).map(s => s.name).join("、")}
                 <span style={{ display: "inline-block" }}> の持ち点が0を下回りました</span>
               </div>
             </div>
           )}
           {kyotakuAward && (
-            <div style={{ fontSize: 11, color: t.gd, marginBottom: 10, padding: "7px 10px", borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}33`, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 12, color: t.gd, marginBottom: 10, padding: "8px 10px", borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}33`, lineHeight: 1.9 }}>
               卓上に残った供託リーチ棒 {kyotakuAward.n}本（+{(kyotakuAward.n * 1000).toLocaleString()}点）はトップの {players[kyotakuAward.idx]} さんが受け取りました
             </div>
           )}
@@ -12419,8 +12449,8 @@ input, select { padding: 10px 14px; }
 
         {/* Oka calculation */}
         <div style={card}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>精算（オカ計算）</div>
-          <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>精算（オカ計算）</div>
+          <div style={{ fontSize: 13, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
             返し点 {returnPt.toLocaleString()} / オカ {okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし"}
             {(ruleSet.uma || []).some(u => u !== 0) && ` / ウマ ${(ruleSet.uma || []).map(u => (u > 0 ? "+" : "") + u).join("/")}`}
           </div>
@@ -12440,7 +12470,7 @@ input, select { padding: 10px 14px; }
                 <span style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.finalPt > 0 ? t.gn : s.finalPt < 0 ? t.rd : t.tx }}>
                   {s.finalPt > 0 ? "+" : ""}{s.finalPt.toLocaleString()}
                 </span>
-                <div style={{ fontSize: 11, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.dm }}>
+                <div style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.dm }}>
                   素点 {s.rawScore.toLocaleString()}
                 </div>
                 {/* レートを決めているときは、いくらになるかも出す */}
@@ -12462,7 +12492,7 @@ input, select { padding: 10px 14px; }
             </div>
           ))}
           {!!ruleSet.rate && (
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
+            <div style={{ fontSize: 12, color: t.dm, marginTop: 8, lineHeight: 1.9 }}>
               レート 1点 = {RATE_LABEL(ruleSet.rate)} {ruleSet.rateUnit || "G"}。
               <span style={{ display: "inline-block" }}>1,000点単位に五捨六入してから掛けています</span>
               {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (
@@ -12597,13 +12627,13 @@ input, select { padding: 10px 14px; }
           );
         })()}
 
-        {/* 幅280pxでも1行で収まるよう、狭い画面だけ少し縮める */}
-        <button style={{ ...actionBtn("d"), fontSize: "min(15px, 4.8vw)" }} onClick={() => {
+        {/* 「終了」「再試合」をまず読ませ、説明はそのうしろに小さく置く */}
+        <button style={{ ...actionBtn("d"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }} onClick={() => {
           const lgName = leagues.find(l => l.id === activeLeagueId)?.name;
           if (!window.confirm(
             lgName
-              ? `この結果を「${lgName}」に記録して対局を終了します。\n記録後は変更できません。よろしいですか？`
-              : "この結果を履歴に記録して対局を終了します。\n記録後は変更できません。よろしいですか？"
+              ? `対局を終了して、この結果を「${lgName}」に記録します。\n記録後は変更できません。よろしいですか？`
+              : "対局を終了して、この結果を履歴に記録します。\n記録後は変更できません。よろしいですか？"
           )) return;
           setReviewing(false);
           setShowScoreFix(false);
@@ -12614,12 +12644,21 @@ input, select { padding: 10px 14px; }
           setGameFinished(false);
           if (back) { setLeagueId(back); setLeagueTab("stand"); setView("leaguedetail"); }
           else setView("home");
-        }}>{activeLeagueId ? "✓ 対局終了・リーグに記録する" : "✓ 対局終了・履歴に記録して終了"}</button>
+        }}>
+          <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>✓ 終了</span>
+          <span style={{ width: "100%", fontSize: "min(12px, 3.6vw)", fontWeight: 600, opacity: 0.9, marginTop: 2 }}>
+            {activeLeagueId ? "リーグに記録します" : "履歴に記録して対局を終わります"}
+          </span>
+        </button>
 
         {/* 再試合（リーグ対局はリーグ画面から次戦を始めるため通常対局のみ） */}
         {!activeLeagueId && (
-          <button style={{ ...actionBtn("p"), fontSize: "min(15px, 4.8vw)" }} onClick={() => setRematchPick(true)}>
-            🔁 対局終了・履歴を残して再試合
+          <button style={{ ...actionBtn("p"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}
+            onClick={() => setRematchPick(true)}>
+            <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>🔁 再試合</span>
+            <span style={{ width: "100%", fontSize: "min(12px, 3.6vw)", fontWeight: 600, opacity: 0.9, marginTop: 2 }}>
+              履歴を残して同じメンバーでもう一度
+            </span>
           </button>
         )}
 
@@ -13155,7 +13194,11 @@ input, select { padding: 10px 14px; }
                 else if (view === "leagueform") setView("league");
                 else if (view === "leaguedetail") setView("league");
                 else if (view === "leaguestart") setView("leaguedetail");
-                else if (view === "scorequiz" && sqMode) setSqMode(null);
+                else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
+                  // 問題の途中から解説を見に来たときは、その問題にそのまま戻す
+                  const back = sqLessonBackTo; setSqLessonBackTo(null); setSqMode(back);
+                }
+                else if (view === "scorequiz" && sqMode) { setSqLessonBackTo(null); setSqMode(null); }
                 else setView("home");
               }}
               style={{
