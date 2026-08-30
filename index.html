@@ -259,6 +259,227 @@ const RotateIcon = ({
   fill: "currentColor",
   d: "M19.83,9.75A8.15,8.15 0 0 0 4.17,9.75L6.18,10.33A6.05,6.05 0 0 1 17.82,10.33Z M4.27,13.22L7.91,10.31L2.72,8.82Z M4.17,14.25A8.15,8.15 0 0 0 19.83,14.25L17.82,13.67A6.05,6.05 0 0 1 6.18,13.67Z M19.73,10.78L16.09,13.69L21.28,15.18Z"
 }));
+const RateSetting = ({
+  t,
+  rate,
+  onChange,
+  unit,
+  onUnitChange
+}) => {
+  const on = !!rate;
+  const U = unit || "G";
+  const [unitDraft, setUnitDraft] = React.useState(U);
+  const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
+  const unitRef = React.useRef(U);
+  const rateRef = React.useRef(rate);
+  React.useEffect(() => {
+    if (unitRef.current !== U) {
+      unitRef.current = U;
+      setUnitDraft(U);
+    }
+  }, [U]);
+  React.useEffect(() => {
+    if (rateRef.current !== rate) {
+      rateRef.current = rate;
+      if (rate) setRateDraft(String(rate));
+    }
+  }, [rate]);
+  const rateNum = parseFloat(rateDraft);
+  const rateValid = !isNaN(rateNum) && rateNum >= 0.001 && rateNum <= 10;
+  const commitUnit = raw => {
+    const v = (raw || "").trim().slice(0, 3);
+    if (!v || v === U) return;
+    unitRef.current = v;
+    onUnitChange && onUnitChange(v);
+  };
+  const blurUnit = () => {
+    const v = (unitDraft || "").trim().slice(0, 3) || "G";
+    setUnitDraft(v);
+    commitUnit(v);
+  };
+  const commitRate = raw => {
+    const n = parseFloat(raw);
+    if (isNaN(n) || n < 0.001 || n > 10 || n === rate) return;
+    rateRef.current = n;
+    onChange(n);
+  };
+  const blurRate = () => {
+    if (rateValid) {
+      setRateDraft(String(rateNum));
+      commitRate(rateNum);
+    } else setRateDraft(String(rate || 0.1));
+  };
+  return React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: on ? 12 : 0
+    }
+  }, React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: t.tx
+    }
+  }, "レート計算"), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginTop: 2,
+      lineHeight: 1.7
+    }
+  }, ["点数を違うレート単位で", "表示します。"].map((x, k) => React.createElement("span", {
+    key: k,
+    style: {
+      display: "inline-block"
+    }
+  }, x)))), React.createElement("button", {
+    onClick: () => onChange(on ? 0 : 0.1),
+    style: {
+      width: 48,
+      minHeight: 34,
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      background: "transparent",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 48,
+      height: 28,
+      borderRadius: 14,
+      display: "block",
+      background: on ? t.gd : t.bd,
+      position: "relative",
+      transition: "background 0.15s"
+    }
+  }, React.createElement("span", {
+    style: {
+      position: "absolute",
+      top: 3,
+      left: on ? 23 : 3,
+      width: 22,
+      height: 22,
+      borderRadius: "50%",
+      background: "#fff",
+      transition: "left 0.15s"
+    }
+  })))), on && React.createElement(React.Fragment, null, React.createElement("div", {
+    style: {
+      marginBottom: 12,
+      padding: 10,
+      borderRadius: 10,
+      background: t.sf,
+      border: `1px solid ${t.bd}`
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: t.tx,
+      marginBottom: 6
+    }
+  }, "レート単位を変える"), React.createElement("input", {
+    value: unitDraft,
+    maxLength: 3,
+    onChange: e => {
+      const v = e.target.value.slice(0, 3);
+      setUnitDraft(v);
+      commitUnit(v);
+    },
+    onBlur: blurUnit,
+    onKeyDown: e => {
+      if (e.key === "Enter") e.currentTarget.blur();
+    },
+    placeholder: "G",
+    style: {
+      width: "100%",
+      boxSizing: "border-box",
+      padding: "10px 12px",
+      borderRadius: 9,
+      border: `1px solid ${t.bd}`,
+      background: t.card,
+      color: t.tx,
+      fontSize: 16,
+      fontWeight: 800,
+      textAlign: "center",
+      outline: "none"
+    }
+  }), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: t.dm,
+      marginTop: 6
+    }
+  }, "3文字以内（入力するとそのまま反映されます）")), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "レート単位（", U, "）"), React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: t.dm,
+      marginBottom: 8,
+      lineHeight: 1.7
+    }
+  }, "1点あたりの", U, "。精算画面に", U, "の増減が表示されます"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      alignItems: "center"
+    }
+  }, React.createElement("input", {
+    value: rateDraft,
+    inputMode: "decimal",
+    onChange: e => {
+      const v = e.target.value.replace(/[^0-9.]/g, "").slice(0, 6);
+      setRateDraft(v);
+      commitRate(v);
+    },
+    onBlur: blurRate,
+    onKeyDown: e => {
+      if (e.key === "Enter") e.currentTarget.blur();
+    },
+    placeholder: "0.1",
+    style: {
+      flex: 1,
+      minWidth: 0,
+      padding: "12px 12px",
+      borderRadius: 9,
+      border: `1px solid ${rateValid ? t.bd : t.rd}`,
+      background: t.card,
+      color: t.tx,
+      fontSize: 20,
+      fontWeight: 900,
+      textAlign: "center",
+      outline: "none"
+    }
+  }), React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 800,
+      color: t.gd,
+      flexShrink: 0
+    }
+  }, U)), React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: rateValid ? t.dm : t.rd,
+      marginTop: 6
+    }
+  }, rateValid ? "0.001 〜 10 の範囲で入力（入力するとそのまま反映されます）" : "0.001 〜 10 の範囲で入力してください")));
+};
 function MahjongScorer() {
   const [view, setView] = useState("title");
   const [gameHistory, setGameHistory] = useState(() => {
@@ -8309,225 +8530,6 @@ input, select { padding: 10px 14px; }
       }
     })));
   };
-  const RateSetting = ({
-    rate,
-    onChange,
-    unit,
-    onUnitChange
-  }) => {
-    const on = !!rate;
-    const U = unit || "G";
-    const [unitDraft, setUnitDraft] = React.useState(U);
-    React.useEffect(() => {
-      setUnitDraft(U);
-    }, [U]);
-    const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
-    React.useEffect(() => {
-      if (rate) setRateDraft(String(rate));
-    }, [rate]);
-    const rateNum = parseFloat(rateDraft);
-    const rateValid = !isNaN(rateNum) && rateNum >= 0.001 && rateNum <= 10;
-    return React.createElement("div", {
-      style: {
-        marginBottom: 16
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: on ? 12 : 0
-      }
-    }, React.createElement("div", null, React.createElement("div", {
-      style: {
-        fontSize: 14,
-        fontWeight: 700,
-        color: t.tx
-      }
-    }, "レート計算"), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 2,
-        lineHeight: 1.7
-      }
-    }, ["点数を違うレート単位で", "表示します。"].map((x, k) => React.createElement("span", {
-      key: k,
-      style: {
-        display: "inline-block"
-      }
-    }, x)))), React.createElement("button", {
-      onClick: () => onChange(on ? 0 : 0.1),
-      style: {
-        width: 48,
-        minHeight: 34,
-        border: "none",
-        padding: 0,
-        cursor: "pointer",
-        background: "transparent",
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      }
-    }, React.createElement("span", {
-      style: {
-        width: 48,
-        height: 28,
-        borderRadius: 14,
-        display: "block",
-        background: on ? t.gd : t.bd,
-        position: "relative",
-        transition: "background 0.15s"
-      }
-    }, React.createElement("span", {
-      style: {
-        position: "absolute",
-        top: 3,
-        left: on ? 23 : 3,
-        width: 22,
-        height: 22,
-        borderRadius: "50%",
-        background: "#fff",
-        transition: "left 0.15s"
-      }
-    })))), on && React.createElement(React.Fragment, null, React.createElement("div", {
-      style: {
-        marginBottom: 12,
-        padding: 10,
-        borderRadius: 10,
-        background: t.sf,
-        border: `1px solid ${t.bd}`
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: t.tx,
-        marginBottom: 6
-      }
-    }, "レート単位を変える"), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        alignItems: "center"
-      }
-    }, React.createElement("input", {
-      value: unitDraft,
-      maxLength: 3,
-      onChange: e => setUnitDraft(e.target.value.slice(0, 3)),
-      onKeyDown: e => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      },
-      placeholder: "G",
-      style: {
-        flex: 1,
-        minWidth: 0,
-        padding: "10px 12px",
-        borderRadius: 9,
-        border: `1px solid ${t.bd}`,
-        background: t.card,
-        color: t.tx,
-        fontSize: 16,
-        fontWeight: 800,
-        textAlign: "center",
-        outline: "none"
-      }
-    }), React.createElement("button", {
-      onClick: () => {
-        const v = (unitDraft || "").trim().slice(0, 3) || "G";
-        setUnitDraft(v);
-        onUnitChange && onUnitChange(v);
-      },
-      disabled: (unitDraft || "").trim() === U,
-      style: {
-        padding: "10px 18px",
-        borderRadius: 9,
-        border: "none",
-        cursor: "pointer",
-        background: (unitDraft || "").trim() === U ? t.bd : t.ac,
-        color: (unitDraft || "").trim() === U ? t.dm : "#fff",
-        fontSize: 14,
-        fontWeight: 800,
-        flexShrink: 0
-      }
-    }, "決定")), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        marginTop: 6
-      }
-    }, "3文字以内")), React.createElement("div", {
-      style: {
-        fontSize: 13,
-        fontWeight: 700,
-        marginBottom: 4
-      }
-    }, "レート単位（", U, "）"), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        marginBottom: 8,
-        lineHeight: 1.7
-      }
-    }, "1点あたりの", U, "。精算画面に", U, "の増減が表示されます"), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        alignItems: "center"
-      }
-    }, React.createElement("input", {
-      value: rateDraft,
-      inputMode: "decimal",
-      onChange: e => setRateDraft(e.target.value.replace(/[^0-9.]/g, "").slice(0, 6)),
-      onKeyDown: e => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      },
-      placeholder: "0.1",
-      style: {
-        flex: 1,
-        minWidth: 0,
-        padding: "12px 12px",
-        borderRadius: 9,
-        border: `1px solid ${rateValid ? t.bd : t.rd}`,
-        background: t.card,
-        color: t.tx,
-        fontSize: 20,
-        fontWeight: 900,
-        textAlign: "center",
-        outline: "none"
-      }
-    }), React.createElement("span", {
-      style: {
-        fontSize: 14,
-        fontWeight: 800,
-        color: t.gd,
-        flexShrink: 0
-      }
-    }, U), React.createElement("button", {
-      onClick: () => {
-        if (rateValid) onChange(rateNum);
-      },
-      disabled: !rateValid || rateNum === rate,
-      style: {
-        padding: "12px 18px",
-        borderRadius: 9,
-        border: "none",
-        cursor: "pointer",
-        background: rateValid && rateNum !== rate ? t.ac : t.bd,
-        color: rateValid && rateNum !== rate ? "#fff" : t.dm,
-        fontSize: 14,
-        fontWeight: 800,
-        flexShrink: 0
-      }
-    }, "決定")), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: rateValid ? t.dm : t.rd,
-        marginTop: 6
-      }
-    }, rateValid ? "0.001 〜 10 の範囲で入力" : "0.001 〜 10 の範囲で入力してください")));
-  };
   const TableDiagram = ({
     highlight,
     dice1,
@@ -13405,7 +13407,7 @@ input, select { padding: 10px 14px; }
     }, subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league")), subBtn("🔢", "一局計算", "翻・符から", () => {
       resetCalc();
       setView("calc");
-    }), subBtn("📋", "履歴", `${gameHistory.length}件`, () => {
+    }), subBtn("📋", "対局履歴", `${gameHistory.length}件`, () => {
       setActiveLeagueId(null);
       setView("history");
     })), React.createElement("div", {
@@ -14287,6 +14289,7 @@ input, select { padding: 10px 14px; }
         marginTop: 4
       }
     }, React.createElement(RateSetting, {
+      t: t,
       rate: draftRules.rate || 0,
       onChange: v => editDraft({
         rate: v
@@ -18985,6 +18988,7 @@ input, select { padding: 10px 14px; }
       marginTop: 4
     }
   }, React.createElement(RateSetting, {
+    t: t,
     rate: rules.rate || 0,
     onChange: v => setRules(r => ({
       ...r,
@@ -19807,7 +19811,7 @@ input, select { padding: 10px 14px; }
     const mrRule = (gameConfig || {}).rules?.multiRon || "atamahane";
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
     const PW = "37cqmin";
-    const PH = "26cqmin";
+    const PH = "27cqmin";
     const PGAP = "3cqmin";
     const diceSum = diceVals[0] + diceVals[1];
     const wallTargetIdx = diceSettled || wallBlink ? (dealerIdx + (diceSum - 1)) % PC : -1;
@@ -19828,7 +19832,7 @@ input, select { padding: 10px 14px; }
         style: {
           width: PW,
           height: PH,
-          padding: tmWinStep || tmDrawMode ? "2cqmin" : "1.2cqmin 2.4cqmin",
+          padding: tmWinStep || tmDrawMode ? "2cqmin" : "0.9cqmin 2.4cqmin",
           borderRadius: "3.5cqmin",
           background: tmWinStep || tmDrawMode ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: tmWinStep || tmDrawMode ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
@@ -20150,8 +20154,9 @@ input, select { padding: 10px 14px; }
           padding: "2.4cqmin 1.2cqmin",
           borderRadius: "2cqmin",
           cursor: "pointer",
-          marginTop: "0.3cqmin",
+          marginTop: "max(4px, 1.4cqmin)",
           minHeight: "32px",
+          flexShrink: 0,
           boxSizing: "border-box",
           border: `1px solid ${isRiichi ? t.rd : t.bd}`,
           background: isRiichi ? t.rd : "transparent",

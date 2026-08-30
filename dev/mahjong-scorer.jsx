@@ -157,6 +157,117 @@ const RotateIcon = ({ size = 34 }) => (
   </svg>
 );
 
+// レート設定のカード（ルール編集用）
+// 画面の中で定義すると打鍵のたびに作り直されて入力欄からカーソルが外れるので、
+// ここ（画面の外）に置いて形を固定している。配色 t は呼ぶ側から渡す。
+const RateSetting = ({ t, rate, onChange, unit, onUnitChange }) => {
+  const on = !!rate;
+  const U = unit || "G";
+  const [unitDraft, setUnitDraft] = React.useState(U);
+  const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
+  // 「決定」ボタンを置かず、打った内容をそのまま設定へ反映する。
+  // 自分で反映した分まで下の useEffect が拾うと打っている途中の文字が
+  // 書き換わってしまうので、直前に反映した値を ref で覚えて突き合わせる。
+  const unitRef = React.useRef(U);
+  const rateRef = React.useRef(rate);
+  React.useEffect(() => { if (unitRef.current !== U) { unitRef.current = U; setUnitDraft(U); } }, [U]);
+  React.useEffect(() => { if (rateRef.current !== rate) { rateRef.current = rate; if (rate) setRateDraft(String(rate)); } }, [rate]);
+  const rateNum = parseFloat(rateDraft);
+  const rateValid = !isNaN(rateNum) && rateNum >= 0.001 && rateNum <= 10;
+  // 単位は空のままだと表示できないので、空の間は反映せず既定の「G」に戻す
+  const commitUnit = (raw) => {
+    const v = (raw || "").trim().slice(0, 3);
+    if (!v || v === U) return;
+    unitRef.current = v;
+    onUnitChange && onUnitChange(v);
+  };
+  const blurUnit = () => {
+    const v = (unitDraft || "").trim().slice(0, 3) || "G";
+    setUnitDraft(v);
+    commitUnit(v);
+  };
+  // "0." や空文字など、入力の途中の数字は確定しない
+  const commitRate = (raw) => {
+    const n = parseFloat(raw);
+    if (isNaN(n) || n < 0.001 || n > 10 || n === rate) return;
+    rateRef.current = n;
+    onChange(n);
+  };
+  const blurRate = () => {
+    if (rateValid) { setRateDraft(String(rateNum)); commitRate(rateNum); }
+    else setRateDraft(String(rate || 0.1));
+  };
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {/* レート精算をするかどうか */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: on ? 12 : 0 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>レート計算</div>
+          <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
+            {/* 280px幅で「表示しま/す。」と途中で折り返さないよう意味の切れ目で区切る */}
+            {["点数を違うレート単位で", "表示します。"].map((x, k) => (
+              <span key={k} style={{ display: "inline-block" }}>{x}</span>
+            ))}
+          </div>
+        </div>
+        <button onClick={() => onChange(on ? 0 : 0.1)} style={{
+          // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
+          width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
+          background: "transparent", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <span style={{
+            width: 48, height: 28, borderRadius: 14, display: "block",
+            background: on ? t.gd : t.bd, position: "relative", transition: "background 0.15s",
+          }}>
+            <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
+          </span>
+        </button>
+      </div>
+
+      {on && (<>
+        <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, background: t.sf, border: `1px solid ${t.bd}` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 6 }}>レート単位を変える</div>
+          <input value={unitDraft} maxLength={3}
+            onChange={(e) => { const v = e.target.value.slice(0, 3); setUnitDraft(v); commitUnit(v); }}
+            onBlur={blurUnit}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            placeholder="G"
+            style={{
+              width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 9,
+              border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
+              fontSize: 16, fontWeight: 800, textAlign: "center", outline: "none",
+            }} />
+          <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>3文字以内（入力するとそのまま反映されます）</div>
+        </div>
+
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（{U}）</div>
+        <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
+          1点あたりの{U}。精算画面に{U}の増減が表示されます
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input value={rateDraft}
+            inputMode="decimal"
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, "").slice(0, 6); setRateDraft(v); commitRate(v); }}
+            onBlur={blurRate}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+            placeholder="0.1"
+            style={{
+              flex: 1, minWidth: 0, padding: "12px 12px", borderRadius: 9,
+              border: `1px solid ${rateValid ? t.bd : t.rd}`, background: t.card, color: t.tx,
+              fontSize: 20, fontWeight: 900, textAlign: "center", outline: "none",
+            }} />
+          <span style={{ fontSize: 14, fontWeight: 800, color: t.gd, flexShrink: 0 }}>{U}</span>
+        </div>
+        <div style={{ fontSize: 10, color: rateValid ? t.dm : t.rd, marginTop: 6 }}>
+          {rateValid ? "0.001 〜 10 の範囲で入力（入力するとそのまま反映されます）" : "0.001 〜 10 の範囲で入力してください"}
+        </div>
+
+      </>)}
+    </div>
+  );
+};
+
 export default function MahjongScorer() {
   const [view, setView] = useState("title");
   // 対局履歴。端末に保存する（これまでメモリ上だけで、閉じると消えていた）
@@ -4329,104 +4440,6 @@ input, select { padding: 10px 14px; }
     );
   };
 
-  // レート設定のカード（ルール編集用）
-  const RateSetting = ({ rate, onChange, unit, onUnitChange }) => {
-    const on = !!rate;
-    const U = unit || "G";
-    const [unitDraft, setUnitDraft] = React.useState(U);
-    React.useEffect(() => { setUnitDraft(U); }, [U]);
-    const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
-    React.useEffect(() => { if (rate) setRateDraft(String(rate)); }, [rate]);
-    const rateNum = parseFloat(rateDraft);
-    const rateValid = !isNaN(rateNum) && rateNum >= 0.001 && rateNum <= 10;
-    return (
-      <div style={{ marginBottom: 16 }}>
-        {/* レート精算をするかどうか */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: on ? 12 : 0 }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>レート計算</div>
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
-              {/* 280px幅で「表示しま/す。」と途中で折り返さないよう意味の切れ目で区切る */}
-              {["点数を違うレート単位で", "表示します。"].map((x, k) => (
-                <span key={k} style={{ display: "inline-block" }}>{x}</span>
-              ))}
-            </div>
-          </div>
-          <button onClick={() => onChange(on ? 0 : 0.1)} style={{
-            // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
-            width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
-            background: "transparent", flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <span style={{
-              width: 48, height: 28, borderRadius: 14, display: "block",
-              background: on ? t.gd : t.bd, position: "relative", transition: "background 0.15s",
-            }}>
-              <span style={{ position: "absolute", top: 3, left: on ? 23 : 3, width: 22, height: 22, borderRadius: "50%", background: "#fff", transition: "left 0.15s" }} />
-            </span>
-          </button>
-        </div>
-
-        {on && (<>
-          <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, background: t.sf, border: `1px solid ${t.bd}` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 6 }}>レート単位を変える</div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input value={unitDraft} maxLength={3}
-                onChange={(e) => setUnitDraft(e.target.value.slice(0, 3))}
-                onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                placeholder="G"
-                style={{
-                  flex: 1, minWidth: 0, padding: "10px 12px", borderRadius: 9,
-                  border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
-                  fontSize: 16, fontWeight: 800, textAlign: "center", outline: "none",
-                }} />
-              <button
-                onClick={() => { const v = (unitDraft || "").trim().slice(0, 3) || "G"; setUnitDraft(v); onUnitChange && onUnitChange(v); }}
-                disabled={(unitDraft || "").trim() === U}
-                style={{
-                  padding: "10px 18px", borderRadius: 9, border: "none", cursor: "pointer",
-                  background: (unitDraft || "").trim() === U ? t.bd : t.ac,
-                  color: (unitDraft || "").trim() === U ? t.dm : "#fff",
-                  fontSize: 14, fontWeight: 800, flexShrink: 0,
-                }}>決定</button>
-            </div>
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>3文字以内</div>
-          </div>
-
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（{U}）</div>
-          <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
-            1点あたりの{U}。精算画面に{U}の増減が表示されます
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input value={rateDraft}
-              inputMode="decimal"
-              onChange={(e) => setRateDraft(e.target.value.replace(/[^0-9.]/g, "").slice(0, 6))}
-              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
-              placeholder="0.1"
-              style={{
-                flex: 1, minWidth: 0, padding: "12px 12px", borderRadius: 9,
-                border: `1px solid ${rateValid ? t.bd : t.rd}`, background: t.card, color: t.tx,
-                fontSize: 20, fontWeight: 900, textAlign: "center", outline: "none",
-              }} />
-            <span style={{ fontSize: 14, fontWeight: 800, color: t.gd, flexShrink: 0 }}>{U}</span>
-            <button
-              onClick={() => { if (rateValid) onChange(rateNum); }}
-              disabled={!rateValid || rateNum === rate}
-              style={{
-                padding: "12px 18px", borderRadius: 9, border: "none", cursor: "pointer",
-                background: (rateValid && rateNum !== rate) ? t.ac : t.bd,
-                color: (rateValid && rateNum !== rate) ? "#fff" : t.dm,
-                fontSize: 14, fontWeight: 800, flexShrink: 0,
-              }}>決定</button>
-          </div>
-          <div style={{ fontSize: 10, color: rateValid ? t.dm : t.rd, marginTop: 6 }}>
-            {rateValid ? "0.001 〜 10 の範囲で入力" : "0.001 〜 10 の範囲で入力してください"}
-          </div>
-
-        </>)}
-      </div>
-    );
-  };
 
   const TableDiagram = ({ highlight, dice1, dice2, breakPos, labels }) => {
     const seatStyle = (pos, on) => {
@@ -7191,7 +7204,7 @@ input, select { padding: 10px 14px; }
         <div style={{ display: "flex", gap: 8, marginBottom: 8, ...reveal(2) }}>
           {subBtn("🏆", "リーグ戦", "通算で競う", () => setView("league"))}
           {subBtn("🔢", "一局計算", "翻・符から", () => { resetCalc(); setView("calc"); })}
-          {subBtn("📋", "履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
+          {subBtn("📋", "対局履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
         </div>
         <div style={{ display: "flex", gap: 8, ...reveal(3) }}>
           {subBtn("🎓", "練習問題", "点数・役・符", () => { setView("home"); setHomeCat("practice"); })}
@@ -7642,7 +7655,7 @@ input, select { padding: 10px 14px; }
             {secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${draftRules.rateUnit || "G"}` : "レート計算なし")}
             {setOpen === "rate" && (
               <div style={{ ...card, padding: 16, marginTop: 4 }}>
-                <RateSetting rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })}
+                <RateSetting t={t} rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })}
                   unit={draftRules.rateUnit} onUnitChange={(u) => editDraft({ rateUnit: u })} />
               </div>
             )}
@@ -10153,7 +10166,7 @@ input, select { padding: 10px 14px; }
           {gsHdr("rate", "💰", "レート設定", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${rules.rateUnit || "G"}` : "レート計算なし")}
           {gsOpen === "rate" && (
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
-              <RateSetting rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
+              <RateSetting t={t} rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
                 unit={rules.rateUnit} onUnitChange={(u) => setRules(r => ({ ...r, rateUnit: u }))} />
             </div>
           )}
@@ -10635,7 +10648,7 @@ input, select { padding: 10px 14px; }
     // 席順: players[0]=手前, [1]=右, [2]=向かい, [3]=左（反時計回り＝下家が右）
     // 卓（正方形）の一辺に対する比率で決める。端末サイズが変わっても重ならない
     const PW = "37cqmin";   // パネルの長辺
-    const PH = "26cqmin";   // パネルの短辺
+    const PH = "27cqmin";   // パネルの短辺（点数とリーチボタンの間を空けた分だけ広げてある）
     const PGAP = "3cqmin"; // 卓のふちからの余白
 
     // サイコロの結果で割る山の持ち主
@@ -10664,8 +10677,8 @@ input, select { padding: 10px 14px; }
         <div style={{
           width: PW, height: PH,
           // 通常時は内側の余白を詰める。名前・風/点数・リーチの3段が
-          // はみ出さずに収まる幅を確保するため（横 3.5→2.4 / 縦 3→1.2）
-          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "1.2cqmin 2.4cqmin", borderRadius: "3.5cqmin",
+          // はみ出さずに収まる幅を確保するため（横 3.5→2.4 / 縦 3→0.9）
+          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "0.9cqmin 2.4cqmin", borderRadius: "3.5cqmin",
           // 親は外枠だけ黄色に。背景は他家と同じ
           background: (tmWinStep || tmDrawMode) ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: (tmWinStep || tmDrawMode) ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
@@ -10829,8 +10842,10 @@ input, select { padding: 10px 14px; }
                 // 指で押せる高さ（32px以上）と読める文字を確保する。
                 // 卓上モードは cqmin が基本だが、狭い画面では潰れて押せなくなるため
                 // 高さと文字だけ最低値を持たせている（大小関係は名前・点数より小さいまま）
-                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "0.3cqmin",
-                minHeight: "32px", boxSizing: "border-box",
+                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "max(4px, 1.4cqmin)",
+                // 余白を足した分だけ縦に潰されて文字が枠に貼りつかないよう、
+                // このボタンだけは縮まないようにしている
+                minHeight: "32px", flexShrink: 0, boxSizing: "border-box",
                 border: `1px solid ${isRiichi ? t.rd : t.bd}`,
                 background: isRiichi ? t.rd : "transparent",
                 color: isRiichi ? "#fff" : t.dm,
