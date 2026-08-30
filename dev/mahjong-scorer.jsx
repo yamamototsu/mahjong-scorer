@@ -5202,6 +5202,12 @@ input, select { padding: 10px 14px; }
         { q: "門前でツモあがりした時の基本符は？（ツモ符込み）", choices: ["20符","22符","30符"], answer: "22符" },
         { q: "ポンをした手でツモあがり。基本符は？", choices: ["20符","22符","30符"], answer: "22符" },
         { q: "鳴いてロンした時の基本符は？", choices: ["20符","25符","30符"], answer: "20符" },
+        { q: "あがった人全員につく「副底（フテイ）」は何符？", choices: ["20符","22符","30符"], answer: "20符" },
+        { q: "門前ロンだけにつく「門前加符」は何符？", choices: ["+2符","+4符","+10符"], answer: "+10符" },
+        { q: "ツモあがりにつく「ツモ符」は何符？", choices: ["+2符","+10符","+20符"], answer: "+2符" },
+        { q: "チーをした手でロンあがり。基本符は？", choices: ["20符","22符","30符"], answer: "20符" },
+        { q: "ポンとチーをした手でツモあがり。基本符は？", choices: ["20符","22符","32符"], answer: "22符" },
+        { q: "門前加符の10符がつくのはどれ？", choices: ["門前ロン","門前ツモ","鳴いてツモ"], answer: "門前ロン" },
       ]
     },
     {
@@ -5221,6 +5227,12 @@ input, select { padding: 10px 14px; }
         { q: "東を自力で3枚揃えた時（暗刻・么九牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
         { q: "9筒をポンした時（明刻・么九牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
         { q: "3索を自力で3枚揃えた時（暗刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
+        { q: "1萬を自力で3枚揃えた時（暗刻・么九牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
+        { q: "7索をポンした時（明刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "2符" },
+        { q: "中をポンした時（明刻・么九牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
+        { q: "8萬を自力で3枚揃えた時（暗刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
+        { q: "同じ牌の3枚組でも、符が多いのはどちら？", choices: ["明刻（ポンした方）","暗刻（自力で揃えた方）","どちらも同じ"], answer: "暗刻（自力で揃えた方）" },
+        { q: "符がいちばん高い刻子はどれ？", choices: ["中張牌の暗刻（4符）","么九牌の明刻（4符）","么九牌の暗刻（8符）"], answer: "么九牌の暗刻（8符）" },
       ]
     },
     {
@@ -5239,6 +5251,13 @@ input, select { padding: 10px 14px; }
         { q: "6萬を明槓した時（中張牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
         { q: "白を暗槓した時（么九牌）の符は？", choices: ["16符","32符","64符"], answer: "32符" },
         { q: "1萬を明槓した時（么九牌）の符は？", choices: ["8符","16符","32符"], answer: "16符" },
+        { q: "4索を暗槓した時（中張牌）の符は？", choices: ["8符","16符","32符"], answer: "16符" },
+        { q: "9萬を暗槓した時（么九牌）の符は？", choices: ["16符","32符","64符"], answer: "32符" },
+        { q: "發を明槓した時（么九牌）の符は？", choices: ["8符","16符","32符"], answer: "16符" },
+        { q: "2筒を明槓した時（中張牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
+        { q: "槓子の符は、同じ牌の刻子の何倍？", choices: ["2倍","3倍","4倍"], answer: "4倍" },
+        { q: "符がいちばん高い槓子はどれ？", choices: ["中張牌の暗槓（16符）","么九牌の明槓（16符）","么九牌の暗槓（32符）"], answer: "么九牌の暗槓（32符）" },
+        { q: "中張牌の暗槓と么九牌の明槓、符が多いのはどちら？", choices: ["中張牌の暗槓","么九牌の明槓","どちらも16符で同じ"], answer: "どちらも16符で同じ" },
       ]
     },
     {
@@ -5259,6 +5278,12 @@ input, select { padding: 10px 14px; }
         { q: "カンチャン待ち（例: 46で5待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符" },
         { q: "タンキ待ち（雀頭の1枚待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符" },
         { q: "シャンポン待ちの符は？", choices: ["0符","2符","4符"], answer: "0符" },
+        { q: "ペンチャン待ち（例: 12で3待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符" },
+        { q: "45を持っていて3でも6でもあがれる形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "0符" },
+        { q: "79を持っていて8だけを待つ形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "2符" },
+        { q: "89を持っていて7だけを待つ形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "2符" },
+        { q: "この中で符がつかない待ちはどれ？", choices: ["両面待ち","カンチャン待ち","ペンチャン待ち"], answer: "両面待ち" },
+        { q: "雀頭になる牌をあと1枚だけ待っている形を何という？", choices: ["タンキ待ち","シャンポン待ち","カンチャン待ち"], answer: "タンキ待ち" },
       ]
     },
     {
@@ -5276,6 +5301,13 @@ input, select { padding: 10px 14px; }
         { q: "5萬が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
         { q: "白が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
         { q: "自分の風牌が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
+        { q: "中が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
+        { q: "9索が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
+        { q: "場風でも自風でもない風牌（オタ風）が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
+        { q: "場風の牌が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
+        { q: "1筒が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
+        { q: "雀頭で2符がつくのはどれ？", choices: ["数牌（1〜9）","オタ風","三元牌（白・發・中）"], answer: "三元牌（白・發・中）" },
+        { q: "数牌の雀頭とオタ風の雀頭、符が多いのはどちら？", choices: ["数牌","オタ風","どちらも0符で同じ"], answer: "どちらも0符で同じ" },
       ]
     },
     {
@@ -5284,15 +5316,21 @@ input, select { padding: 10px 14px; }
         { type: "text", text: "全てを組み合わせた符計算に挑戦！合計を10符単位に切り上げます。" },
         { type: "box", items: [
           "基本符 + 面子の符 + 待ちの符 + 雀頭の符",
-          "→ 合計を10の倍数に切り上げ",
+          "→ 10の倍数に切り上げる",
           "例: 30 + 4 + 2 + 0 = 36 → 40符",
         ]},
       ],
       questions: [
-        { q: "門前ロン、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？\n(30+4+0+0=34→切上)", choices: ["30符","40符","50符"], answer: "40符" },
-        { q: "ツモ、暗刻(么九)1つ、カンチャン待ち、役牌雀頭。合計符は？\n(20+2+8+2+2=34→切上)", choices: ["30符","40符","50符"], answer: "40符" },
-        { q: "門前ロン、暗刻(么九)2つ、タンキ待ち、数牌雀頭。合計符は？\n(30+8+8+2+0=48→切上)", choices: ["40符","50符","60符"], answer: "50符" },
-        { q: "ロン（ポンあり）、明刻(中張)1つ、明刻(么九)1つ、両面、数牌雀頭。符は？\n※鳴いているので門前加符なし → 基本20符\n(20+2+4+0+0=26→切上)", choices: ["30符","40符","50符"], answer: "30符" },
+        { q: "門前ロン、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符" },
+        { q: "ツモ、暗刻(么九)1つ、カンチャン待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符" },
+        { q: "門前ロン、暗刻(么九)2つ、タンキ待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符" },
+        { q: "ロン（ポンあり）、明刻(中張)1つ、明刻(么九)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符" },
+        { q: "門前ロン、暗刻(么九)1つ、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符" },
+        { q: "門前ツモ、暗槓(么九)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["50符","60符","70符"], answer: "60符" },
+        { q: "ロン（チーあり）、明刻(么九)1つ、ペンチャン待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符" },
+        { q: "門前ツモ、暗刻(中張)2つ、シャンポン待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符" },
+        { q: "門前ロン、暗槓(中張)1つ、カンチャン待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符" },
+        { q: "ツモ（ポンあり）、明刻(么九)2つ、両面待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符" },
       ]
     },
   ];
@@ -5331,9 +5369,11 @@ input, select { padding: 10px 14px; }
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 20 }}>{cleared ? "✅" : locked ? "🔒" : "📖"}</span>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: locked ? t.dm : t.tx }}>{l.title}</div>
-                    <div style={{ fontSize: 11, color: t.dm }}>{l.questions.length}問のテスト</div>
+                  <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                    {/* 「レベル1: 基本符…」は狭い画面で半端に折り返すので、番号と名前で行を分ける */}
+                    <div style={{ fontSize: 11, fontWeight: 700, color: t.dm }}>{l.title.split(": ")[0]}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: locked ? t.dm : t.tx }}>{l.title.split(": ").slice(1).join(": ")}</div>
+                    <div style={{ fontSize: 11, color: t.dm, marginTop: 2 }}>{l.questions.length}問のテスト</div>
                   </div>
                 </div>
               </button>
@@ -5348,13 +5388,13 @@ input, select { padding: 10px 14px; }
       return (
         <div style={body}>
           <button style={backBtn} onClick={() => setFuLessonPhase("menu")}>← レベル選択</button>
-          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16 }}>{lesson.title}</div>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, textWrap: "balance" }}>{lesson.title}</div>
           <div style={card}>
             {lesson.content.map((c, ci) => {
-              if (c.type === "text") return <div key={ci} style={{ fontSize: 14, lineHeight: 1.8, marginBottom: 12, color: t.tx }}>{c.text}</div>;
+              if (c.type === "text") return <div key={ci} style={{ fontSize: 14, lineHeight: 1.8, marginBottom: 12, color: t.tx, textWrap: "balance" }}>{c.text}</div>;
               if (c.type === "box") return (
                 <div key={ci} style={{ background: t.sf, borderRadius: 10, padding: 12, marginBottom: 12 }}>
-                  {c.items.map((item, ii) => <div key={ii} style={{ fontSize: 13, lineHeight: 1.8, color: t.tx, padding: "2px 0" }}>{item}</div>)}
+                  {c.items.map((item, ii) => <div key={ii} style={{ fontSize: 13, lineHeight: 1.8, color: t.tx, padding: "2px 0", textWrap: "balance" }}>{item}</div>)}
                 </div>
               );
               return null;
@@ -5380,7 +5420,8 @@ input, select { padding: 10px 14px; }
             <div style={{ height: 4, background: t.ac, borderRadius: 2, width: `${(fuTestIdx / lesson.questions.length) * 100}%`, transition: "width 0.3s" }} />
           </div>
           <div style={card}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, lineHeight: 1.6, whiteSpace: "pre-line" }}>{q.q}</div>
+            {/* 設問は長さがまちまちなので、行の長さをそろえて最後の行だけ極端に短くならないようにする */}
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, lineHeight: 1.6, whiteSpace: "pre-line", textWrap: "balance" }}>{q.q}</div>
             {!fuTestRevealed ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {q.choices.map(ch => (
@@ -5423,7 +5464,7 @@ input, select { padding: 10px 14px; }
         <div style={body}>
           <div style={{ textAlign: "center", padding: "24px 0 16px" }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>{passed ? "🎉" : "📚"}</div>
-            <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>{lesson.title}</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px", textWrap: "balance" }}>{lesson.title}</h2>
             <p style={{ fontSize: 13, color: t.dm }}>{passed ? "クリア！次のレベルが解放されました" : "70%以上で合格です。もう一度挑戦！"}</p>
           </div>
           <div style={{ ...card, textAlign: "center" }}>
