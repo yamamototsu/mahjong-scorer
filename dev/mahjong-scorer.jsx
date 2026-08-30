@@ -709,20 +709,6 @@ export default function MahjongScorer() {
   // ただし規定半荘数に届かない人は順位に入れない（下に回す）。
   const PONZUKE_MIN_GAMES = 16;
   const PONZUKE_UMA = [30, 10, -10, -30];
-  // ── 人数ごとのおすすめルール ──
-  // 1人あたり PONZUKE_MIN_GAMES 半荘は打てるように、リーグ全体の半荘数を決める。
-  // 席数ちょうどの人数なら全員が同じ半荘数を打つので、総合ポイントで足りる。
-  const recommendedLeagueRule = (memberCount, pc) => {
-    const per = pc === 3 ? 12 : PONZUKE_MIN_GAMES;   // 1人あたりの目安
-    if (memberCount <= pc) {
-      return { targetCount: per, minGames: 0, scoring: "total", scoringN: 10, per };
-    }
-    return {
-      targetCount: Math.min(100, Math.ceil(memberCount * per / pc)),
-      minGames: per, scoring: "avg", scoringN: 10, per,
-    };
-  };
-
   const newPonzukeDraft = () => {
     const d = newLeagueDraft();
     return {
@@ -7948,79 +7934,9 @@ input, select { padding: 10px 14px; }
           }}>👤 名前を追加・編集する</button>
         </div>
 
-        {/* 人数に合わせたおすすめルール。メンバーを選び直すと中身も変わる */}
-        {d.members.length >= lgPC && (() => {
-          const rec = recommendedLeagueRule(d.members.length, lgPC);
-          const mode = SCORING_MODES.find(m => m.key === rec.scoring);
-          const same = d.targetCount === rec.targetCount
-            && (d.minGames ?? 0) === rec.minGames
-            && (d.scoring || "total") === rec.scoring;
-          const perHead = Math.floor(rec.targetCount * lgPC / d.members.length);
-          const row = (label, value) => (
-            <div key={label} style={{ display: "flex", gap: 10, padding: "5px 0", alignItems: "baseline" }}>
-              <span style={{ flex: "0 0 92px", fontSize: 11, color: t.dm }}>{label}</span>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 800, color: t.tx, lineHeight: 1.7 }}>{value}</span>
-            </div>
-          );
-          return (
-            <div style={{
-              padding: "14px 15px", marginBottom: 12, borderRadius: 13,
-              background: t.gdS, border: `1px solid ${t.gd}55`,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: t.gd, marginBottom: 3 }}>
-                🏅 {d.members.length}人ならこの設定がおすすめ
-              </div>
-              <div style={{ fontSize: 11, color: t.dm, marginBottom: 9, lineHeight: 1.8 }}>
-                {d.members.length === lgPC
-                  ? `メンバーが${lgPC}人なので全員が毎回出ます。打った数が同じなので総合ポイントで足ります`
-                  : `毎回${d.members.length - lgPC}人が休みます。打った数がずれるので平均ポイントで比べます`}
-              </div>
-              <div style={{ borderTop: `1px solid ${t.gd}33`, paddingTop: 4 }}>
-                {row("何半荘やるか", `${rec.targetCount}半荘`)}
-                {row("最低半荘数", rec.minGames > 0 ? `1人 ${rec.minGames}半荘以上` : "なし（全員が同じ数を打つため）")}
-                {row("計算方式", mode.needN ? mode.label.replace("◯", String(rec.scoringN)) : mode.label)}
-                {row("1人あたり", `およそ${perHead}半荘ずつ（${rec.targetCount}半荘 × ${lgPC}人 ÷ ${d.members.length}人）`)}
-              </div>
-              <button onClick={() => set({
-                targetCount: rec.targetCount, minGames: rec.minGames,
-                scoring: rec.scoring, scoringN: rec.scoringN,
-              })} disabled={same} style={{
-                width: "100%", marginTop: 11, padding: "13px 8px", borderRadius: 10,
-                border: `1px solid ${t.gd}`, background: same ? "transparent" : t.gd,
-                color: same ? t.dm : "#1a1a1a", fontSize: 14, fontWeight: 800,
-                cursor: same ? "default" : "pointer", opacity: same ? 0.6 : 1,
-              }}>{same ? "この設定になっています" : "この設定にする"}</button>
-            </div>
-          );
-        })()}
-
-        {/* 何半荘やるか（リーグ全体） */}
-        <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>3. 何半荘やるか</div>
-          <div style={{ fontSize: 11, color: t.dm, marginBottom: 8 }}>リーグ全体で打つ数（2〜100）</div>
-          <select
-            value={d.targetCount}
-            onChange={e => set({ targetCount: parseInt(e.target.value, 10) })}
-            style={{ ...selectStyle, fontSize: 17, fontWeight: 800, padding: "14px 12px", textAlign: "center" }}
-          >
-            {Array.from({ length: 99 }, (_, i) => i + 2).map(n => (
-              <option key={n} value={n}>{n} 半荘</option>
-            ))}
-          </select>
-          <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
-            この数に達すると自動で終了になります。
-            {d.members.length >= lgPC && (() => {
-              const per = Math.floor(d.targetCount * lgPC / d.members.length);
-              return d.members.length === lgPC
-                ? `メンバー${lgPC}人なら全員が${d.targetCount}半荘ずつ打ちます`
-                : `メンバー${d.members.length}人なら1人あたり およそ${per}半荘ずつ（${d.targetCount} × ${lgPC} ÷ ${d.members.length}）`;
-            })()}
-          </div>
-        </div>
-
         {/* 1人あたりの最低半荘数（規定） */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>4. 最低何半荘やるか</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>3. 最低何半荘やるか</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.8 }}>
             1人あたりの規定半荘数。これに届かない人は順位に入れず、成績表の下に参考として出します
           </div>
@@ -8031,22 +7947,11 @@ input, select { padding: 10px 14px; }
               <option key={n} value={n}>{n === 0 ? "なし（1半荘から）" : `${n} 半荘以上`}</option>
             ))}
           </select>
-          {/* 規定に全員を届かせるのに必要な半荘数の目安 */}
-          {(d.minGames ?? 0) > 0 && d.members.length >= lgPC && (() => {
-            const need = Math.ceil(d.members.length * d.minGames / lgPC);
-            return (
-              <div style={{ fontSize: 10, color: need > d.targetCount ? t.gd : t.dm, marginTop: 8, lineHeight: 1.8 }}>
-                {`全員が規定${d.minGames}半荘に届くには ${need}半荘 くらい必要です`}
-                {`（${d.members.length}人 × ${d.minGames}半荘 ÷ ${lgPC}人）`}
-                {need > d.targetCount && `。今は上の「何半荘やるか」が${d.targetCount}半荘です`}
-              </div>
-            );
-          })()}
         </div>
 
         {/* 点数の計算方式 */}
         <div style={{ ...card, padding: 16, marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. 点数の計算方式</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>4. 点数の計算方式</div>
           <div style={{ fontSize: 11, color: t.dm, marginBottom: 10 }}>成績表で誰を上位にするか</div>
           {SCORING_MODES.map(o => {
             const on = (d.scoring || "total") === o.key;
@@ -8094,6 +7999,61 @@ input, select { padding: 10px 14px; }
             {(d.scoring || "total") === "recent" &&
               `例）最後に打った${d.scoringN || 10}半荘ぶんだけで比べます。それより前の成績は順位に入りません。`}
             同じ点数のときは トップ率 → 素点平均 → 直接対決 の順で決めます
+          </div>
+        </div>
+
+        {/* ここまでの内容から、全体で何半荘やればよいかの目安を出す */}
+        {d.members.length >= lgPC && (d.minGames ?? 0) > 0 && (() => {
+          const need = Math.min(100, Math.ceil(d.members.length * d.minGames / lgPC));
+          const same = d.targetCount === need;
+          return (
+            <div style={{
+              padding: "14px 15px", marginBottom: 12, borderRadius: 13,
+              background: t.gdS, border: `1px solid ${t.gd}55`,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: t.gd, marginBottom: 6 }}>
+                🏅 おすすめの全対局数
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 26, fontWeight: 900, color: t.tx, lineHeight: 1.2 }}>{need}</span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: t.tx }}>半荘</span>
+              </div>
+              <div style={{ fontSize: 11, color: t.dm, marginTop: 6, lineHeight: 1.9 }}>
+                {`全員が最低${d.minGames}半荘打つのに必要な数です`}
+                <br />
+                {`メンバー${d.members.length}人 × ${d.minGames}半荘 ÷ ${lgPC}人 = ${need}半荘`}
+              </div>
+              <button onClick={() => set({ targetCount: need })} disabled={same} style={{
+                width: "100%", marginTop: 11, padding: "13px 8px", borderRadius: 10,
+                border: `1px solid ${t.gd}`, background: same ? "transparent" : t.gd,
+                color: same ? t.dm : "#1a1a1a", fontSize: 14, fontWeight: 800,
+                cursor: same ? "default" : "pointer", opacity: same ? 0.6 : 1,
+              }}>{same ? "この数になっています" : `${need}半荘にする`}</button>
+            </div>
+          );
+        })()}
+
+        {/* 何半荘やるか（リーグ全体） */}
+        <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>5. 何半荘やるか</div>
+          <div style={{ fontSize: 11, color: t.dm, marginBottom: 8 }}>リーグ全体で打つ数（2〜100）</div>
+          <select
+            value={d.targetCount}
+            onChange={e => set({ targetCount: parseInt(e.target.value, 10) })}
+            style={{ ...selectStyle, fontSize: 17, fontWeight: 800, padding: "14px 12px", textAlign: "center" }}
+          >
+            {Array.from({ length: 99 }, (_, i) => i + 2).map(n => (
+              <option key={n} value={n}>{n} 半荘</option>
+            ))}
+          </select>
+          <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
+            この数に達すると自動で終了になります。
+            {d.members.length >= lgPC && (() => {
+              const per = Math.floor(d.targetCount * lgPC / d.members.length);
+              return d.members.length === lgPC
+                ? `メンバー${lgPC}人なら全員が${d.targetCount}半荘ずつ打ちます`
+                : `メンバー${d.members.length}人なら1人あたり およそ${per}半荘ずつ（${d.targetCount} × ${lgPC} ÷ ${d.members.length}）`;
+            })()}
           </div>
         </div>
 
