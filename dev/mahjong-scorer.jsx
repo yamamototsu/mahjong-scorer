@@ -3287,18 +3287,83 @@ export default function MahjongScorer() {
     );
   };
 
-  const ScoreDisplay = ({ han, fu, limit, result, tsumo, parent, extra, pc }) => {
+  const ScoreDisplay = ({ han, fu, limit, result, tsumo, parent, extra, pc, winnerName, loserName, honbaAdd, sticks }) => {
     const nPC = pc || PC;   // 一局計算のように対局外から呼ぶときは人数を渡す
-    return (
-    <div style={{ background: `linear-gradient(135deg, ${t.card}, ${t.sf})`, borderRadius: 16, padding: 24, textAlign: "center", border: `1px solid ${t.ac}33`, marginBottom: 14 }}>
-      {limit && <div style={{ display: "inline-block", padding: "4px 18px", borderRadius: 20, fontSize: 14, fontWeight: 800, background: han >= 13 ? t.gdS : t.acS, color: han >= 13 ? t.gd : t.ac, marginBottom: 12 }}>{limit}</div>}
+    // あがった人の名前が渡されたときだけ「受け取る点数」の見せ方にする。
+    // 一局計算からは名前も本場もリーチ棒も無いので、これまで通りの表示のまま
+    const inGame = !!winnerName;
+    const hbAdd = honbaAdd || 0;
+    const st = sticks || 0;
+    const receive = result.total + hbAdd;
+    // 三人麻雀は子のツモも全員が同額なので、親ツモと同じ見せ方にする
+    const evenTsumo = tsumo && (parent || (result.fromChild != null && result.fromChild === result.fromParent));
+    const eachAmt = () => (result.each != null ? result.each : result.fromChild);
+    const headLine = (
       <div style={{ fontSize: 13, color: t.dm, marginBottom: 10 }}>
         {han >= 13 ? getLimitName(han) : han >= 5 ? `${han}翻` : `${han}翻 ${fu}符`} / {tsumo ? "ツモ" : "ロン"} / {parent ? "親" : "子"}
       </div>
+    );
+    const limitBadge = limit && <div style={{ display: "inline-block", padding: "4px 18px", borderRadius: 20, fontSize: 14, fontWeight: 800, background: han >= 13 ? t.gdS : t.acS, color: han >= 13 ? t.gd : t.ac, marginBottom: 12 }}>{limit}</div>;
+    const card = { background: `linear-gradient(135deg, ${t.card}, ${t.sf})`, borderRadius: 16, padding: 24, textAlign: "center", border: `1px solid ${t.ac}33`, marginBottom: 14 };
+
+    if (inGame) {
+      // 内訳の行。ロンは「◯◯から」の1行が和了点そのものなので「合計」を重ねて出さない
+      const rows = [];
+      if (tsumo) {
+        rows.push({ lb: "合計", v: result.total.toLocaleString(), c: t.tx });
+        if (evenTsumo) rows.push({ lb: "全員から", v: `${eachAmt().toLocaleString()}×${nPC - 1}`, c: t.gd });
+        else {
+          rows.push({ lb: "子から", v: `${result.fromChild.toLocaleString()}${nPC - 2 >= 2 ? `×${nPC - 2}` : ""}`, c: t.ac });
+          rows.push({ lb: "親から", v: result.fromParent.toLocaleString(), c: t.gd });
+        }
+      } else {
+        rows.push({ lb: loserName ? `${loserName}から` : "放銃者から", v: result.total.toLocaleString(), c: t.tx });
+      }
+      if (hbAdd > 0) rows.push({ lb: "本場", v: `+${hbAdd.toLocaleString()}`, c: t.gd });
+      if (st > 0) rows.push({ lb: "リーチ棒", v: `${st}本 (+${(st * 1000).toLocaleString()})`, c: t.ac });
+      return (
+        <div style={card}>
+          {limitBadge}
+          {headLine}
+          {/* あがった人。長い名前でも枠から出ないように省略する */}
+          <div style={{
+            fontSize: 17, fontWeight: 800, color: t.tx, marginBottom: 6,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%",
+          }}>{winnerName} {tsumo ? "ツモ" : `← ${loserName}`}</div>
+          {/* 実際に受け取る点数（和了点＋本場）。リーチ棒は点に混ぜず本数で添える */}
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
+              {receive.toLocaleString()}
+              <span style={{ fontSize: 16, fontWeight: 800, color: t.dm, marginLeft: 3 }}>点</span>
+            </span>
+            {st > 0 && (
+              <span style={{ fontSize: 15, fontWeight: 800, color: t.ac, whiteSpace: "nowrap" }}>
+                ＋リーチ棒{st}本
+              </span>
+            )}
+          </div>
+          {/* 内訳 */}
+          <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${t.bd}` }}>
+            <div style={{ fontSize: 11, color: t.dm, fontWeight: 700, textAlign: "left", marginBottom: 4 }}>内訳</div>
+            {rows.map((r, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, padding: "4px 0" }}>
+                <span style={{ fontSize: 13, color: t.dm, fontWeight: 700, textAlign: "left", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lb}</span>
+                <span style={{ fontSize: 16, fontWeight: 900, color: r.c, whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.v}</span>
+              </div>
+            ))}
+          </div>
+          {extra}
+        </div>
+      );
+    }
+
+    return (
+    <div style={card}>
+      {limitBadge}
+      {headLine}
 
       {tsumo ? (
-        /* 三人麻雀は子のツモも全員が同額なので、親ツモと同じ見せ方にする */
-        (parent || (result.fromChild != null && result.fromChild === result.fromParent)) ? (
+        evenTsumo ? (
           /* 親ツモ: 全員から同額 */
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10 }}>
@@ -3308,7 +3373,7 @@ export default function MahjongScorer() {
             <div style={{ padding: "12px 0", borderTop: `1px solid ${t.bd}`, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12 }}>
               <span style={{ fontSize: 18, color: t.gd, fontWeight: 800 }}>全員から</span>
               <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1.1 }}>
-                {(result.each != null ? result.each : result.fromChild).toLocaleString()}
+                {eachAmt().toLocaleString()}
                 <span style={{ fontSize: 15, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{nPC - 1}</span>
               </span>
             </div>
@@ -6546,19 +6611,26 @@ input, select { padding: 10px 14px; }
     return { flows, pool, total };
   };
 
+  // あがった人が本場でもらう実額。1本場の点数はルール次第（HU）で、
+  // ツモは人数で割って集めるため端数が出る。表示は必ずこの実額に合わせる
+  const honbaGet = () => {
+    const payers = PC - 1;
+    const hb = honba * HU();
+    return gTsumo ? Math.floor(hb / payers) * payers : (gLoser !== null ? hb : 0);
+  };
+  // 卓に出ているリーチ棒の本数（前局からの供託＋この局のウィザード入力ぶん）
+  const riichiSticks = () => riichiBets + gRiichi.filter(Boolean).length;
+
   // 点数・本場・リーチ棒を分けて見せる内訳。分けるものが無ければ出さない
   const PayBreakdown = () => {
     if (gWinner === null || !gResult) return null;
     const { pool, total } = payInfo();
-    const payers = PC - 1;
-    const hb = honba * HU();
-    // ツモは本場を人数で割って払うので、端数を切った実際の受け取り額で示す
-    const honbaTotal = gTsumo ? Math.floor(hb / payers) * payers : (gLoser !== null ? hb : 0);
+    const honbaTotal = honbaGet();
     const base = total - pool - honbaTotal;
     if (honbaTotal <= 0 && pool <= 0) return null;
     const parts = [
       { lb: "和了点", amt: base, c: t.tx },
-      ...(honbaTotal > 0 ? [{ lb: `積み棒 ${honba}本`, amt: honbaTotal, c: t.gd }] : []),
+      ...(honbaTotal > 0 ? [{ lb: `${honba}本場`, amt: honbaTotal, c: t.gd }] : []),
       ...(pool > 0 ? [{ lb: `リーチ棒 ${pool / 1000}本`, amt: pool, c: t.ac }] : []),
     ];
     return (
@@ -6634,25 +6706,25 @@ input, select { padding: 10px 14px; }
           </svg>
 
 
-          {/* 各席のパネル。和了点・リーチ棒・積み棒を行で分けて示す */}
+          {/* 各席のパネル。和了点・リーチ棒・本場を行で分けて示す */}
           {Array.from({ length: PC }, (_, i) => i).map(i => {
             const pos = posOf(i);
             const isWin = i === gWinner;
             const f = flows.find(x => x.from === i);
             const hb2 = honba * HU();
-            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の積み棒ぶん
-            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る積み棒ぶん
+            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の本場ぶん
+            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る本場ぶん
             // この局にリーチ棒を出した人（卓上の宣言・ウィザード入力のどちらでも）
             const decl = !!(declaredRiichi[i] || gRiichi[i]);
             const sticks = pool / 1000;   // 卓に出ているリーチ棒の本数（前局からの供託を含む）
-            // 並びは 和了点 → 積み棒 → 合計 → リーチ棒。
-            // 合計は和了点と積み棒の小計で、供託のやりとりであるリーチ棒は含めない
+            // 並びは 和了点 → 本場 → 合計 → リーチ棒。
+            // 合計は和了点と本場の小計で、供託のやりとりであるリーチ棒は含めない
             const rows = [];
             if (isWin) rows.push({ lb: "和了点", v: total - pool - hbGet });
             else if (f) rows.push({ lb: "和了点", v: -(f.amt - hbPay) });
-            if (isWin ? hbGet > 0 : (f && hbPay > 0)) rows.push({ lb: "積み棒", v: isWin ? hbGet : -hbPay });
+            if (isWin ? hbGet > 0 : (f && hbPay > 0)) rows.push({ lb: "本場", v: isWin ? hbGet : -hbPay });
             const sub = rows.reduce((a, r) => a + r.v, 0);
-            // 積み棒が無いときは和了点がそのまま合計なので、同じ数字を2行出さない
+            // 本場が無いときは和了点がそのまま合計なので、同じ数字を2行出さない
             if (rows.length >= 2) rows.push({ lb: "合計", v: sub, strong: true });
             // リーチ棒は点数ではなく本数で示す。卓上で宣言した人は宣言した時点で
             // 1,000点を引いてあり、ウィザードで後から入力した人は精算時に引く。
@@ -6686,7 +6758,7 @@ input, select { padding: 10px 14px; }
                   {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.2, flexShrink: 0 }}>親</span>}
                 </div>
                 {/* 内訳の行（ラベル左・金額右）。動きの無い席は 0 を1行だけ出す。
-                    和了点・積み棒・合計・リーチ棒の4行になると枠に収まらないので、
+                    和了点・本場・合計・リーチ棒の4行になると枠に収まらないので、
                     そのときだけ字送りと文字を詰める */}
                 {(rows.length ? rows : [{ lb: "和了点", v: 0 }]).map((r2, k2, arr) => {
                   // 「本人分含む」の注記が入る分も行数に数える
@@ -10688,8 +10760,8 @@ input, select { padding: 10px 14px; }
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
     // 席順: players[0]=手前, [1]=右, [2]=向かい, [3]=左（反時計回り＝下家が右）
     // 卓（正方形）の一辺に対する比率で決める。端末サイズが変わっても重ならない
-    const PW = "37cqmin";   // パネルの長辺
-    const PH = "27cqmin";   // パネルの短辺（点数とリーチボタンの間を空けた分だけ広げてある）
+    const PW = "36cqmin";   // パネルの長辺
+    const PH = "28cqmin";   // パネルの短辺（名前・点数・リーチの間を空けた分だけ広げてある）
     const PGAP = "3cqmin"; // 卓のふちからの余白
 
     // サイコロの結果で割る山の持ち主
@@ -10719,7 +10791,7 @@ input, select { padding: 10px 14px; }
           width: PW, height: PH,
           // 通常時は内側の余白を詰める。名前・風/点数・リーチの3段が
           // はみ出さずに収まる幅を確保するため（横 3.5→2.4 / 縦 3→0.9）
-          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "0.9cqmin 2.4cqmin", borderRadius: "3.5cqmin",
+          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "0.7cqmin 2.4cqmin", borderRadius: "3.5cqmin",
           // 親は外枠だけ黄色に。背景は他家と同じ
           background: (tmWinStep || tmDrawMode) ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: (tmWinStep || tmDrawMode) ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
@@ -10857,13 +10929,13 @@ input, select { padding: 10px 14px; }
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   lineHeight: 1.2, textAlign: "center", width: "100%", flexShrink: 0,
                 }}>{players[i]}</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.2cqmin", marginTop: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1cqmin", marginTop: "1cqmin" }}>
                   <span style={{
                     fontSize: "3.9cqmin", fontWeight: 900, lineHeight: 1,
                     color: isDealer ? "#1a1a1a" : t.tx,
                     background: isDealer ? t.gd : t.sf,
                     border: `1px solid ${isDealer ? t.gd : t.bd}`,
-                    borderRadius: "1.6cqmin", padding: "0.8cqmin 1.3cqmin", flexShrink: 0,
+                    borderRadius: "1.6cqmin", padding: "0.5cqmin 1cqmin", flexShrink: 0,
                   }}>{seatWind}</span>
                   <span style={{
                     fontSize: "5.3cqmin", fontWeight: 900, lineHeight: 1.1, flexShrink: 0,
@@ -10883,7 +10955,7 @@ input, select { padding: 10px 14px; }
                 // 指で押せる高さ（32px以上）と読める文字を確保する。
                 // 卓上モードは cqmin が基本だが、狭い画面では潰れて押せなくなるため
                 // 高さと文字だけ最低値を持たせている（大小関係は名前・点数より小さいまま）
-                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "max(4px, 1.4cqmin)",
+                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "1.4cqmin",
                 // 余白を足した分だけ縦に潰されて文字が枠に貼りつかないよう、
                 // このボタンだけは縮まないようにしている
                 minHeight: "32px", flexShrink: 0, boxSizing: "border-box",
@@ -11780,7 +11852,7 @@ input, select { padding: 10px 14px; }
                           style={{ ...rowStyle, cursor: "pointer" }}>
                           <span style={{ fontSize: 12, color: t.dm }}>あがり方</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: gTsumo ? t.gn : t.rd }}>{gTsumo ? "ツモ" : "ロン"}{!gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: gTsumo ? t.gn : t.rd, textWrap: "balance" }}>{gTsumo ? "ツモ" : "ロン"}{!gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""}</span>
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
@@ -11821,22 +11893,8 @@ input, select { padding: 10px 14px; }
                   )}
                 </div>
                 <ScoreDisplay han={gHan} fu={gFu} limit={gLimit} result={gResult} tsumo={gTsumo} parent={gParent}
-                  extra={
-                    <>
-                      <div style={{ fontSize: 18, color: t.tx, marginTop: 8, fontWeight: 700 }}>
-                        {players[gWinner]} {gTsumo ? "ツモ" : `← ${players[gLoser]}`}
-                      </div>
-                      {(honba > 0 || riichiBets > 0 || gRiichi.some(Boolean)) && (
-                        <div style={{ fontSize: 12, color: t.dm, marginTop: 6, borderTop: `1px solid ${t.bd}`, paddingTop: 6 }}>
-                          {/* 1本場の点数はルールに従う（三麻連盟は600点）。実際の加算(HU)と表示を一致させる */}
-                          {honba > 0 && `本場 +${(honba * HU()).toLocaleString()}`}
-                          {honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / "}
-                          {(riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`}
-                        </div>
-                      )}
-                    </>
-                  }
-                />
+                  winnerName={players[gWinner]} loserName={gLoser !== null ? players[gLoser] : null}
+                  honbaAdd={honbaGet()} sticks={riichiSticks()} />
                 {/* 点数の受け渡し（開かなくても最初から見えるように埋め込む。タップで大きく表示） */}
                 <div onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
                   <PayTableBox boxW="min(100vw - 32px, 400px)" />

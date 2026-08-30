@@ -5588,19 +5588,27 @@ function MahjongScorer() {
     tsumo,
     parent,
     extra,
-    pc
+    pc,
+    winnerName,
+    loserName,
+    honbaAdd,
+    sticks
   }) => {
     const nPC = pc || PC;
-    return React.createElement("div", {
+    const inGame = !!winnerName;
+    const hbAdd = honbaAdd || 0;
+    const st = sticks || 0;
+    const receive = result.total + hbAdd;
+    const evenTsumo = tsumo && (parent || result.fromChild != null && result.fromChild === result.fromParent);
+    const eachAmt = () => result.each != null ? result.each : result.fromChild;
+    const headLine = React.createElement("div", {
       style: {
-        background: `linear-gradient(135deg, ${t.card}, ${t.sf})`,
-        borderRadius: 16,
-        padding: 24,
-        textAlign: "center",
-        border: `1px solid ${t.ac}33`,
-        marginBottom: 14
+        fontSize: 13,
+        color: t.dm,
+        marginBottom: 10
       }
-    }, limit && React.createElement("div", {
+    }, han >= 13 ? getLimitName(han) : han >= 5 ? `${han}翻` : `${han}翻 ${fu}符`, " / ", tsumo ? "ツモ" : "ロン", " / ", parent ? "親" : "子");
+    const limitBadge = limit && React.createElement("div", {
       style: {
         display: "inline-block",
         padding: "4px 18px",
@@ -5611,13 +5619,147 @@ function MahjongScorer() {
         color: han >= 13 ? t.gd : t.ac,
         marginBottom: 12
       }
-    }, limit), React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: t.dm,
-        marginBottom: 10
+    }, limit);
+    const card = {
+      background: `linear-gradient(135deg, ${t.card}, ${t.sf})`,
+      borderRadius: 16,
+      padding: 24,
+      textAlign: "center",
+      border: `1px solid ${t.ac}33`,
+      marginBottom: 14
+    };
+    if (inGame) {
+      const rows = [];
+      if (tsumo) {
+        rows.push({
+          lb: "合計",
+          v: result.total.toLocaleString(),
+          c: t.tx
+        });
+        if (evenTsumo) rows.push({
+          lb: "全員から",
+          v: `${eachAmt().toLocaleString()}×${nPC - 1}`,
+          c: t.gd
+        });else {
+          rows.push({
+            lb: "子から",
+            v: `${result.fromChild.toLocaleString()}${nPC - 2 >= 2 ? `×${nPC - 2}` : ""}`,
+            c: t.ac
+          });
+          rows.push({
+            lb: "親から",
+            v: result.fromParent.toLocaleString(),
+            c: t.gd
+          });
+        }
+      } else {
+        rows.push({
+          lb: loserName ? `${loserName}から` : "放銃者から",
+          v: result.total.toLocaleString(),
+          c: t.tx
+        });
       }
-    }, han >= 13 ? getLimitName(han) : han >= 5 ? `${han}翻` : `${han}翻 ${fu}符`, " / ", tsumo ? "ツモ" : "ロン", " / ", parent ? "親" : "子"), tsumo ? (parent || result.fromChild != null && result.fromChild === result.fromParent ? React.createElement("div", {
+      if (hbAdd > 0) rows.push({
+        lb: "本場",
+        v: `+${hbAdd.toLocaleString()}`,
+        c: t.gd
+      });
+      if (st > 0) rows.push({
+        lb: "リーチ棒",
+        v: `${st}本 (+${(st * 1000).toLocaleString()})`,
+        c: t.ac
+      });
+      return React.createElement("div", {
+        style: card
+      }, limitBadge, headLine, React.createElement("div", {
+        style: {
+          fontSize: 17,
+          fontWeight: 800,
+          color: t.tx,
+          marginBottom: 6,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: "100%"
+        }
+      }, winnerName, " ", tsumo ? "ツモ" : `← ${loserName}`), React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "center",
+          gap: 8,
+          flexWrap: "wrap"
+        }
+      }, React.createElement("span", {
+        style: {
+          fontSize: 40,
+          fontWeight: 900,
+          color: t.ac,
+          lineHeight: 1.1,
+          fontVariantNumeric: "tabular-nums"
+        }
+      }, receive.toLocaleString(), React.createElement("span", {
+        style: {
+          fontSize: 16,
+          fontWeight: 800,
+          color: t.dm,
+          marginLeft: 3
+        }
+      }, "点")), st > 0 && React.createElement("span", {
+        style: {
+          fontSize: 15,
+          fontWeight: 800,
+          color: t.ac,
+          whiteSpace: "nowrap"
+        }
+      }, "＋リーチ棒", st, "本")), React.createElement("div", {
+        style: {
+          marginTop: 14,
+          paddingTop: 10,
+          borderTop: `1px solid ${t.bd}`
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          fontWeight: 700,
+          textAlign: "left",
+          marginBottom: 4
+        }
+      }, "内訳"), rows.map((r, i) => React.createElement("div", {
+        key: i,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 10,
+          padding: "4px 0"
+        }
+      }, React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: t.dm,
+          fontWeight: 700,
+          textAlign: "left",
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, r.lb), React.createElement("span", {
+        style: {
+          fontSize: 16,
+          fontWeight: 900,
+          color: r.c,
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          fontVariantNumeric: "tabular-nums"
+        }
+      }, r.v)))), extra);
+    }
+    return React.createElement("div", {
+      style: card
+    }, limitBadge, headLine, tsumo ? evenTsumo ? React.createElement("div", {
       style: {
         display: "flex",
         flexDirection: "column",
@@ -5665,7 +5807,7 @@ function MahjongScorer() {
         color: t.gd,
         lineHeight: 1.1
       }
-    }, (result.each != null ? result.each : result.fromChild).toLocaleString(), React.createElement("span", {
+    }, eachAmt().toLocaleString(), React.createElement("span", {
       style: {
         fontSize: 15,
         fontWeight: 800,
@@ -5760,7 +5902,7 @@ function MahjongScorer() {
         minWidth: "min(110px, 30vw)",
         textAlign: "left"
       }
-    }, result.fromParent.toLocaleString())))) : React.createElement("div", null, React.createElement("div", {
+    }, result.fromParent.toLocaleString()))) : React.createElement("div", null, React.createElement("div", {
       style: {
         fontSize: 48,
         fontWeight: 900,
@@ -12395,15 +12537,19 @@ input, select { padding: 10px 14px; }
       total
     };
   };
+  const honbaGet = () => {
+    const payers = PC - 1;
+    const hb = honba * HU();
+    return gTsumo ? Math.floor(hb / payers) * payers : gLoser !== null ? hb : 0;
+  };
+  const riichiSticks = () => riichiBets + gRiichi.filter(Boolean).length;
   const PayBreakdown = () => {
     if (gWinner === null || !gResult) return null;
     const {
       pool,
       total
     } = payInfo();
-    const payers = PC - 1;
-    const hb = honba * HU();
-    const honbaTotal = gTsumo ? Math.floor(hb / payers) * payers : gLoser !== null ? hb : 0;
+    const honbaTotal = honbaGet();
     const base = total - pool - honbaTotal;
     if (honbaTotal <= 0 && pool <= 0) return null;
     const parts = [{
@@ -12411,7 +12557,7 @@ input, select { padding: 10px 14px; }
       amt: base,
       c: t.tx
     }, ...(honbaTotal > 0 ? [{
-      lb: `積み棒 ${honba}本`,
+      lb: `${honba}本場`,
       amt: honbaTotal,
       c: t.gd
     }] : []), ...(pool > 0 ? [{
@@ -12565,7 +12711,7 @@ input, select { padding: 10px 14px; }
         v: -(f.amt - hbPay)
       });
       if (isWin ? hbGet > 0 : f && hbPay > 0) rows.push({
-        lb: "積み棒",
+        lb: "本場",
         v: isWin ? hbGet : -hbPay
       });
       const sub = rows.reduce((a, r) => a + r.v, 0);
@@ -19979,8 +20125,8 @@ input, select { padding: 10px 14px; }
   const renderTableMode = () => {
     const mrRule = (gameConfig || {}).rules?.multiRon || "atamahane";
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
-    const PW = "37cqmin";
-    const PH = "27cqmin";
+    const PW = "36cqmin";
+    const PH = "28cqmin";
     const PGAP = "3cqmin";
     const diceSum = diceVals[0] + diceVals[1];
     const wallTargetIdx = diceSettled || wallBlink ? (dealerIdx + (diceSum - 1)) % PC : -1;
@@ -20001,7 +20147,7 @@ input, select { padding: 10px 14px; }
         style: {
           width: PW,
           height: PH,
-          padding: tmWinStep || tmDrawMode ? "2cqmin" : "0.9cqmin 2.4cqmin",
+          padding: tmWinStep || tmDrawMode ? "2cqmin" : "0.7cqmin 2.4cqmin",
           borderRadius: "3.5cqmin",
           background: tmWinStep || tmDrawMode ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: tmWinStep || tmDrawMode ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
@@ -20280,8 +20426,8 @@ input, select { padding: 10px 14px; }
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: "1.2cqmin",
-          marginTop: 0
+          gap: "1cqmin",
+          marginTop: "1cqmin"
         }
       }, React.createElement("span", {
         style: {
@@ -20292,7 +20438,7 @@ input, select { padding: 10px 14px; }
           background: isDealer ? t.gd : t.sf,
           border: `1px solid ${isDealer ? t.gd : t.bd}`,
           borderRadius: "1.6cqmin",
-          padding: "0.8cqmin 1.3cqmin",
+          padding: "0.5cqmin 1cqmin",
           flexShrink: 0
         }
       }, seatWind), React.createElement("span", {
@@ -20323,7 +20469,7 @@ input, select { padding: 10px 14px; }
           padding: "2.4cqmin 1.2cqmin",
           borderRadius: "2cqmin",
           cursor: "pointer",
-          marginTop: "max(4px, 1.4cqmin)",
+          marginTop: "1.4cqmin",
           minHeight: "32px",
           flexShrink: 0,
           boxSizing: "border-box",
@@ -21998,7 +22144,8 @@ input, select { padding: 10px 14px; }
       style: {
         fontSize: 13,
         fontWeight: 700,
-        color: gTsumo ? t.gn : t.rd
+        color: gTsumo ? t.gn : t.rd,
+        textWrap: "balance"
       }
     }, gTsumo ? "ツモ" : "ロン", !gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""), React.createElement("span", {
       style: editTag
@@ -22121,22 +22268,10 @@ input, select { padding: 10px 14px; }
     result: gResult,
     tsumo: gTsumo,
     parent: gParent,
-    extra: React.createElement(React.Fragment, null, React.createElement("div", {
-      style: {
-        fontSize: 18,
-        color: t.tx,
-        marginTop: 8,
-        fontWeight: 700
-      }
-    }, players[gWinner], " ", gTsumo ? "ツモ" : `← ${players[gLoser]}`), (honba > 0 || riichiBets > 0 || gRiichi.some(Boolean)) && React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.dm,
-        marginTop: 6,
-        borderTop: `1px solid ${t.bd}`,
-        paddingTop: 6
-      }
-    }, honba > 0 && `本場 +${(honba * HU()).toLocaleString()}`, honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / ", (riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`))
+    winnerName: players[gWinner],
+    loserName: gLoser !== null ? players[gLoser] : null,
+    honbaAdd: honbaGet(),
+    sticks: riichiSticks()
   }), React.createElement("div", {
     onClick: () => setShowPayView(true),
     style: {
