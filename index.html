@@ -22947,17 +22947,18 @@ input, select { padding: 10px 14px; }
       const gold = GOLD(pt, ruleSet.rate);
       return React.createElement("div", {
         style: {
-          fontSize: 13,
-          fontWeight: 800,
-          marginTop: 2,
+          fontSize: 17,
+          fontWeight: 900,
+          marginTop: 3,
           fontVariantNumeric: "tabular-nums",
           whiteSpace: "nowrap",
+          lineHeight: 1.2,
           color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm
         }
       }, gold > 0 ? "+" : "", GOLD_LABEL(gold), React.createElement("span", {
         style: {
-          fontSize: 10,
-          marginLeft: 2,
+          fontSize: 12,
+          marginLeft: 3,
           opacity: 0.85
         }
       }, ruleSet.rateUnit || "G"));
@@ -23069,16 +23070,18 @@ input, select { padding: 10px 14px; }
         }
       }, o.pt > 0 ? "+" : "", o.pt), !!gameConfig?.rules?.rate && React.createElement("div", {
         style: {
-          fontSize: 12,
-          fontWeight: 800,
-          marginTop: 1,
+          fontSize: 16,
+          fontWeight: 900,
+          marginTop: 3,
           fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          lineHeight: 1.2,
           color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm
         }
       }, o.pt > 0 ? "+" : "", GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate)), React.createElement("span", {
         style: {
-          fontSize: 10,
-          marginLeft: 2,
+          fontSize: 12,
+          marginLeft: 3,
           opacity: 0.85
         }
       }, gameConfig.rules.rateUnit || "G"))))), !!gameConfig?.rules?.rate && React.createElement("div", {

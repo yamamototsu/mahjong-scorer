@@ -12329,11 +12329,12 @@ input, select { padding: 10px 14px; }
                   const gold = GOLD(pt, ruleSet.rate);
                   return (
                     <div style={{
-                      fontSize: 13, fontWeight: 800, marginTop: 2, fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap", color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm,
+                      fontSize: 17, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap", lineHeight: 1.2,
+                      color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm,
                     }}>
                       {gold > 0 ? "+" : ""}{GOLD_LABEL(gold)}
-                      <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{ruleSet.rateUnit || "G"}</span>
+                      <span style={{ fontSize: 12, marginLeft: 3, opacity: 0.85 }}>{ruleSet.rateUnit || "G"}</span>
                     </div>
                   );
                 })()}
@@ -12387,11 +12388,12 @@ input, select { padding: 10px 14px; }
                     }}>{o.pt > 0 ? "+" : ""}{o.pt}</span>
                     {!!(gameConfig?.rules?.rate) && (
                       <div style={{
-                        fontSize: 12, fontWeight: 800, marginTop: 1, fontVariantNumeric: "tabular-nums",
+                        fontSize: 16, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap", lineHeight: 1.2,
                         color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm,
                       }}>
                         {o.pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate))}
-                        <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{gameConfig.rules.rateUnit || "G"}</span>
+                        <span style={{ fontSize: 12, marginLeft: 3, opacity: 0.85 }}>{gameConfig.rules.rateUnit || "G"}</span>
                       </div>
                     )}
                   </div>
