@@ -5555,7 +5555,8 @@ input, select { padding: 10px 14px; }
   // 選択をキャンセルしたら対局画面ではなく元の確認画面に戻す
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false); // 卓上モードの流局入力
-  const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル
+  const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル（"flip" で180度回転）
+  const [tmMenu, setTmMenu] = useState(false);               // 卓上の📋メニュー（"flip" で180度回転）
   const [seatRot, setSeatRot] = useState(0); // 卓の回転（0-3）自分を手前に持ってくる
   const [playerDetail, setPlayerDetail] = useState(null); // 変動履歴を表示するプレイヤーのindex
   const [rankPeek, setRankPeek] = useState(null);         // 長押しで順位・点差を表示するプレイヤーのindex
@@ -6481,7 +6482,7 @@ input, select { padding: 10px 14px; }
                 setRonPick([]); setRonLoserPick(null); setMultiRon(null);
                 setGameFinished(true);
               }}
-              style={{ ...actionBtn(), marginBottom: 0, color: t.rd, border: `1px solid ${t.rd}55` }}
+              style={{ ...actionBtn(), marginBottom: 0, color: t.rd, border: `1px solid ${t.rd}55`, textWrap: "balance" }}
             >⏹ この対局を途中で終了する</button>
             <div style={{ fontSize: 10, color: t.dm, marginTop: 7, lineHeight: 1.7, textAlign: "center" }}>
               オーラスを待たずに終わります。結果画面で内容を確認してから記録できます
@@ -10690,10 +10691,64 @@ input, select { padding: 10px 14px; }
   // ── TABLE MODE (卓上モード) ──
   // 卓の中央にスマホを置き、各プレイヤーが自分の点数を正面から読める向きに回転
   // ══════════════════════════════════
+  // 卓上の📋メニュー。「局の修正」と「ルールの確認・変更」を選ばせる
+  const TableMenuModal = () => {
+    if (!tmMenu) return null;
+    const flip = tmMenu === "flip";
+    const close = () => setTmMenu(false);
+    const canFix = rounds.length > 0;
+    const item = (icon, label, hint, on, disabled) => (
+      <button onClick={disabled ? undefined : on} disabled={!!disabled} style={{
+        width: "100%", textAlign: "left", cursor: disabled ? "default" : "pointer",
+        padding: "14px 14px", borderRadius: 12, marginBottom: 8, minHeight: 34,
+        border: `1px solid ${disabled ? t.bd : t.ac}55`,
+        background: disabled ? t.sf : t.acS, opacity: disabled ? 0.5 : 1,
+        display: "flex", alignItems: "center", gap: 11,
+      }}>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 15, fontWeight: 800, color: disabled ? t.dm : t.tx, textWrap: "balance" }}>{label}</span>
+          <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.6, textWrap: "balance" }}>{hint}</span>
+        </span>
+      </button>
+    );
+    return (
+      <div style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 120,
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "20px 16px",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        overflowY: "auto",
+      }} onClick={close}>
+        <div style={{
+          ...card, maxWidth: 400, width: "100%", margin: 0,
+          // 上側（対面向き）のボタンから開いたときは、向かいの人が読める向きにする
+          transform: flip ? "rotate(180deg)" : "none",
+        }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: t.tx }}>メニュー</span>
+            <button aria-label="閉じる" style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer", lineHeight: 1, minWidth: 34, minHeight: 34, padding: "0 6px" }}
+              onClick={close}>✕</button>
+          </div>
+          {item("✏️", "局の修正",
+            canFix ? "終わった局を選んで入力し直します" : "まだ終わった局がありません",
+            () => { setTmMenu(false); setEditingRoundIdx(null); setShowRoundEdit(flip ? "flip" : true); },
+            !canFix)}
+          {item("📋", "ルールの確認・変更",
+            "この対局のルールを確認して、その場で変えられます",
+            () => { setTmMenu(false); setShowRuleCheck(flip ? "flip" : true); })}
+          <button style={{ ...actionBtn(), marginTop: 4 }} onClick={close}>閉じる</button>
+        </div>
+      </div>
+    );
+  };
+
   // 局の修正モーダル（卓上モード・通常画面の両方から使う）
   const RoundEditModal = () => !showRoundEdit ? null : (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto" }}>
-            <div style={{ width: "100%", maxWidth: 400 }}>
+            {/* 上側（対面向き）のボタンから開いたときは、向かいの人が読める向きにする */}
+            <div style={{ width: "100%", maxWidth: 400, transform: showRoundEdit === "flip" ? "rotate(180deg)" : "none" }}>
               <div style={card}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <span style={{ fontSize: 16, fontWeight: 800 }}>局の修正</span>
@@ -11100,8 +11155,8 @@ input, select { padding: 10px 14px; }
           </div>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
-            <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
-              onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
+            <button aria-label="メニュー" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+              onClick={() => setTmMenu(flip ? "flip" : true)}>📋</button>
             <button aria-label="対局を保留" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
               onClick={() => {
                 setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
@@ -11128,16 +11183,6 @@ input, select { padding: 10px 14px; }
         overflow: "hidden",
         display: "flex", flexDirection: "column", justifyContent: "center",
       }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginBottom: 4, padding: "0 6px" }}>
-          {rounds.length > 0 && (
-            <button style={{
-              background: "none", border: "none", color: t.dm, fontSize: 11, cursor: "pointer", fontWeight: 600,
-              // 31pxしかなく指で押しにくかったので高さを34px以上にする
-              padding: "9px 10px", minHeight: 34, boxSizing: "border-box",
-            }} onClick={() => setShowRoundEdit(true)}>📋 局の修正</button>
-          )}
-        </div>
-
         {/* いまどの局を直しているか（入力はふだんどおり下のボタンから） */}
         {fixIdx !== null && (
           <div style={{
@@ -11163,6 +11208,7 @@ input, select { padding: 10px 14px; }
           </div>
         )}
         {RuleCheckModal()}
+        {TableMenuModal()}
         {RonRuleWarnModal()}
         {actionRow(true)}
 
