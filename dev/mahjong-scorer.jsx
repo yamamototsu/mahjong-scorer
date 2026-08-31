@@ -3307,20 +3307,33 @@ export default function MahjongScorer() {
     const card = { background: `linear-gradient(135deg, ${t.card}, ${t.sf})`, borderRadius: 16, padding: 24, textAlign: "center", border: `1px solid ${t.ac}33`, marginBottom: 14 };
 
     if (inGame) {
-      // 内訳の行。ロンは「◯◯から」の1行が和了点そのものなので「合計」を重ねて出さない
-      const rows = [];
-      if (tsumo) {
-        rows.push({ lb: "合計", v: result.total.toLocaleString(), c: t.tx });
-        if (evenTsumo) rows.push({ lb: "全員から", v: `${eachAmt().toLocaleString()}×${nPC - 1}`, c: t.gd });
-        else {
-          rows.push({ lb: "子から", v: `${result.fromChild.toLocaleString()}${nPC - 2 >= 2 ? `×${nPC - 2}` : ""}`, c: t.ac });
-          rows.push({ lb: "親から", v: result.fromParent.toLocaleString(), c: t.gd });
-        }
-      } else {
-        rows.push({ lb: loserName ? `${loserName}から` : "放銃者から", v: result.total.toLocaleString(), c: t.tx });
-      }
-      if (hbAdd > 0) rows.push({ lb: "本場", v: `+${hbAdd.toLocaleString()}`, c: t.gd });
-      if (st > 0) rows.push({ lb: "リーチ棒", v: `${st}本 (+${(st * 1000).toLocaleString()})`, c: t.ac });
+      // 内訳は「誰から」ごとにまとめる。本場があるときは、その人から受け取る
+      // 和了点・本場・合計を並べる（ツモは本場を人数で割って集めるので、
+      // 1人あたりの本場は割ったあとの実額を出す）
+      const payers = nPC - 1;
+      const hbEach = hbAdd > 0 ? (tsumo ? Math.round(hbAdd / payers) : hbAdd) : 0;
+      const groups = tsumo
+        ? (evenTsumo
+            ? [{ lb: "全員から", each: eachAmt(), n: payers }]
+            : [{ lb: "子から", each: result.fromChild, n: nPC - 2 },
+               { lb: "親から", each: result.fromParent, n: 1 }])
+        : [{ lb: loserName ? `${loserName}から` : "放銃者から", each: result.total, n: 1 }];
+      const amount = (v, n) => `${v.toLocaleString()}点${n >= 2 ? ` ×${n}人` : ""}`;
+      const line = (lb, v, opt) => (
+        <div key={lb} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          gap: 10, padding: "3px 0", paddingLeft: (opt && opt.indent) ? 10 : 0,
+        }}>
+          <span style={{
+            fontSize: 13, color: t.dm, fontWeight: 700, textAlign: "left",
+            minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>{lb}</span>
+          <span style={{
+            fontSize: (opt && opt.strong) ? 16 : 14, fontWeight: (opt && opt.strong) ? 900 : 700,
+            color: (opt && opt.c) || t.tx, whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums",
+          }}>{v}</span>
+        </div>
+      );
       return (
         <div style={card}>
           {limitBadge}
@@ -3345,12 +3358,26 @@ export default function MahjongScorer() {
           {/* 内訳 */}
           <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${t.bd}` }}>
             <div style={{ fontSize: 11, color: t.dm, fontWeight: 700, textAlign: "left", marginBottom: 4 }}>内訳</div>
-            {rows.map((r, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, padding: "4px 0" }}>
-                <span style={{ fontSize: 13, color: t.dm, fontWeight: 700, textAlign: "left", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.lb}</span>
-                <span style={{ fontSize: 16, fontWeight: 900, color: r.c, whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.v}</span>
+            {groups.map((g, gi) => (
+              <div key={gi} style={{ marginBottom: hbEach > 0 ? 8 : 0 }}>
+                {hbEach > 0 ? (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: t.tx, textAlign: "left", marginBottom: 1 }}>{g.lb}</div>
+                    {line("和了点", amount(g.each, g.n), { indent: true })}
+                    {line("本場", amount(hbEach, g.n), { indent: true, c: t.gd })}
+                    {line("合計", amount(g.each + hbEach, g.n), { indent: true, strong: true, c: t.ac })}
+                  </>
+                ) : (
+                  /* 本場が無いときは和了点がそのまま合計なので、1行だけにする */
+                  line(g.lb, amount(g.each, g.n), { strong: true, c: t.ac })
+                )}
               </div>
             ))}
+            {st > 0 && (
+              <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${t.bd}55` }}>
+                {line("リーチ棒", `${st}本 (+${(st * 1000).toLocaleString()})`, { c: t.ac })}
+              </div>
+            )}
           </div>
           {extra}
         </div>

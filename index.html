@@ -5629,46 +5629,57 @@ function MahjongScorer() {
       marginBottom: 14
     };
     if (inGame) {
-      const rows = [];
-      if (tsumo) {
-        rows.push({
-          lb: "合計",
-          v: result.total.toLocaleString(),
-          c: t.tx
-        });
-        if (evenTsumo) rows.push({
-          lb: "全員から",
-          v: `${eachAmt().toLocaleString()}×${nPC - 1}`,
-          c: t.gd
-        });else {
-          rows.push({
-            lb: "子から",
-            v: `${result.fromChild.toLocaleString()}${nPC - 2 >= 2 ? `×${nPC - 2}` : ""}`,
-            c: t.ac
-          });
-          rows.push({
-            lb: "親から",
-            v: result.fromParent.toLocaleString(),
-            c: t.gd
-          });
+      const payers = nPC - 1;
+      const hbEach = hbAdd > 0 ? tsumo ? Math.round(hbAdd / payers) : hbAdd : 0;
+      const groups = tsumo ? evenTsumo ? [{
+        lb: "全員から",
+        each: eachAmt(),
+        n: payers
+      }] : [{
+        lb: "子から",
+        each: result.fromChild,
+        n: nPC - 2
+      }, {
+        lb: "親から",
+        each: result.fromParent,
+        n: 1
+      }] : [{
+        lb: loserName ? `${loserName}から` : "放銃者から",
+        each: result.total,
+        n: 1
+      }];
+      const amount = (v, n) => `${v.toLocaleString()}点${n >= 2 ? ` ×${n}人` : ""}`;
+      const line = (lb, v, opt) => React.createElement("div", {
+        key: lb,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 10,
+          padding: "3px 0",
+          paddingLeft: opt && opt.indent ? 10 : 0
         }
-      } else {
-        rows.push({
-          lb: loserName ? `${loserName}から` : "放銃者から",
-          v: result.total.toLocaleString(),
-          c: t.tx
-        });
-      }
-      if (hbAdd > 0) rows.push({
-        lb: "本場",
-        v: `+${hbAdd.toLocaleString()}`,
-        c: t.gd
-      });
-      if (st > 0) rows.push({
-        lb: "リーチ棒",
-        v: `${st}本 (+${(st * 1000).toLocaleString()})`,
-        c: t.ac
-      });
+      }, React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: t.dm,
+          fontWeight: 700,
+          textAlign: "left",
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, lb), React.createElement("span", {
+        style: {
+          fontSize: opt && opt.strong ? 16 : 14,
+          fontWeight: opt && opt.strong ? 900 : 700,
+          color: opt && opt.c || t.tx,
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          fontVariantNumeric: "tabular-nums"
+        }
+      }, v));
       return React.createElement("div", {
         style: card
       }, limitBadge, headLine, React.createElement("div", {
@@ -5726,36 +5737,40 @@ function MahjongScorer() {
           textAlign: "left",
           marginBottom: 4
         }
-      }, "内訳"), rows.map((r, i) => React.createElement("div", {
-        key: i,
+      }, "内訳"), groups.map((g, gi) => React.createElement("div", {
+        key: gi,
         style: {
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          gap: 10,
-          padding: "4px 0"
+          marginBottom: hbEach > 0 ? 8 : 0
         }
-      }, React.createElement("span", {
+      }, hbEach > 0 ? React.createElement(React.Fragment, null, React.createElement("div", {
         style: {
           fontSize: 13,
-          color: t.dm,
-          fontWeight: 700,
+          fontWeight: 800,
+          color: t.tx,
           textAlign: "left",
-          minWidth: 0,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap"
+          marginBottom: 1
         }
-      }, r.lb), React.createElement("span", {
+      }, g.lb), line("和了点", amount(g.each, g.n), {
+        indent: true
+      }), line("本場", amount(hbEach, g.n), {
+        indent: true,
+        c: t.gd
+      }), line("合計", amount(g.each + hbEach, g.n), {
+        indent: true,
+        strong: true,
+        c: t.ac
+      })) : (line(g.lb, amount(g.each, g.n), {
+        strong: true,
+        c: t.ac
+      })))), st > 0 && React.createElement("div", {
         style: {
-          fontSize: 16,
-          fontWeight: 900,
-          color: r.c,
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-          fontVariantNumeric: "tabular-nums"
+          marginTop: 6,
+          paddingTop: 6,
+          borderTop: `1px solid ${t.bd}55`
         }
-      }, r.v)))), extra);
+      }, line("リーチ棒", `${st}本 (+${(st * 1000).toLocaleString()})`, {
+        c: t.ac
+      }))), extra);
     }
     return React.createElement("div", {
       style: card
