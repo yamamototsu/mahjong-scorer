@@ -12738,7 +12738,7 @@ input, select { padding: 10px 14px; }
         const existingIds = new Set(gameHistory.map(g => g.id));
         const merged = [...gameHistory, ...incoming.filter(g => !existingIds.has(g.id))];
         merged.sort((a, b) => (a.id || 0) - (b.id || 0));
-        saveHistory(merged);
+        setGameHistory(merged);   // 保存は mj_history の useEffect が行う
         setRestoreMsg({ ok: true, text: `${incoming.filter(g => !existingIds.has(g.id)).length}件を追加しました（合計${merged.length}件）` });
       } catch {
         setRestoreMsg({ ok: false, text: "読み込みに失敗しました" });
