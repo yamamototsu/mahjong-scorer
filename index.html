@@ -12500,7 +12500,9 @@ input, select { padding: 10px 14px; }
         style: {
           fontSize: 14,
           fontWeight: 600,
-          color: t.tx
+          color: t.tx,
+          minWidth: 0,
+          textWrap: "balance"
         }
       }, label), React.createElement("button", {
         onClick: onToggle,
@@ -12557,7 +12559,13 @@ input, select { padding: 10px 14px; }
           lineHeight: 1.7,
           marginBottom: 4
         }
-      }, "変更はこの対局にすぐ反映されます（リーグや次回対局の既定ルールは変わりません）"), editRow("形式", seg([["tonpu", "東風戦"], ["hanchan", "半荘戦"], ["zenchan", "全荘戦"]], gameConfig?.matchType, k => patchMatchType(k)), "延長・短縮はここで切り替えられます。すでに過ぎた場には戻れません"), row("持ち点 / 返し点", `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`, "対局中は変更できません"), editRow("流局したときの親", seg([["agari", "あがり連荘"], ["tenpai", "テンパイ連荘"], ["none", "無条件連荘"]], renchanKey, k => patchGameRules(k === "agari" ? {
+      }, "変更はこの対局にすぐ反映されます（リーグや次回対局の既定ルールは変わりません）"), row("人数", PC === 3 ? "三人麻雀" : "四人麻雀", "対局中は変更できません"), editRow("形式", seg([["tonpu", "東風戦"], ["hanchan", "半荘戦"], ["zenchan", "全荘戦"]], gameConfig?.matchType, k => patchMatchType(k)), "延長・短縮はここで切り替えられます。すでに過ぎた場には戻れません"), row("持ち点 / 返し点", `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`, "対局中は変更できません"), lg ? row("ウマ（順位点）", umaLabel, "リーグの設定に従います。対局中は変更できません") : editRow("ウマ（順位点）", seg((PC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).map(u => [u.key, u.label]), rs.umaKey || (PC === 3 ? "none3" : "none"), k => {
+        const pre = (PC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === k);
+        if (pre) patchGameRules({
+          umaKey: k,
+          uma: [...pre.uma]
+        });
+      }), "精算のときだけ使うので、ここまでの点数は動きません"), editRow("流局したときの親", seg([["agari", "あがり連荘"], ["tenpai", "テンパイ連荘"], ["none", "無条件連荘"]], renchanKey, k => patchGameRules(k === "agari" ? {
         agariRenchan: true,
         tenpaiRenchan: false
       } : k === "tenpai" ? {
@@ -12578,11 +12586,35 @@ input, select { padding: 10px 14px; }
         kiriage: !rs.kiriage
       }), "4翻30符・3翻60符を満貫扱い（これ以降の入力と局の修正に適用）"), tgl("ダブル役満あり", rs.doubleYakuman === true, () => patchGameRules({
         doubleYakuman: !rs.doubleYakuman
-      }), "役満の複合を2倍・3倍で計算"), tgl("トビで終了", rs.tobiEnd !== false, () => patchGameRules({
+      }), "役満の複合を2倍・3倍で計算"), tgl("数え役満あり", rs.kazoeYakuman !== false, () => patchGameRules({
+        kazoeYakuman: rs.kazoeYakuman === false
+      }), "13翻以上を役満として計算（これ以降の入力と局の修正に適用）"), tgl("トビで終了", rs.tobiEnd !== false, () => patchGameRules({
         tobiEnd: rs.tobiEnd === false
-      })), tgl("チョンボの計算（罰符）", rs.chomboCalc !== false, () => patchGameRules({
+      })), row("本場", `1本 = ${HU().toLocaleString()}点`, "対局中は変更できません"), row("ノーテン罰符", "場で3,000点", "対局中は変更できません"), tgl("チョンボの計算（罰符）", rs.chomboCalc !== false, () => patchGameRules({
         chomboCalc: rs.chomboCalc === false
-      }), "OFFだと記録だけ残して点数は動かしません。金額はチョンボ入力のその場で変更できます"));
+      }), "OFFだと記録だけ残して点数は動かしません。金額はチョンボ入力のその場で変更できます"), React.createElement("div", {
+        style: {
+          padding: "10px 0",
+          borderBottom: `1px solid ${t.bd}33`
+        }
+      }, React.createElement(RateSetting, {
+        t: t,
+        rate: rs.rate || 0,
+        onChange: v => patchGameRules({
+          rate: v
+        }),
+        unit: rs.rateUnit,
+        onUnitChange: u => patchGameRules({
+          rateUnit: u
+        })
+      }), React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: "#b9c6d8",
+          marginTop: 4,
+          lineHeight: 1.6
+        }
+      }, "精算のときだけ使うので、ここまでの点数は動きません")));
     })(), React.createElement("button", {
       style: {
         ...actionBtn(),

@@ -6604,7 +6604,7 @@ input, select { padding: 10px 14px; }
             const tgl = (label, on, onToggle, hint) => (
               <div style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: t.tx }}>{label}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: t.tx, minWidth: 0, textWrap: "balance" }}>{label}</span>
                   <button onClick={onToggle} style={{
                     // スイッチの見た目は48×28のまま、指で押せるよう当たり判定だけ縦に広げる
                     width: 48, minHeight: 34, border: "none", padding: 0, cursor: "pointer",
@@ -6628,6 +6628,8 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 11, color: t.gd, padding: "8px 10px", borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}33`, lineHeight: 1.7, marginBottom: 4 }}>
                   変更はこの対局にすぐ反映されます（リーグや次回対局の既定ルールは変わりません）
                 </div>
+                {/* 変えられないものも、行ごと消さずに理由を添えて出す */}
+                {row("人数", PC === 3 ? "三人麻雀" : "四人麻雀", "対局中は変更できません")}
                 {editRow("形式", seg(
                   [["tonpu", "東風戦"], ["hanchan", "半荘戦"], ["zenchan", "全荘戦"]],
                   gameConfig?.matchType, (k) => patchMatchType(k)),
@@ -6635,6 +6637,18 @@ input, select { padding: 10px 14px; }
                 {row("持ち点 / 返し点",
                   `${(rs.startPoints ?? 25000).toLocaleString()} / ${(rs.returnPoints ?? 30000).toLocaleString()}`,
                   "対局中は変更できません")}
+                {/* ウマは精算のときにしか使わないので、途中で変えても過去の局は動かない。
+                    ただしリーグ戦はリーグ側のウマが正なので、そちらは触らせない */}
+                {lg
+                  ? row("ウマ（順位点）", umaLabel, "リーグの設定に従います。対局中は変更できません")
+                  : editRow("ウマ（順位点）", seg(
+                      (PC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).map(u => [u.key, u.label]),
+                      rs.umaKey || (PC === 3 ? "none3" : "none"),
+                      (k) => {
+                        const pre = (PC === 3 ? UMA_PRESETS_3 : UMA_PRESETS).find(u => u.key === k);
+                        if (pre) patchGameRules({ umaKey: k, uma: [...pre.uma] });
+                      }),
+                      "精算のときだけ使うので、ここまでの点数は動きません")}
                 {editRow("流局したときの親", seg(
                   [["agari", "あがり連荘"], ["tenpai", "テンパイ連荘"], ["none", "無条件連荘"]],
                   renchanKey,
@@ -6653,10 +6667,25 @@ input, select { padding: 10px 14px; }
                   "4翻30符・3翻60符を満貫扱い（これ以降の入力と局の修正に適用）")}
                 {tgl("ダブル役満あり", rs.doubleYakuman === true, () => patchGameRules({ doubleYakuman: !rs.doubleYakuman }),
                   "役満の複合を2倍・3倍で計算")}
+                {tgl("数え役満あり", rs.kazoeYakuman !== false,
+                  () => patchGameRules({ kazoeYakuman: rs.kazoeYakuman === false }),
+                  "13翻以上を役満として計算（これ以降の入力と局の修正に適用）")}
                 {tgl("トビで終了", rs.tobiEnd !== false, () => patchGameRules({ tobiEnd: rs.tobiEnd === false }))}
+                {/* 本場とノーテン罰符は、変えると過去の局の点数が動いてしまう */}
+                {row("本場", `1本 = ${HU().toLocaleString()}点`, "対局中は変更できません")}
+                {row("ノーテン罰符", "場で3,000点", "対局中は変更できません")}
                 {tgl("チョンボの計算（罰符）", rs.chomboCalc !== false,
                   () => patchGameRules({ chomboCalc: rs.chomboCalc === false }),
                   "OFFだと記録だけ残して点数は動かしません。金額はチョンボ入力のその場で変更できます")}
+                {/* レートも精算のときだけ使う。入力の作法は設定画面と同じ（打てば反映） */}
+                <div style={{ padding: "10px 0", borderBottom: `1px solid ${t.bd}33` }}>
+                  <RateSetting t={t} rate={rs.rate || 0}
+                    onChange={(v) => patchGameRules({ rate: v })}
+                    unit={rs.rateUnit} onUnitChange={(u) => patchGameRules({ rateUnit: u })} />
+                  <div style={{ fontSize: 11, color: "#b9c6d8", marginTop: 4, lineHeight: 1.6 }}>
+                    精算のときだけ使うので、ここまでの点数は動きません
+                  </div>
+                </div>
               </>
             );
           })()}
