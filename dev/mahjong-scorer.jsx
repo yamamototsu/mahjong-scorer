@@ -990,7 +990,6 @@ export default function MahjongScorer() {
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
   const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
   const [voiceSeatOn, setVoiceSeatOn] = useState(() => loadVoicePref("mj_voice_seat"));
-  const [voiceYakuOn, setVoiceYakuOn] = useState(() => loadVoicePref("mj_voice_yaku"));
   const saveVoicePref = (key, setter) => (on) => {
     setter(on);
     try { localStorage.setItem(key, on ? "1" : "0"); } catch {}
@@ -1000,7 +999,6 @@ export default function MahjongScorer() {
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
   const saveVoiceSeat = saveVoicePref("mj_voice_seat", setVoiceSeatOn);
-  const saveVoiceYaku = saveVoicePref("mj_voice_yaku", setVoiceYakuOn);
   const voiceOnFor = (text) =>
     text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   // 収録した掛け声。再生できない端末では音声合成にフォールバックする
@@ -1142,23 +1140,6 @@ export default function MahjongScorer() {
     } catch {}
   };
   const speakRound = (wind, dealer, honba2) => speakJa(roundKana(wind, dealer, honba2));
-
-  // 役の読み上げ（役を選んで確定したとき）。YAKU_DATA の yomi を使うので
-  // 「一盃口」を「いちはいくち」と読まれることがない
-  const yakuYomi = (name) => {
-    const y = YAKU_DATA.find(x => x.name === name);
-    if (y && y.yomi && y.yomi[0]) return y.yomi[0];
-    return String(name).replace(/[（(][^）)]*[）)]/g, "");
-  };
-  const speakYaku = (names, totalHan, force) => {
-    if (!force && !voiceYakuOn) return;
-    const parts = (names || []).map(yakuYomi).filter(Boolean);
-    if (pickerDora > 0) parts.push(`どら${pickerDora}`);
-    if (pickerUra > 0) parts.push(`うらどら${pickerUra}`);
-    if (parts.length === 0) return;
-    const tail = totalHan >= 13 ? YAKUMAN_LABEL(totalHan) : `ごうけい${totalHan}はん`;
-    speakJa(parts.join("、") + "、" + tail);
-  };
 
   // 局の読み上げの収録音声（東・南・西・北／1〜4局／オーラス／1〜10本場）。
   // 部品をつないで「なん・にきょく・いっぽんば」のように順に再生する
@@ -3358,18 +3339,110 @@ export default function MahjongScorer() {
     );
   };
 
-  const ScoreDisplay = ({ han, fu, limit, result, tsumo, parent, extra, pc }) => {
+  const ScoreDisplay = ({ han, fu, limit, result, tsumo, parent, extra, pc, winnerName, loserName, honbaAdd, sticks }) => {
     const nPC = pc || PC;   // 一局計算のように対局外から呼ぶときは人数を渡す
-    return (
-    <div style={{ background: `linear-gradient(135deg, ${t.card}, ${t.sf})`, borderRadius: 16, padding: 24, textAlign: "center", border: `1px solid ${t.ac}33`, marginBottom: 14 }}>
-      {limit && <div style={{ display: "inline-block", padding: "4px 18px", borderRadius: 20, fontSize: 14, fontWeight: 800, background: han >= 13 ? t.gdS : t.acS, color: han >= 13 ? t.gd : t.ac, marginBottom: 12 }}>{limit}</div>}
+    // あがった人の名前が渡されたときだけ「受け取る点数」の見せ方にする。
+    // 一局計算からは名前も本場もリーチ棒も無いので、これまで通りの表示のまま
+    const inGame = !!winnerName;
+    const hbAdd = honbaAdd || 0;
+    const st = sticks || 0;
+    const receive = result.total + hbAdd;
+    // 三人麻雀は子のツモも全員が同額なので、親ツモと同じ見せ方にする
+    const evenTsumo = tsumo && (parent || (result.fromChild != null && result.fromChild === result.fromParent));
+    const eachAmt = () => (result.each != null ? result.each : result.fromChild);
+    const headLine = (
       <div style={{ fontSize: 13, color: t.dm, marginBottom: 10 }}>
         {han >= 13 ? getLimitName(han) : han >= 5 ? `${han}翻` : `${han}翻 ${fu}符`} / {tsumo ? "ツモ" : "ロン"} / {parent ? "親" : "子"}
       </div>
+    );
+    const limitBadge = limit && <div style={{ display: "inline-block", padding: "4px 18px", borderRadius: 20, fontSize: 14, fontWeight: 800, background: han >= 13 ? t.gdS : t.acS, color: han >= 13 ? t.gd : t.ac, marginBottom: 12 }}>{limit}</div>;
+    const card = { background: `linear-gradient(135deg, ${t.card}, ${t.sf})`, borderRadius: 16, padding: 24, textAlign: "center", border: `1px solid ${t.ac}33`, marginBottom: 14 };
+
+    if (inGame) {
+      // 内訳は「誰から」ごとにまとめる。本場があるときは、その人から受け取る
+      // 和了点・本場・合計を並べる（ツモは本場を人数で割って集めるので、
+      // 1人あたりの本場は割ったあとの実額を出す）
+      const payers = nPC - 1;
+      const hbEach = hbAdd > 0 ? (tsumo ? Math.round(hbAdd / payers) : hbAdd) : 0;
+      const groups = tsumo
+        ? (evenTsumo
+            ? [{ lb: "全員から", each: eachAmt(), n: payers }]
+            : [{ lb: "子から", each: result.fromChild, n: nPC - 2 },
+               { lb: "親から", each: result.fromParent, n: 1 }])
+        : [{ lb: loserName ? `${loserName}から` : "放銃者から", each: result.total, n: 1 }];
+      const amount = (v, n) => `${v.toLocaleString()}点${n >= 2 ? ` ×${n}人` : ""}`;
+      const line = (lb, v, opt) => (
+        <div key={lb} style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          gap: 10, padding: "3px 0", paddingLeft: (opt && opt.indent) ? 10 : 0,
+        }}>
+          <span style={{
+            fontSize: 13, color: t.dm, fontWeight: 700, textAlign: "left",
+            minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>{lb}</span>
+          <span style={{
+            fontSize: (opt && opt.strong) ? 16 : 14, fontWeight: (opt && opt.strong) ? 900 : 700,
+            color: (opt && opt.c) || t.tx, whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums",
+          }}>{v}</span>
+        </div>
+      );
+      return (
+        <div style={card}>
+          {limitBadge}
+          {headLine}
+          {/* あがった人。長い名前でも枠から出ないように省略する */}
+          <div style={{
+            fontSize: 17, fontWeight: 800, color: t.tx, marginBottom: 6,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%",
+          }}>{winnerName} {tsumo ? "ツモ" : `← ${loserName}`}</div>
+          {/* 実際に受け取る点数（和了点＋本場）。リーチ棒は点に混ぜず本数で添える */}
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
+              {receive.toLocaleString()}
+              <span style={{ fontSize: 16, fontWeight: 800, color: t.dm, marginLeft: 3 }}>点</span>
+            </span>
+            {st > 0 && (
+              <span style={{ fontSize: 15, fontWeight: 800, color: t.ac, whiteSpace: "nowrap" }}>
+                ＋リーチ棒{st}本
+              </span>
+            )}
+          </div>
+          {/* 内訳 */}
+          <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${t.bd}` }}>
+            <div style={{ fontSize: 11, color: t.dm, fontWeight: 700, textAlign: "left", marginBottom: 4 }}>内訳</div>
+            {groups.map((g, gi) => (
+              <div key={gi} style={{ marginBottom: hbEach > 0 ? 8 : 0 }}>
+                {hbEach > 0 ? (
+                  <>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: t.tx, textAlign: "left", marginBottom: 1 }}>{g.lb}</div>
+                    {line("和了点", amount(g.each, g.n), { indent: true })}
+                    {line("本場", amount(hbEach, g.n), { indent: true, c: t.gd })}
+                    {line("合計", amount(g.each + hbEach, g.n), { indent: true, strong: true, c: t.ac })}
+                  </>
+                ) : (
+                  /* 本場が無いときは和了点がそのまま合計なので、1行だけにする */
+                  line(g.lb, amount(g.each, g.n), { strong: true, c: t.ac })
+                )}
+              </div>
+            ))}
+            {st > 0 && (
+              <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${t.bd}55` }}>
+                {line("リーチ棒", `${st}本 (+${(st * 1000).toLocaleString()})`, { c: t.ac })}
+              </div>
+            )}
+          </div>
+          {extra}
+        </div>
+      );
+    }
+
+    return (
+    <div style={card}>
+      {limitBadge}
+      {headLine}
 
       {tsumo ? (
-        /* 三人麻雀は子のツモも全員が同額なので、親ツモと同じ見せ方にする */
-        (parent || (result.fromChild != null && result.fromChild === result.fromParent)) ? (
+        evenTsumo ? (
           /* 親ツモ: 全員から同額 */
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 10 }}>
@@ -3379,7 +3452,7 @@ export default function MahjongScorer() {
             <div style={{ padding: "12px 0", borderTop: `1px solid ${t.bd}`, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 12 }}>
               <span style={{ fontSize: 18, color: t.gd, fontWeight: 800 }}>全員から</span>
               <span style={{ fontSize: 34, fontWeight: 900, color: t.gd, lineHeight: 1.1 }}>
-                {(result.each != null ? result.each : result.fromChild).toLocaleString()}
+                {eachAmt().toLocaleString()}
                 <span style={{ fontSize: 15, fontWeight: 800, color: t.dm, marginLeft: 5 }}>×{nPC - 1}</span>
               </span>
             </div>
@@ -3517,6 +3590,16 @@ input, select { padding: 10px 14px; }
     border-color: rgba(56,189,248,0.35);
     box-shadow: 0 0 4px rgba(56,189,248,0.15);
   }
+}
+/* 点数を打ち込む欄。ここに入れるのだと気づけるよう、枠と光だけを脈打たせる。
+   文字を薄くすると placeholder が読めなくなるので不透明度は変えない */
+@keyframes inputPrompt {
+  0%, 100% { border-color: #5b9bff; box-shadow: 0 0 0 3px rgba(91,155,255,0.22), 0 0 16px rgba(91,155,255,0.45); }
+  50%      { border-color: rgba(91,155,255,0.45); box-shadow: 0 0 0 1px rgba(91,155,255,0.10), 0 0 4px rgba(91,155,255,0.12); }
+}
+/* 動きを抑える設定の端末では光らせっぱなしにして、点滅させない */
+@media (prefers-reduced-motion: reduce) {
+  .sq-input-prompt { animation: none !important; border-color: #5b9bff !important; box-shadow: 0 0 0 2px rgba(91,155,255,0.22) !important; }
 }
 @keyframes wallLabelBlink {
   0%, 100% { opacity: 1; }
@@ -3730,6 +3813,9 @@ input, select { padding: 10px 14px; }
     };
   };
   const [sqMode, setSqMode] = useState(null);     // null | "choice" | "input"
+  // 問題を解いている途中で「計算のしかた」を見に行ったときの戻り先。
+  // 出題方式の選択画面から入ったときは null のままで、戻ると選択画面に戻る
+  const [sqLessonBackTo, setSqLessonBackTo] = useState(null);
   const [sqQ, setSqQ] = useState(null);
   const [sqPicked, setSqPicked] = useState(null); // 選択式で選んだ答え
   const [sqIn1, setSqIn1] = useState("");
@@ -5269,16 +5355,16 @@ input, select { padding: 10px 14px; }
         { type: "text", text: "ポイント: 門前加符10符はロンの時だけ。ツモ符2符は鳴いていてもつきます。" },
       ],
       questions: [
-        { q: "門前（メンゼン）でロンした時の基本符は？", choices: ["20符","30符","40符"], answer: "30符" },
-        { q: "門前でツモあがりした時の基本符は？（ツモ符込み）", choices: ["20符","22符","30符"], answer: "22符" },
-        { q: "ポンをした手でツモあがり。基本符は？", choices: ["20符","22符","30符"], answer: "22符" },
-        { q: "鳴いてロンした時の基本符は？", choices: ["20符","25符","30符"], answer: "20符" },
-        { q: "あがった人全員につく「副底（フテイ）」は何符？", choices: ["20符","22符","30符"], answer: "20符" },
-        { q: "門前ロンだけにつく「門前加符」は何符？", choices: ["+2符","+4符","+10符"], answer: "+10符" },
-        { q: "ツモあがりにつく「ツモ符」は何符？", choices: ["+2符","+10符","+20符"], answer: "+2符" },
-        { q: "チーをした手でロンあがり。基本符は？", choices: ["20符","22符","30符"], answer: "20符" },
-        { q: "ポンとチーをした手でツモあがり。基本符は？", choices: ["20符","22符","32符"], answer: "22符" },
-        { q: "門前加符の10符がつくのはどれ？", choices: ["門前ロン","門前ツモ","鳴いてツモ"], answer: "門前ロン" },
+        { q: "門前（メンゼン）でロンした時の基本符は？", choices: ["20符","30符","40符"], answer: "30符", why: "副底20符 ＋ 門前加符10符 ＝ 30符。門前加符はロンのときだけつきます。" },
+        { q: "門前でツモあがりした時の基本符は？（ツモ符込み）", choices: ["20符","22符","30符"], answer: "22符", why: "副底20符 ＋ ツモ符2符 ＝ 22符。ツモには門前加符10符はつきません。" },
+        { q: "ポンをした手でツモあがり。基本符は？", choices: ["20符","22符","30符"], answer: "22符", why: "副底20符 ＋ ツモ符2符 ＝ 22符。ツモ符は鳴いていてもつきます。" },
+        { q: "鳴いてロンした時の基本符は？", choices: ["20符","25符","30符"], answer: "20符", why: "副底20符だけ。鳴いているので門前加符はなく、ロンなのでツモ符もつきません。" },
+        { q: "あがった人全員につく「副底（フテイ）」は何符？", choices: ["20符","22符","30符"], answer: "20符", why: "副底は誰でも必ずつく土台の20符。ここに門前加符やツモ符を足していきます。" },
+        { q: "門前ロンだけにつく「門前加符」は何符？", choices: ["+2符","+4符","+10符"], answer: "+10符", why: "門前加符は10符。同じ門前でもツモにはつかず、ロンのときだけです。" },
+        { q: "ツモあがりにつく「ツモ符」は何符？", choices: ["+2符","+10符","+20符"], answer: "+2符", why: "ツモ符は2符。鳴いていてもツモなら必ずつきます。" },
+        { q: "チーをした手でロンあがり。基本符は？", choices: ["20符","22符","30符"], answer: "20符", why: "チーも鳴きなので門前加符なし。ロンなのでツモ符もなく、副底20符だけです。" },
+        { q: "ポンとチーをした手でツモあがり。基本符は？", choices: ["20符","22符","32符"], answer: "22符", why: "副底20符 ＋ ツモ符2符 ＝ 22符。鳴いた数は基本符に関係ありません。" },
+        { q: "門前加符の10符がつくのはどれ？", choices: ["門前ロン","門前ツモ","鳴いてツモ"], answer: "門前ロン", why: "10符がつくのは門前ロンだけ。門前ツモにも、鳴いた手にもつきません。" },
       ]
     },
     {
@@ -5294,16 +5380,16 @@ input, select { padding: 10px 14px; }
         { type: "text", text: "ポイント: 暗刻は明刻の2倍！么九牌は中張牌の2倍！" },
       ],
       questions: [
-        { q: "5萬をポンした時（明刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "2符" },
-        { q: "東を自力で3枚揃えた時（暗刻・么九牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
-        { q: "9筒をポンした時（明刻・么九牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
-        { q: "3索を自力で3枚揃えた時（暗刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
-        { q: "1萬を自力で3枚揃えた時（暗刻・么九牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
-        { q: "7索をポンした時（明刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "2符" },
-        { q: "中をポンした時（明刻・么九牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
-        { q: "8萬を自力で3枚揃えた時（暗刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "4符" },
-        { q: "同じ牌の3枚組でも、符が多いのはどちら？", choices: ["明刻（ポンした方）","暗刻（自力で揃えた方）","どちらも同じ"], answer: "暗刻（自力で揃えた方）" },
-        { q: "符がいちばん高い刻子はどれ？", choices: ["中張牌の暗刻（4符）","么九牌の明刻（4符）","么九牌の暗刻（8符）"], answer: "么九牌の暗刻（8符）" },
+        { q: "5萬をポンした時（明刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "2符", why: "5萬は中張牌（2〜8）。ポンなので明刻で、刻子でいちばん低い2符です。" },
+        { q: "東を自力で3枚揃えた時（暗刻・么九牌）の符は？", choices: ["4符","8符","16符"], answer: "8符", why: "東は字牌なので么九牌。暗刻は中張牌の暗刻4符の2倍で8符です。" },
+        { q: "9筒をポンした時（明刻・么九牌）の符は？", choices: ["2符","4符","8符"], answer: "4符", why: "9筒は么九牌。明刻なので、中張牌の明刻2符の2倍で4符です。" },
+        { q: "3索を自力で3枚揃えた時（暗刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "4符", why: "3索は中張牌。暗刻なので、明刻2符の2倍で4符です。" },
+        { q: "1萬を自力で3枚揃えた時（暗刻・么九牌）の符は？", choices: ["4符","8符","16符"], answer: "8符", why: "1萬は么九牌。暗刻なので、中張牌の暗刻4符の2倍で8符です。" },
+        { q: "7索をポンした時（明刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "2符", why: "7索は中張牌。ポンなので明刻で2符です。" },
+        { q: "中をポンした時（明刻・么九牌）の符は？", choices: ["2符","4符","8符"], answer: "4符", why: "中は字牌なので么九牌。明刻なので、中張牌の明刻2符の2倍で4符です。" },
+        { q: "8萬を自力で3枚揃えた時（暗刻・中張牌）の符は？", choices: ["2符","4符","8符"], answer: "4符", why: "8萬は中張牌。暗刻なので、明刻2符の2倍で4符です。" },
+        { q: "同じ牌の3枚組でも、符が多いのはどちら？", choices: ["明刻（ポンした方）","暗刻（自力で揃えた方）","どちらも同じ"], answer: "暗刻（自力で揃えた方）", why: "暗刻は明刻の2倍。ポンして見せた刻子より、自力で揃えた刻子のほうが高くなります。" },
+        { q: "符がいちばん高い刻子はどれ？", choices: ["中張牌の暗刻（4符）","么九牌の明刻（4符）","么九牌の暗刻（8符）"], answer: "么九牌の暗刻（8符）", why: "刻子は「暗刻なら2倍」「么九牌なら2倍」。両方そろう么九牌の暗刻が 2符×2×2 ＝ 8符で最高です。" },
       ]
     },
     {
@@ -5319,16 +5405,16 @@ input, select { padding: 10px 14px; }
         { type: "text", text: "暗槓の么九牌は32符。これだけで一気に符が跳ね上がります。" },
       ],
       questions: [
-        { q: "6萬を明槓した時（中張牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
-        { q: "白を暗槓した時（么九牌）の符は？", choices: ["16符","32符","64符"], answer: "32符" },
-        { q: "1萬を明槓した時（么九牌）の符は？", choices: ["8符","16符","32符"], answer: "16符" },
-        { q: "4索を暗槓した時（中張牌）の符は？", choices: ["8符","16符","32符"], answer: "16符" },
-        { q: "9萬を暗槓した時（么九牌）の符は？", choices: ["16符","32符","64符"], answer: "32符" },
-        { q: "發を明槓した時（么九牌）の符は？", choices: ["8符","16符","32符"], answer: "16符" },
-        { q: "2筒を明槓した時（中張牌）の符は？", choices: ["4符","8符","16符"], answer: "8符" },
-        { q: "槓子の符は、同じ牌の刻子の何倍？", choices: ["2倍","3倍","4倍"], answer: "4倍" },
-        { q: "符がいちばん高い槓子はどれ？", choices: ["中張牌の暗槓（16符）","么九牌の明槓（16符）","么九牌の暗槓（32符）"], answer: "么九牌の暗槓（32符）" },
-        { q: "中張牌の暗槓と么九牌の明槓、符が多いのはどちら？", choices: ["中張牌の暗槓","么九牌の明槓","どちらも16符で同じ"], answer: "どちらも16符で同じ" },
+        { q: "6萬を明槓した時（中張牌）の符は？", choices: ["4符","8符","16符"], answer: "8符", why: "6萬は中張牌。明槓は同じ牌の明刻2符の4倍で8符です。" },
+        { q: "白を暗槓した時（么九牌）の符は？", choices: ["16符","32符","64符"], answer: "32符", why: "白は字牌なので么九牌。暗槓は么九牌の暗刻8符の4倍で32符、符のいちばん高い形です。" },
+        { q: "1萬を明槓した時（么九牌）の符は？", choices: ["8符","16符","32符"], answer: "16符", why: "1萬は么九牌。明槓は么九牌の明刻4符の4倍で16符です。" },
+        { q: "4索を暗槓した時（中張牌）の符は？", choices: ["8符","16符","32符"], answer: "16符", why: "4索は中張牌。暗槓は中張牌の暗刻4符の4倍で16符です。" },
+        { q: "9萬を暗槓した時（么九牌）の符は？", choices: ["16符","32符","64符"], answer: "32符", why: "9萬は么九牌。暗槓は么九牌の暗刻8符の4倍で32符です。" },
+        { q: "發を明槓した時（么九牌）の符は？", choices: ["8符","16符","32符"], answer: "16符", why: "發は字牌なので么九牌。明槓は么九牌の明刻4符の4倍で16符です。" },
+        { q: "2筒を明槓した時（中張牌）の符は？", choices: ["4符","8符","16符"], answer: "8符", why: "2筒は中張牌。明槓は中張牌の明刻2符の4倍で8符です。" },
+        { q: "槓子の符は、同じ牌の刻子の何倍？", choices: ["2倍","3倍","4倍"], answer: "4倍", why: "槓子は同じ牌の刻子の4倍です（明刻2符→明槓8符、暗刻8符→暗槓32符）。" },
+        { q: "符がいちばん高い槓子はどれ？", choices: ["中張牌の暗槓（16符）","么九牌の明槓（16符）","么九牌の暗槓（32符）"], answer: "么九牌の暗槓（32符）", why: "槓子も「暗槓なら2倍」「么九牌なら2倍」。両方そろう么九牌の暗槓が32符で最高です。" },
+        { q: "中張牌の暗槓と么九牌の明槓、符が多いのはどちら？", choices: ["中張牌の暗槓","么九牌の明槓","どちらも16符で同じ"], answer: "どちらも16符で同じ", why: "中張の暗槓は暗刻4符の4倍で16符、么九の明槓は明刻4符の4倍で16符。倍になる理由は違いますが同じ16符です。" },
       ]
     },
     {
@@ -5345,16 +5431,16 @@ input, select { padding: 10px 14px; }
         { type: "text", text: "両面とシャンポンは0符。それ以外は2符です。" },
       ],
       questions: [
-        { q: "両面（リャンメン）待ちの符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "カンチャン待ち（例: 46で5待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "タンキ待ち（雀頭の1枚待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "シャンポン待ちの符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "ペンチャン待ち（例: 12で3待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "45を持っていて3でも6でもあがれる形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "79を持っていて8だけを待つ形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "89を持っていて7だけを待つ形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "この中で符がつかない待ちはどれ？", choices: ["両面待ち","カンチャン待ち","ペンチャン待ち"], answer: "両面待ち" },
-        { q: "雀頭になる牌をあと1枚だけ待っている形を何という？", choices: ["タンキ待ち","シャンポン待ち","カンチャン待ち"], answer: "タンキ待ち" },
+        { q: "両面（リャンメン）待ちの符は？", choices: ["0符","2符","4符"], answer: "0符", why: "両面はあがり牌が2種類あって待ちやすいので0符です。" },
+        { q: "カンチャン待ち（例: 46で5待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "カンチャンは間の1種類しか待てないので2符つきます。" },
+        { q: "タンキ待ち（雀頭の1枚待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "タンキは雀頭の相方1枚だけを待つ形なので2符つきます。" },
+        { q: "シャンポン待ちの符は？", choices: ["0符","2符","4符"], answer: "0符", why: "シャンポンは2種類の牌のどちらでもあがれるので0符です。" },
+        { q: "ペンチャン待ち（例: 12で3待ち）の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "ペンチャンは端でふさがっていて1種類しか待てないので2符つきます。" },
+        { q: "45を持っていて3でも6でもあがれる形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "0符", why: "2種類を待つ両面待ちなので0符です。" },
+        { q: "79を持っていて8だけを待つ形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "2符", why: "間の8だけを待つカンチャン待ちなので2符です。" },
+        { q: "89を持っていて7だけを待つ形。この待ちの符は？", choices: ["0符","2符","4符"], answer: "2符", why: "端の7だけを待つペンチャン待ちなので2符です。" },
+        { q: "この中で符がつかない待ちはどれ？", choices: ["両面待ち","カンチャン待ち","ペンチャン待ち"], answer: "両面待ち", why: "0符なのは両面とシャンポン。カンチャン・ペンチャン・タンキは2符つきます。" },
+        { q: "雀頭になる牌をあと1枚だけ待っている形を何という？", choices: ["タンキ待ち","シャンポン待ち","カンチャン待ち"], answer: "タンキ待ち", why: "これがタンキ待ちで、符は2符つきます。" },
       ]
     },
     {
@@ -5369,16 +5455,16 @@ input, select { padding: 10px 14px; }
         { type: "text", text: "役牌が雀頭の時だけ2符プラスです。" },
       ],
       questions: [
-        { q: "5萬が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "白が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "自分の風牌が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "中が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "9索が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "場風でも自風でもない風牌（オタ風）が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "場風の牌が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符" },
-        { q: "1筒が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符" },
-        { q: "雀頭で2符がつくのはどれ？", choices: ["数牌（1〜9）","オタ風","三元牌（白・發・中）"], answer: "三元牌（白・發・中）" },
-        { q: "数牌の雀頭とオタ風の雀頭、符が多いのはどちら？", choices: ["数牌","オタ風","どちらも0符で同じ"], answer: "どちらも0符で同じ" },
+        { q: "5萬が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符", why: "数牌の雀頭は役に関わらないので0符です。" },
+        { q: "白が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "白は三元牌（役牌）なので、雀頭で2符つきます。" },
+        { q: "自分の風牌が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "自風は役牌なので、雀頭で2符つきます。" },
+        { q: "中が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "中は三元牌（役牌）なので、雀頭で2符つきます。" },
+        { q: "9索が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符", why: "么九牌でも数牌の雀頭は0符。刻子と違い、雀頭は役牌かどうかだけで決まります。" },
+        { q: "場風でも自風でもない風牌（オタ風）が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符", why: "オタ風は役にならないので、雀頭でも0符です。" },
+        { q: "場風の牌が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "2符", why: "場風は役牌なので、雀頭で2符つきます。" },
+        { q: "1筒が雀頭の時の符は？", choices: ["0符","2符","4符"], answer: "0符", why: "数牌の雀頭は0符です。" },
+        { q: "雀頭で2符がつくのはどれ？", choices: ["数牌（1〜9）","オタ風","三元牌（白・發・中）"], answer: "三元牌（白・發・中）", why: "2符がつくのは役牌の雀頭。三元牌（白・發・中）と、場風・自風です。" },
+        { q: "数牌の雀頭とオタ風の雀頭、符が多いのはどちら？", choices: ["数牌","オタ風","どちらも0符で同じ"], answer: "どちらも0符で同じ", why: "どちらも役にならないので0符。雀頭の符は役牌かどうかだけで決まります。" },
       ]
     },
     {
@@ -5392,16 +5478,16 @@ input, select { padding: 10px 14px; }
         ]},
       ],
       questions: [
-        { q: "門前ロン、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符" },
-        { q: "ツモ、暗刻(么九)1つ、カンチャン待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符" },
-        { q: "門前ロン、暗刻(么九)2つ、タンキ待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符" },
-        { q: "ロン（ポンあり）、明刻(中張)1つ、明刻(么九)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符" },
-        { q: "門前ロン、暗刻(么九)1つ、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符" },
-        { q: "門前ツモ、暗槓(么九)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["50符","60符","70符"], answer: "60符" },
-        { q: "ロン（チーあり）、明刻(么九)1つ、ペンチャン待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符" },
-        { q: "門前ツモ、暗刻(中張)2つ、シャンポン待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符" },
-        { q: "門前ロン、暗槓(中張)1つ、カンチャン待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符" },
-        { q: "ツモ（ポンあり）、明刻(么九)2つ、両面待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符" },
+        { q: "門前ロン、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符", why: "基本符30（副底20＋門前加符10）＋ 暗刻(中張)4 ＋ 両面0 ＋ 数牌雀頭0 ＝ 34符 → 10の倍数に切り上げて40符。" },
+        { q: "ツモ、暗刻(么九)1つ、カンチャン待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符", why: "基本符22（副底20＋ツモ符2）＋ 暗刻(么九)8 ＋ カンチャン2 ＋ 役牌雀頭2 ＝ 34符 → 切り上げて40符。" },
+        { q: "門前ロン、暗刻(么九)2つ、タンキ待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符", why: "基本符30 ＋ 暗刻(么九)8×2 ＝ 16 ＋ タンキ2 ＋ 数牌雀頭0 ＝ 48符 → 切り上げて50符。" },
+        { q: "ロン（ポンあり）、明刻(中張)1つ、明刻(么九)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符", why: "鳴いているので門前加符なしの基本符20 ＋ 明刻(中張)2 ＋ 明刻(么九)4 ＋ 両面0 ＋ 数牌雀頭0 ＝ 26符 → 切り上げて30符。" },
+        { q: "門前ロン、暗刻(么九)1つ、暗刻(中張)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符", why: "基本符30 ＋ 暗刻(么九)8 ＋ 暗刻(中張)4 ＋ 両面0 ＋ 数牌雀頭0 ＝ 42符 → 切り上げて50符。" },
+        { q: "門前ツモ、暗槓(么九)1つ、両面待ち、数牌雀頭。合計符は？", choices: ["50符","60符","70符"], answer: "60符", why: "基本符22（副底20＋ツモ符2）＋ 暗槓(么九)32 ＋ 両面0 ＋ 数牌雀頭0 ＝ 54符 → 切り上げて60符。" },
+        { q: "ロン（チーあり）、明刻(么九)1つ、ペンチャン待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符", why: "鳴いているので基本符20 ＋ 明刻(么九)4 ＋ ペンチャン2 ＋ 役牌雀頭2 ＝ 28符 → 切り上げて30符。" },
+        { q: "門前ツモ、暗刻(中張)2つ、シャンポン待ち、数牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "30符", why: "基本符22 ＋ 暗刻(中張)4×2 ＝ 8 ＋ シャンポン0 ＋ 数牌雀頭0 ＝ 30符。ちょうど10の倍数なので、そのまま30符です。" },
+        { q: "門前ロン、暗槓(中張)1つ、カンチャン待ち、数牌雀頭。合計符は？", choices: ["40符","50符","60符"], answer: "50符", why: "基本符30 ＋ 暗槓(中張)16 ＋ カンチャン2 ＋ 数牌雀頭0 ＝ 48符 → 切り上げて50符。" },
+        { q: "ツモ（ポンあり）、明刻(么九)2つ、両面待ち、役牌雀頭。合計符は？", choices: ["30符","40符","50符"], answer: "40符", why: "基本符22（鳴いていてもツモ符2はつく）＋ 明刻(么九)4×2 ＝ 8 ＋ 両面0 ＋ 役牌雀頭2 ＝ 32符 → 切り上げて40符。" },
       ]
     },
   ];
@@ -5513,6 +5599,13 @@ input, select { padding: 10px 14px; }
                     {fuTestAnswer === q.answer ? "⭕ 正解！" : `❌ 正解は ${q.answer}`}
                   </div>
                 </div>
+                {/* 当たっても外れても、なぜその符になるのかを出す */}
+                {q.why && (
+                  <div style={{ padding: 13, borderRadius: 11, background: t.sf, border: `1px solid ${t.bd}`, marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, color: t.dm, fontWeight: 700, marginBottom: 5 }}>符の数え方</div>
+                    <div style={{ fontSize: 13, color: t.tx, lineHeight: 1.95, textWrap: "balance" }}>{q.why}</div>
+                  </div>
+                )}
                 <button style={actionBtn("p")} onClick={() => {
                   if (fuTestIdx + 1 >= lesson.questions.length) setFuLessonPhase("result");
                   else { setFuTestIdx(fuTestIdx + 1); setFuTestAnswer(null); setFuTestRevealed(false); }
@@ -5561,7 +5654,8 @@ input, select { padding: 10px 14px; }
   // 選択をキャンセルしたら対局画面ではなく元の確認画面に戻す
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false); // 卓上モードの流局入力
-  const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル
+  const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル（"flip" で180度回転）
+  const [tmMenu, setTmMenu] = useState(false);               // 卓上の📋メニュー（"flip" で180度回転）
   const [seatRot, setSeatRot] = useState(0); // 卓の回転（0-3）自分を手前に持ってくる
   const [playerDetail, setPlayerDetail] = useState(null); // 変動履歴を表示するプレイヤーのindex
   const [rankPeek, setRankPeek] = useState(null);         // 長押しで順位・点差を表示するプレイヤーのindex
@@ -5787,8 +5881,14 @@ input, select { padding: 10px 14px; }
   const [keepAwake, setKeepAwake] = useState(() => {
     try { return localStorage.getItem("mj_keep_awake") !== "0"; } catch { return true; }
   });
-  const [wakeActive, setWakeActive] = useState(false);
+  // "idle" = まだ取っていない／他のアプリに移って外れた、"on" = 効いている、
+  // "failed" = 端末に断られた（iPhoneの低電力モードなど）。
+  // 画面を出した直後はまだ結果が返っていないので "idle"。ここで失敗を出さない
+  const [wakeState, setWakeState] = useState("idle");
   const wakeLockRef = React.useRef(null);
+  // 失敗したあとに、その場でもう一度試せるようにしておく
+  const wakeAcquireRef = React.useRef(null);
+  const retryWakeLock = () => { if (wakeAcquireRef.current) wakeAcquireRef.current(); };
   const saveKeepAwake = (v) => { setKeepAwake(v); try { localStorage.setItem("mj_keep_awake", v ? "1" : "0"); } catch {} };
 
   React.useEffect(() => {
@@ -5802,18 +5902,22 @@ input, select { padding: 10px 14px; }
         const wl = await navigator.wakeLock.request("screen");
         if (cancelled) { try { await wl.release(); } catch {} return; }
         wakeLockRef.current = wl;
-        setWakeActive(true);
+        setWakeState("on");
         wl.addEventListener("release", () => {
+          // 他のアプリに切り替えたときにも呼ばれる。これは失敗ではない
           wakeLockRef.current = null;
-          setWakeActive(false);
+          setWakeState("idle");
         });
-      } catch { setWakeActive(false); }
+      } catch {
+        // 端末に断られたときだけ失敗として覚える
+        setWakeState("failed");
+      }
     };
 
     const release = async () => {
       const wl = wakeLockRef.current;
       wakeLockRef.current = null;
-      setWakeActive(false);
+      setWakeState("idle");
       if (wl) { try { await wl.release(); } catch {} }
     };
 
@@ -5821,6 +5925,7 @@ input, select { padding: 10px 14px; }
       if (document.visibilityState === "visible") acquire();
     };
 
+    wakeAcquireRef.current = acquire;
     if (keepAwake) {
       acquire();
       document.addEventListener("visibilitychange", onVisible);
@@ -5830,6 +5935,7 @@ input, select { padding: 10px 14px; }
 
     return () => {
       cancelled = true;
+      wakeAcquireRef.current = null;
       document.removeEventListener("visibilitychange", onVisible);
       if (!keepAwake) return;
       const wl = wakeLockRef.current;
@@ -6199,9 +6305,6 @@ input, select { padding: 10px 14px; }
           on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
         { label: "🀫 席決めの牌の声", desc: "めくった牌に応じて「トン」など",
           on: voiceSeatOn, save: saveVoiceSeat, preview: () => playWindVoice("東", true) },
-        { label: "📖 役の読み上げ", desc: "役を選んで確定したときに「りーち、たんやお、ごうけい2はん」",
-          on: voiceYakuOn, save: saveVoiceYaku,
-          preview: () => speakYaku(["リーチ（立直）", "断么九（タンヤオ）"], 2, true) },
       ].map((row, i) => (
         <div key={i} style={{
           // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
@@ -6250,19 +6353,33 @@ input, select { padding: 10px 14px; }
           fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>💡</span>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>画面をスリープさせない</div>
-          <div style={{ fontSize: 11, color: t.dm }}>対局中に画面が暗くなるのを防ぎます</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: t.tx, textWrap: "balance" }}>画面をスリープさせない</div>
+          <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.7, textWrap: "balance" }}>アプリを開いている間、画面が暗くなるのを防ぎます</div>
         </div>
       </div>
       {wakeSupported ? (
         <>
           {toggleRow("スリープ防止を有効にする", keepAwake, () => saveKeepAwake(!keepAwake))}
-          <div style={{ fontSize: 10, color: keepAwake && wakeActive ? t.gn : t.dm, marginTop: 8 }}>
-            {keepAwake
-              ? (wakeActive ? "● 動作中 — このアプリを開いている間は画面が消えません" : "他のアプリに切り替えると一時停止し、戻ると再開します")
-              : "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います"}
+          <div style={{
+            fontSize: 12, marginTop: 8, lineHeight: 1.8, textWrap: "balance",
+            color: !keepAwake ? t.dm : wakeState === "on" ? t.gn : wakeState === "failed" ? t.gd : t.dm,
+          }}>
+            {!keepAwake
+              ? "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います"
+              : wakeState === "on"
+                ? "● 動作中 — このアプリを開いている間は画面が消えません"
+                : wakeState === "failed"
+                  ? "⚠ 有効にできませんでした — iPhoneが低電力モードのときは使えません。オフにしてからもう一度お試しください"
+                  : "他のアプリに切り替えると一時停止し、戻ると再開します"}
           </div>
+          {keepAwake && wakeState === "failed" && (
+            <button onClick={retryWakeLock} style={{
+              marginTop: 8, padding: "10px 14px", minHeight: 34, borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${t.gd}66`, background: t.gdS, color: t.gd,
+              fontSize: 13, fontWeight: 800,
+            }}>もう一度試す</button>
+          )}
         </>
       ) : (
         <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.7 }}>
@@ -6461,9 +6578,9 @@ input, select { padding: 10px 14px; }
               </div>
               {[
                 ["voice", "🔊", "音の設定",
-                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`],
+                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`],
                 ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`],
-                ["screen", "💡", "画面設定", "対局中のスリープ防止"],
+                ["screen", "💡", "画面設定", "開いている間のスリープ防止"],
               ].map(([id, icon, title, sub]) => (
                 <React.Fragment key={id}>
                   <button onClick={() => setRcSet(v => (v === id ? null : id))} style={{
@@ -6474,7 +6591,7 @@ input, select { padding: 10px 14px; }
                     <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: t.tx }}>{title}</span>
-                      <span style={{ display: "block", fontSize: 10.5, color: t.dm, marginTop: 1 }}>{sub}</span>
+                      <span style={{ display: "block", fontSize: 10.5, color: t.dm, marginTop: 1, textWrap: "balance" }}>{sub}</span>
                     </span>
                     <span style={{
                       color: rcSet === id ? t.ac : t.dm, fontSize: 12, flexShrink: 0,
@@ -6505,7 +6622,7 @@ input, select { padding: 10px 14px; }
                 setRonPick([]); setRonLoserPick(null); setMultiRon(null);
                 setGameFinished(true);
               }}
-              style={{ ...actionBtn(), marginBottom: 0, color: t.rd, border: `1px solid ${t.rd}55` }}
+              style={{ ...actionBtn(), marginBottom: 0, color: t.rd, border: `1px solid ${t.rd}55`, textWrap: "balance" }}
             >⏹ この対局を途中で終了する</button>
             <div style={{ fontSize: 10, color: t.dm, marginTop: 7, lineHeight: 1.7, textAlign: "center" }}>
               オーラスを待たずに終わります。結果画面で内容を確認してから記録できます
@@ -6635,19 +6752,26 @@ input, select { padding: 10px 14px; }
     return { flows, pool, total };
   };
 
+  // あがった人が本場でもらう実額。1本場の点数はルール次第（HU）で、
+  // ツモは人数で割って集めるため端数が出る。表示は必ずこの実額に合わせる
+  const honbaGet = () => {
+    const payers = PC - 1;
+    const hb = honba * HU();
+    return gTsumo ? Math.floor(hb / payers) * payers : (gLoser !== null ? hb : 0);
+  };
+  // 卓に出ているリーチ棒の本数（前局からの供託＋この局のウィザード入力ぶん）
+  const riichiSticks = () => riichiBets + gRiichi.filter(Boolean).length;
+
   // 点数・本場・リーチ棒を分けて見せる内訳。分けるものが無ければ出さない
   const PayBreakdown = () => {
     if (gWinner === null || !gResult) return null;
     const { pool, total } = payInfo();
-    const payers = PC - 1;
-    const hb = honba * HU();
-    // ツモは本場を人数で割って払うので、端数を切った実際の受け取り額で示す
-    const honbaTotal = gTsumo ? Math.floor(hb / payers) * payers : (gLoser !== null ? hb : 0);
+    const honbaTotal = honbaGet();
     const base = total - pool - honbaTotal;
     if (honbaTotal <= 0 && pool <= 0) return null;
     const parts = [
       { lb: "和了点", amt: base, c: t.tx },
-      ...(honbaTotal > 0 ? [{ lb: `積み棒 ${honba}本`, amt: honbaTotal, c: t.gd }] : []),
+      ...(honbaTotal > 0 ? [{ lb: `${honba}本場`, amt: honbaTotal, c: t.gd }] : []),
       ...(pool > 0 ? [{ lb: `リーチ棒 ${pool / 1000}本`, amt: pool, c: t.ac }] : []),
     ];
     return (
@@ -6723,25 +6847,25 @@ input, select { padding: 10px 14px; }
           </svg>
 
 
-          {/* 各席のパネル。和了点・リーチ棒・積み棒を行で分けて示す */}
+          {/* 各席のパネル。和了点・リーチ棒・本場を行で分けて示す */}
           {Array.from({ length: PC }, (_, i) => i).map(i => {
             const pos = posOf(i);
             const isWin = i === gWinner;
             const f = flows.find(x => x.from === i);
             const hb2 = honba * HU();
-            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の積み棒ぶん
-            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る積み棒ぶん
+            const hbPay = gTsumo ? Math.floor(hb2 / (PC - 1)) : hb2;          // 払う側の本場ぶん
+            const hbGet = gTsumo ? Math.floor(hb2 / (PC - 1)) * (PC - 1) : (gLoser !== null ? hb2 : 0); // 受け取る本場ぶん
             // この局にリーチ棒を出した人（卓上の宣言・ウィザード入力のどちらでも）
             const decl = !!(declaredRiichi[i] || gRiichi[i]);
             const sticks = pool / 1000;   // 卓に出ているリーチ棒の本数（前局からの供託を含む）
-            // 並びは 和了点 → 積み棒 → 合計 → リーチ棒。
-            // 合計は和了点と積み棒の小計で、供託のやりとりであるリーチ棒は含めない
+            // 並びは 和了点 → 本場 → 合計 → リーチ棒。
+            // 合計は和了点と本場の小計で、供託のやりとりであるリーチ棒は含めない
             const rows = [];
             if (isWin) rows.push({ lb: "和了点", v: total - pool - hbGet });
             else if (f) rows.push({ lb: "和了点", v: -(f.amt - hbPay) });
-            if (isWin ? hbGet > 0 : (f && hbPay > 0)) rows.push({ lb: "積み棒", v: isWin ? hbGet : -hbPay });
+            if (isWin ? hbGet > 0 : (f && hbPay > 0)) rows.push({ lb: "本場", v: isWin ? hbGet : -hbPay });
             const sub = rows.reduce((a, r) => a + r.v, 0);
-            // 積み棒が無いときは和了点がそのまま合計なので、同じ数字を2行出さない
+            // 本場が無いときは和了点がそのまま合計なので、同じ数字を2行出さない
             if (rows.length >= 2) rows.push({ lb: "合計", v: sub, strong: true });
             // リーチ棒は点数ではなく本数で示す。卓上で宣言した人は宣言した時点で
             // 1,000点を引いてあり、ウィザードで後から入力した人は精算時に引く。
@@ -6775,7 +6899,7 @@ input, select { padding: 10px 14px; }
                   {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.2, flexShrink: 0 }}>親</span>}
                 </div>
                 {/* 内訳の行（ラベル左・金額右）。動きの無い席は 0 を1行だけ出す。
-                    和了点・積み棒・合計・リーチ棒の4行になると枠に収まらないので、
+                    和了点・本場・合計・リーチ棒の4行になると枠に収まらないので、
                     そのときだけ字送りと文字を詰める */}
                 {(rows.length ? rows : [{ lb: "和了点", v: 0 }]).map((r2, k2, arr) => {
                   // 「本人分含む」の注記が入る分も行数に数える
@@ -7815,10 +7939,10 @@ input, select { padding: 10px 14px; }
             {setOpen === "dice" && dicePanelCard()}
 
             {secHdr("voice", "🔊", "音の設定",
-              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
+              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
             {setOpen === "voice" && voicePanelCard()}
 
-            {secHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
+            {secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
             {setOpen === "screen" && screenPanelCard()}
 
             {/* ルール類の保存（変更があるときだけ表示）。横並び1行の小さめボタン */}
@@ -9003,7 +9127,7 @@ input, select { padding: 10px 14px; }
               width: 24, height: 24, borderRadius: "50%", background: t.ac, color: "#fff",
               fontSize: 13, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}>{no}</span>
-            <span style={{ fontSize: 15, fontWeight: 800, color: t.tx }}>{title}</span>
+            <span style={{ fontSize: 15, fontWeight: 800, color: t.tx, textWrap: "balance" }}>{title}</span>
           </div>
           <div style={{ fontSize: 13, color: t.tx, lineHeight: 1.95, paddingLeft: 32 }}>{children}</div>
         </div>
@@ -9092,7 +9216,7 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 13, lineHeight: 2, color: t.tx }}>
               ① 100 × 2<sup>(2+1)</sup> = 100 × 8 = <b style={{ color: t.gd }}>800</b><br />
               ② 子は 800 × 1 = 800 ／ 親は 800 × 2 = 1,600<br />
-              ③ どちらも端数なし → <b style={{ color: t.gn }}>800 / 1,600</b><br />
+              ③ どちらも端数なし → <b style={{ color: t.gn, whiteSpace: "nowrap" }}>800 / 1,600</b><br />
               <span style={{ fontSize: 12, color: t.dm }}>合計は 800×2 + 1,600 = 3,200点</span>
             </div>
 
@@ -9102,8 +9226,8 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 13, lineHeight: 2, color: t.tx }}>
               子・ロン・4翻40符<br />
               ① 40 × 2<sup>(2+4)</sup> = 40 × 64 = 2,560<br />
-              　→ 2,000を超えるので <b style={{ color: t.gd }}>2,000で頭打ち</b><br />
-              ② 2,000 × 4 = <b style={{ color: t.gn }}>8,000点（満貫）</b>
+              　→ 2,000を超えるので <b style={{ color: t.gd, whiteSpace: "nowrap" }}>2,000で頭打ち</b><br />
+              ② 2,000 × 4 = <b style={{ color: t.gn, whiteSpace: "nowrap" }}>8,000点（満貫）</b>
             </div>
           </div>
 
@@ -9132,11 +9256,18 @@ input, select { padding: 10px 14px; }
             </div>
           </div>
 
-          <button style={{ ...actionBtn("p"), marginTop: 16 }}
-            onClick={() => { setSqMode("choice"); setSqScore({ ok: 0, total: 0 }); makeScoreQuestion(); }}>
-            選択式で練習する
-          </button>
-          <button style={actionBtn()} onClick={() => setSqMode(null)}>出題方式を選ぶ</button>
+          {sqLessonBackTo ? (
+            <button style={{ ...actionBtn("p"), marginTop: 16 }}
+              onClick={() => { const back = sqLessonBackTo; setSqLessonBackTo(null); setSqMode(back); }}>
+              ← 解いていた問題に戻る
+            </button>
+          ) : (
+            <button style={{ ...actionBtn("p"), marginTop: 16 }}
+              onClick={() => { setSqLessonBackTo(null); setSqMode("choice"); setSqScore({ ok: 0, total: 0 }); makeScoreQuestion(); }}>
+              選択式で練習する
+            </button>
+          )}
+          <button style={actionBtn()} onClick={() => { setSqLessonBackTo(null); setSqMode(null); }}>出題方式を選ぶ</button>
         </div>
       );
     }
@@ -9268,7 +9399,7 @@ input, select { padding: 10px 14px; }
             4翻以下の点数を、親子・ロンツモの組み合わせで出題します
           </div>
 
-          <button onClick={() => setSqMode("lesson")} style={{
+          <button onClick={() => { setSqLessonBackTo(null); setSqMode("lesson"); }} style={{
             width: "100%", padding: "18px", marginBottom: 12, borderRadius: 13, cursor: "pointer",
             border: `2px solid ${t.gn}`, background: t.gnS, textAlign: "left",
           }}>
@@ -9330,7 +9461,7 @@ input, select { padding: 10px 14px; }
 
     return (
       <div style={body}>
-        <button style={backBtn} onClick={() => { setSqMode(null); setSqQ(null); }}>← 出題方式を変える</button>
+        <button style={backBtn} onClick={() => { setSqLessonBackTo(null); setSqMode(null); setSqQ(null); }}>← 出題方式を変える</button>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
           <span style={{ fontSize: 12, color: t.dm }}>
@@ -9393,26 +9524,35 @@ input, select { padding: 10px 14px; }
             </div>
           ) : (
             <div>
-              {a.kind === "pair" ? (
+              {/* まだ何も入っていない欄だけを脈打たせて、ここに打ち込むのだと知らせる。
+                  何か入ったら止める。答え合わせのあと（入力できない状態）も光らせない */}
+              {(() => {
+              const promptOn = (v) => sqJudged === null && !v;
+              const promptStyle = (v) => promptOn(v)
+                ? { animation: "inputPrompt 1.6s ease-in-out infinite" }
+                : null;
+              const promptCls = (v) => promptOn(v) ? "sq-input-prompt" : undefined;
+              return a.kind === "pair" ? (
                 <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>子から</div>
                     <input type="text" inputMode="numeric" value={sqIn1} disabled={sqJudged !== null}
-                      onChange={e => setSqIn1(e.target.value)} placeholder="0"
-                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center" }} />
+                      onChange={e => setSqIn1(e.target.value)} placeholder="0" className={promptCls(sqIn1)}
+                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center", ...promptStyle(sqIn1) }} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: t.dm, marginBottom: 5 }}>親から</div>
                     <input type="text" inputMode="numeric" value={sqIn2} disabled={sqJudged !== null}
-                      onChange={e => setSqIn2(e.target.value)} placeholder="0"
-                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center" }} />
+                      onChange={e => setSqIn2(e.target.value)} placeholder="0" className={promptCls(sqIn2)}
+                      style={{ ...inputStyle, fontSize: 20, fontWeight: 800, textAlign: "center", ...promptStyle(sqIn2) }} />
                   </div>
                 </div>
               ) : (
                 <input type="text" inputMode="numeric" value={sqIn1} disabled={sqJudged !== null}
-                  onChange={e => setSqIn1(e.target.value)} placeholder="点数を入力"
-                  style={{ ...inputStyle, fontSize: 26, fontWeight: 900, textAlign: "center", marginBottom: 12, padding: "14px" }} />
-              )}
+                  onChange={e => setSqIn1(e.target.value)} placeholder="点数を入力" className={promptCls(sqIn1)}
+                  style={{ ...inputStyle, fontSize: 26, fontWeight: 900, textAlign: "center", marginBottom: 12, padding: "14px", ...promptStyle(sqIn1) }} />
+              );
+              })()}
               {sqJudged === null && (
                 <button style={actionBtn("p")} onClick={judgeScoreInput}
                   disabled={!sqIn1 || (a.kind === "pair" && !sqIn2)}>答え合わせ</button>
@@ -9471,7 +9611,8 @@ input, select { padding: 10px 14px; }
           )}
         </div>
 
-        <button style={{ ...actionBtn(), marginTop: 12 }} onClick={() => setSqMode("lesson")}>📘 計算のしかたを見る</button>
+        <button style={{ ...actionBtn(), marginTop: 12 }}
+          onClick={() => { setSqLessonBackTo(sqMode); setSqMode("lesson"); }}>📘 計算のしかたを見る</button>
         <button style={actionBtn()} onClick={() => setView("home")}>メニューに戻る</button>
       </div>
     );
@@ -9748,7 +9889,6 @@ input, select { padding: 10px 14px; }
                 const pinfu = pickedYaku.includes("平和（ピンフ）");
                 const chiitoi = pickedYaku.includes("七対子（チートイツ）");
                 const naki = pickerNaki === true;
-                speakYaku(pickedYaku, h);
                 setCHan(h); setGKnownNaki(pickerNaki); resetYakuPicker();
                 if (h >= 5) { setCFu(30); setCalcStep(4); }
                 else if (chiitoi) { setCFu(25); setCalcStep(4); }
@@ -10326,10 +10466,10 @@ input, select { padding: 10px 14px; }
           {gsOpen === "dice" && dicePanelCard()}
 
           {gsHdr("voice", "🔊", "音の設定",
-            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
+            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
           {gsOpen === "voice" && voicePanelCard()}
 
-          {gsHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
+          {gsHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
           {gsOpen === "screen" && screenPanelCard()}
           </>)}
 
@@ -10728,10 +10868,64 @@ input, select { padding: 10px 14px; }
   // ── TABLE MODE (卓上モード) ──
   // 卓の中央にスマホを置き、各プレイヤーが自分の点数を正面から読める向きに回転
   // ══════════════════════════════════
+  // 卓上の📋メニュー。「局の修正」と「ルールの確認・変更」を選ばせる
+  const TableMenuModal = () => {
+    if (!tmMenu) return null;
+    const flip = tmMenu === "flip";
+    const close = () => setTmMenu(false);
+    const canFix = rounds.length > 0;
+    const item = (icon, label, hint, on, disabled) => (
+      <button onClick={disabled ? undefined : on} disabled={!!disabled} style={{
+        width: "100%", textAlign: "left", cursor: disabled ? "default" : "pointer",
+        padding: "14px 14px", borderRadius: 12, marginBottom: 8, minHeight: 34,
+        border: `1px solid ${disabled ? t.bd : t.ac}55`,
+        background: disabled ? t.sf : t.acS, opacity: disabled ? 0.5 : 1,
+        display: "flex", alignItems: "center", gap: 11,
+      }}>
+        <span style={{ fontSize: 20, flexShrink: 0 }}>{icon}</span>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 15, fontWeight: 800, color: disabled ? t.dm : t.tx, textWrap: "balance" }}>{label}</span>
+          <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, lineHeight: 1.6, textWrap: "balance" }}>{hint}</span>
+        </span>
+      </button>
+    );
+    return (
+      <div style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 120,
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "20px 16px",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        overflowY: "auto",
+      }} onClick={close}>
+        <div style={{
+          ...card, maxWidth: 400, width: "100%", margin: 0,
+          // 上側（対面向き）のボタンから開いたときは、向かいの人が読める向きにする
+          transform: flip ? "rotate(180deg)" : "none",
+        }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: t.tx }}>メニュー</span>
+            <button aria-label="閉じる" style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer", lineHeight: 1, minWidth: 34, minHeight: 34, padding: "0 6px" }}
+              onClick={close}>✕</button>
+          </div>
+          {item("✏️", "局の修正",
+            canFix ? "終わった局を選んで入力し直します" : "まだ終わった局がありません",
+            () => { setTmMenu(false); setEditingRoundIdx(null); setShowRoundEdit(flip ? "flip" : true); },
+            !canFix)}
+          {item("📋", "ルールの確認・変更",
+            "この対局のルールを確認して、その場で変えられます",
+            () => { setTmMenu(false); setShowRuleCheck(flip ? "flip" : true); })}
+          <button style={{ ...actionBtn(), marginTop: 4 }} onClick={close}>閉じる</button>
+        </div>
+      </div>
+    );
+  };
+
   // 局の修正モーダル（卓上モード・通常画面の両方から使う）
   const RoundEditModal = () => !showRoundEdit ? null : (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto" }}>
-            <div style={{ width: "100%", maxWidth: 400 }}>
+            {/* 上側（対面向き）のボタンから開いたときは、向かいの人が読める向きにする */}
+            <div style={{ width: "100%", maxWidth: 400, transform: showRoundEdit === "flip" ? "rotate(180deg)" : "none" }}>
               <div style={card}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                   <span style={{ fontSize: 16, fontWeight: 800 }}>局の修正</span>
@@ -10798,8 +10992,8 @@ input, select { padding: 10px 14px; }
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
     // 席順: players[0]=手前, [1]=右, [2]=向かい, [3]=左（反時計回り＝下家が右）
     // 卓（正方形）の一辺に対する比率で決める。端末サイズが変わっても重ならない
-    const PW = "37cqmin";   // パネルの長辺
-    const PH = "27cqmin";   // パネルの短辺（点数とリーチボタンの間を空けた分だけ広げてある）
+    const PW = "36cqmin";   // パネルの長辺
+    const PH = "28cqmin";   // パネルの短辺（名前・点数・リーチの間を空けた分だけ広げてある）
     const PGAP = "3cqmin"; // 卓のふちからの余白
 
     // サイコロの結果で割る山の持ち主
@@ -10829,7 +11023,7 @@ input, select { padding: 10px 14px; }
           width: PW, height: PH,
           // 通常時は内側の余白を詰める。名前・風/点数・リーチの3段が
           // はみ出さずに収まる幅を確保するため（横 3.5→2.4 / 縦 3→0.9）
-          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "0.9cqmin 2.4cqmin", borderRadius: "3.5cqmin",
+          padding: (tmWinStep || tmDrawMode) ? "2cqmin" : "0.7cqmin 2.4cqmin", borderRadius: "3.5cqmin",
           // 親は外枠だけ黄色に。背景は他家と同じ
           background: (tmWinStep || tmDrawMode) ? "transparent" : isRiichi ? "rgba(220,60,60,0.16)" : t.card,
           border: (tmWinStep || tmDrawMode) ? "2px solid transparent" : `2px solid ${isRiichi ? t.rd : isDealer ? t.gd : t.bd}`,
@@ -10960,20 +11154,20 @@ input, select { padding: 10px 14px; }
             </div>
           ) : (
             <>
-              <div {...longPressHandlers(i)} style={{ ...longPressHandlers(i).style, cursor: "pointer", padding: "0 2px" }}>
+              <div style={{ padding: "0 2px" }}>
                 {/* 名前は横幅いっぱいを使う（長い名前でも切れないように） */}
                 <div style={{
                   fontSize: nameFont(players[i], 4), fontWeight: 700, color: t.tx,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   lineHeight: 1.2, textAlign: "center", width: "100%", flexShrink: 0,
                 }}>{players[i]}</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1.2cqmin", marginTop: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1cqmin", marginTop: "1cqmin" }}>
                   <span style={{
                     fontSize: "3.9cqmin", fontWeight: 900, lineHeight: 1,
                     color: isDealer ? "#1a1a1a" : t.tx,
                     background: isDealer ? t.gd : t.sf,
                     border: `1px solid ${isDealer ? t.gd : t.bd}`,
-                    borderRadius: "1.6cqmin", padding: "0.8cqmin 1.3cqmin", flexShrink: 0,
+                    borderRadius: "1.6cqmin", padding: "0.5cqmin 1cqmin", flexShrink: 0,
                   }}>{seatWind}</span>
                   <span style={{
                     fontSize: "5.3cqmin", fontWeight: 900, lineHeight: 1.1, flexShrink: 0,
@@ -10993,7 +11187,7 @@ input, select { padding: 10px 14px; }
                 // 指で押せる高さ（32px以上）と読める文字を確保する。
                 // 卓上モードは cqmin が基本だが、狭い画面では潰れて押せなくなるため
                 // 高さと文字だけ最低値を持たせている（大小関係は名前・点数より小さいまま）
-                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "max(4px, 1.4cqmin)",
+                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "1.4cqmin",
                 // 余白を足した分だけ縦に潰されて文字が枠に貼りつかないよう、
                 // このボタンだけは縮まないようにしている
                 minHeight: "32px", flexShrink: 0, boxSizing: "border-box",
@@ -11043,6 +11237,35 @@ input, select { padding: 10px 14px; }
       fontSize: 13, fontWeight: 700, cursor: "pointer", boxSizing: "border-box", lineHeight: 1.4,
       ...(v === "p" ? { background: t.ac, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }),
     });
+    // 順位ビューはボタンを押した側の席の人を基準にする（上のバーは対面向き）
+    const rowSeat = (flip) => (((flip && PC === 4) ? 2 : 0) + seatRot) % PC;
+    // 操作バーは端末によって文字の出方が変わり、固定サイズだと横にはみ出す。
+    // すき間・アイコン幅・文字を画面幅に合わせて縮め、さらに文字ボタンは
+    // minWidth:0 にして、どうしても足りないときは枠から出ずに詰まるようにする
+    const BAR_GAP = "clamp(4px, 1.6vw, 8px)";
+    const barIcon = (fs) => ({
+      ...smallBtn(), flex: "0 0 clamp(32px, 10vw, 44px)",
+      fontSize: fs || "clamp(15px, 4.6vw, 19px)", padding: "10px 0",
+    });
+    // basis を中身の幅にしておくと、余った幅を分け合っても
+    // 「アガリ入力」だけ足りなくなることがない
+    const barMain = (v) => ({
+      // smallBtn の width:100% が残っていると basis が枠いっぱいになってしまうので戻す
+      ...smallBtn(v), width: "auto", flex: "1 1 auto", minWidth: 0, padding: "11px 4px",
+      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      fontSize: "clamp(11px, 3.2vw, 14px)",
+    });
+    const rankBtn = (flip) => (
+      <button aria-label="順位と点差" style={{ ...barIcon("clamp(14px, 4.2vw, 17px)") }}
+        onClick={() => { setRankPeekGold(false); setRankPeek(rowSeat(flip)); }}>📊</button>
+    );
+    const rotateBtn = () => (
+      <button aria-label="席順を回す" style={{
+        ...barIcon(), display: "flex", alignItems: "center", justifyContent: "center",
+      }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}>
+        <RotateIcon size={20} />
+      </button>
+    );
     const actionRow = (flip) => (flip && (reviewing || correctingDrawIdx !== null)) ? null : (
       <div style={{
         transform: flip ? "rotate(180deg)" : "none",
@@ -11126,32 +11349,27 @@ input, select { padding: 10px 14px; }
         ) : (reviewing && fixIdx === null) ? (
           /* 結果画面から戻ってきた直後。まだ直す局を選んでいないので
              「アガリ入力」「流局」は出さない（押すと局が増えてしまう） */
-          <div style={{ display: "flex", gap: 8 }}>
-            <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+          <div style={{ display: "flex", gap: BAR_GAP }}>
+            <button aria-label="ルール確認" style={barIcon()}
               onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
-            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }}
+            <button style={barMain("p")}
               onClick={() => { setEditingRoundIdx(null); setShowRoundEdit(true); }}>✏️ 局を選んで修正</button>
-            <button aria-label="席順を回す" style={{
-              ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}><RotateIcon size={22} /></button>
+            {rankBtn(flip)}
+            {rotateBtn()}
           </div>
         ) : (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
-              onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
-            <button aria-label="対局を保留" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+          <div style={{ display: "flex", gap: BAR_GAP }}>
+            <button aria-label="メニュー" style={barIcon()}
+              onClick={() => setTmMenu(flip ? "flip" : true)}>📋</button>
+            <button aria-label="対局を保留" style={barIcon()}
               onClick={() => {
                 setSuspendedGame(snapshotGame());
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
-            {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
-            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
-            <button style={{ ...smallBtn(), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
-            <button aria-label="席順を回す" style={{
-              ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}><RotateIcon size={22} /></button>
+            <button style={barMain("p")} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={barMain()} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
+            {rankBtn(flip)}
+            {rotateBtn()}
           </div>
         )}
       </div>
@@ -11166,16 +11384,6 @@ input, select { padding: 10px 14px; }
         overflow: "hidden",
         display: "flex", flexDirection: "column", justifyContent: "center",
       }}>
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginBottom: 4, padding: "0 6px" }}>
-          {rounds.length > 0 && (
-            <button style={{
-              background: "none", border: "none", color: t.dm, fontSize: 11, cursor: "pointer", fontWeight: 600,
-              // 31pxしかなく指で押しにくかったので高さを34px以上にする
-              padding: "9px 10px", minHeight: 34, boxSizing: "border-box",
-            }} onClick={() => setShowRoundEdit(true)}>📋 局の修正</button>
-          )}
-        </div>
-
         {/* いまどの局を直しているか（入力はふだんどおり下のボタンから） */}
         {fixIdx !== null && (
           <div style={{
@@ -11201,6 +11409,7 @@ input, select { padding: 10px 14px; }
           </div>
         )}
         {RuleCheckModal()}
+        {TableMenuModal()}
         {RonRuleWarnModal()}
         {actionRow(true)}
 
@@ -11466,7 +11675,7 @@ input, select { padding: 10px 14px; }
           }}>↩ 修正をやめる</button>
         )}
         <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
-          点数を長押しすると順位と点差が見られます
+          📊 を押すと順位と点差が見られます
         </div>
         {StartSplash()}
         {PayTableView()}
@@ -11721,7 +11930,6 @@ input, select { padding: 10px 14px; }
                       const pinfu = pickedYaku.includes("平和（ピンフ）");
                       const chiitoi = pickedYaku.includes("七対子（チートイツ）");
                       const naki = pickerNaki === true;
-                      speakYaku(pickedYaku, h);
                       setGHan(h); setGKnownNaki(pickerNaki); resetYakuPicker();
                       if (h >= 5) { setGFu(30); setGStep(7); }
                       else if (chiitoi) { setGFu(25); setGStep(7); }
@@ -11890,7 +12098,7 @@ input, select { padding: 10px 14px; }
                           style={{ ...rowStyle, cursor: "pointer" }}>
                           <span style={{ fontSize: 12, color: t.dm }}>あがり方</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: gTsumo ? t.gn : t.rd }}>{gTsumo ? "ツモ" : "ロン"}{!gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: gTsumo ? t.gn : t.rd, textWrap: "balance" }}>{gTsumo ? "ツモ" : "ロン"}{!gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""}</span>
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
@@ -11931,22 +12139,8 @@ input, select { padding: 10px 14px; }
                   )}
                 </div>
                 <ScoreDisplay han={gHan} fu={gFu} limit={gLimit} result={gResult} tsumo={gTsumo} parent={gParent}
-                  extra={
-                    <>
-                      <div style={{ fontSize: 18, color: t.tx, marginTop: 8, fontWeight: 700 }}>
-                        {players[gWinner]} {gTsumo ? "ツモ" : `← ${players[gLoser]}`}
-                      </div>
-                      {(honba > 0 || riichiBets > 0 || gRiichi.some(Boolean)) && (
-                        <div style={{ fontSize: 12, color: t.dm, marginTop: 6, borderTop: `1px solid ${t.bd}`, paddingTop: 6 }}>
-                          {/* 1本場の点数はルールに従う（三麻連盟は600点）。実際の加算(HU)と表示を一致させる */}
-                          {honba > 0 && `本場 +${(honba * HU()).toLocaleString()}`}
-                          {honba > 0 && (riichiBets > 0 || gRiichi.some(Boolean)) && " / "}
-                          {(riichiBets > 0 || gRiichi.some(Boolean)) && `リーチ棒 ${riichiBets + gRiichi.filter(Boolean).length}本 (+${((riichiBets + gRiichi.filter(Boolean).length) * 1000).toLocaleString()})`}
-                        </div>
-                      )}
-                    </>
-                  }
-                />
+                  winnerName={players[gWinner]} loserName={gLoser !== null ? players[gLoser] : null}
+                  honbaAdd={honbaGet()} sticks={riichiSticks()} />
                 {/* 点数の受け渡し（開かなくても最初から見えるように埋め込む。タップで大きく表示） */}
                 <div onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
                   <PayTableBox boxW="min(100vw - 32px, 400px)" />
@@ -12379,24 +12573,24 @@ input, select { padding: 10px 14px; }
 
         {/* Raw scores */}
         <div style={card}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 10, letterSpacing: "0.05em" }}>最終持ち点</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.dm, marginBottom: 10, letterSpacing: "0.05em" }}>最終持ち点</div>
           {/* ハコ下（0未満）の人がいたら、それが分かるように出す */}
           {adjusted.some(s => s.rawScore < 0) && (
             <div style={{
               marginBottom: 10, padding: "9px 11px", borderRadius: 9,
               background: t.rdS, border: `1px solid ${t.rd}44`,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: t.rd, lineHeight: 1.8 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: t.rd, lineHeight: 1.8 }}>
                 {ruleSet.tobiEnd !== false ? "🔻 トビで終了しました" : "🔻 ハコ下の人がいます"}
               </div>
-              <div style={{ fontSize: 11, color: t.tx, lineHeight: 1.9, marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: t.tx, lineHeight: 1.9, marginTop: 2 }}>
                 {adjusted.filter(s => s.rawScore < 0).map(s => s.name).join("、")}
                 <span style={{ display: "inline-block" }}> の持ち点が0を下回りました</span>
               </div>
             </div>
           )}
           {kyotakuAward && (
-            <div style={{ fontSize: 11, color: t.gd, marginBottom: 10, padding: "7px 10px", borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}33`, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 12, color: t.gd, marginBottom: 10, padding: "8px 10px", borderRadius: 8, background: t.gdS, border: `1px solid ${t.gd}33`, lineHeight: 1.9 }}>
               卓上に残った供託リーチ棒 {kyotakuAward.n}本（+{(kyotakuAward.n * 1000).toLocaleString()}点）はトップの {players[kyotakuAward.idx]} さんが受け取りました
             </div>
           )}
@@ -12417,114 +12611,100 @@ input, select { padding: 10px 14px; }
           ))}
         </div>
 
-        {/* Oka calculation */}
+        {/* 精算。ウマ・オカも1人ずつの内訳として、このカードにまとめて出す */}
+        {(() => {
+          const uma = ruleSet.uma || [];
+          // 要素数が人数と違うウマは合計が崩れるので使わない
+          const hasUma = uma.length === PC && uma.some(u => u !== 0);
+          // オカとウマは素点の順位で決まる
+          const rk = scores.slice(0, PC).map((sc, i) => ({ i, sc })).sort((a, b) => (b.sc - a.sc) || (a.i - b.i));
+          const rankOf = new Array(PC);
+          rk.forEach((x, r) => { rankOf[x.i] = r; });
+          const rows = players.slice(0, PC).map((name, i) => {
+            const rank0 = rankOf[i];
+            const raw = scores[i];
+            const oka = rank0 === 0 ? okaPool : 0;
+            const sub = raw - returnPt + oka;              // 五捨六入する前の精算
+            const roundedPt = goshaRokunyu(sub / 1000);    // 千点単位に五捨六入
+            const umaPt = hasUma ? (uma[rank0] || 0) : 0;
+            const pt = roundedPt + umaPt;                  // ウマ込みのポイント
+            const total = hasUma ? pt * 1000 : sub;        // この人の最終的な増減（点）
+            const gold = ruleSet.rate ? GOLD(hasUma ? pt : roundedPt, ruleSet.rate) : null;
+            return { i, name, rank0, raw, oka, sub, roundedPt, umaPt, pt, total, gold };
+          }).sort((a, b) => (b.total - a.total) || (a.rank0 - b.rank0));
+          const pm = (v) => (v > 0 ? "+" : "") + v.toLocaleString();
+          const detail = (lb, v, c, note) => (
+            <div key={lb} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "baseline",
+              gap: 10, padding: "3px 0",
+            }}>
+              <span style={{
+                fontSize: 12, color: t.dm, fontWeight: 700, textAlign: "left",
+                minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>{lb}{note && <span style={{ fontWeight: 400, marginLeft: 4 }}>{note}</span>}</span>
+              <span style={{
+                fontSize: 14, fontWeight: 800, color: c || t.tx,
+                whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums",
+              }}>{v}</span>
+            </div>
+          );
+          return (
         <div style={card}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>精算（オカ計算）</div>
-          <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>
-            返し点 {returnPt.toLocaleString()} / オカ {okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし"}
-            {(ruleSet.uma || []).some(u => u !== 0) && ` / ウマ ${(ruleSet.uma || []).map(u => (u > 0 ? "+" : "") + u).join("/")}`}
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>
+            {hasUma ? "精算（ウマ・オカ込み）" : "精算（オカ計算）"}
           </div>
-          {sorted.map((s, rank) => (
-            <div key={s.idx} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
+          <div style={{ fontSize: 13, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
+            返し点 {returnPt.toLocaleString()} / オカ {okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし"}
+            {hasUma && ` / ウマ ${uma.map(u => (u > 0 ? "+" : "") + u).join("/")}`}
+            {/* 五捨六入で小計と合計が数百点ずれるので、その理由をここで断っておく */}
+            {hasUma && (
+              <div style={{ marginTop: 4 }}>
+                {["小計を1,000点未満で", "五捨六入し、そこに", "ウマを足したものが合計です"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          {rows.map((r, rank) => (
+            <div key={r.i} style={{
               padding: "12px 14px", borderRadius: 10, marginBottom: 6,
               background: rank === 0 ? t.gdS : "transparent",
               border: rank === 0 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
-                <span style={{ fontSize: 18, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24, flexShrink: 0 }}>{rank + 1}</span>
-                <span style={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-              </div>
-              {tobiTagEl(s.rawScore)}
-              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
-                <span style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.finalPt > 0 ? t.gn : s.finalPt < 0 ? t.rd : t.tx }}>
-                  {s.finalPt > 0 ? "+" : ""}{s.finalPt.toLocaleString()}
-                </span>
-                <div style={{ fontSize: 11, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.dm }}>
-                  素点 {s.rawScore.toLocaleString()}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
+                  <span style={{ fontSize: 18, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24, flexShrink: 0 }}>{r.rank0 + 1}</span>
+                  <span style={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
                 </div>
-                {/* レートを決めているときは、いくらになるかも出す */}
-                {!!ruleSet.rate && (() => {
-                  const pt = goshaRokunyu(s.finalPt / 1000);
-                  const gold = GOLD(pt, ruleSet.rate);
-                  return (
-                    <div style={{
-                      fontSize: 17, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap", lineHeight: 1.2,
-                      color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm,
-                    }}>
-                      {gold > 0 ? "+" : ""}{GOLD_LABEL(gold)}
-                      <span style={{ fontSize: 12, marginLeft: 3, opacity: 0.85 }}>{ruleSet.rateUnit || "G"}</span>
-                    </div>
-                  );
-                })()}
+                {tobiTagEl(r.raw)}
+                <span style={{
+                  fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", flexShrink: 0, marginLeft: "auto",
+                  color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx,
+                }}>{pm(r.total)}
+                  {hasUma && <span style={{ fontSize: 12, fontWeight: 800, color: t.dm, marginLeft: 5 }}>({r.pt > 0 ? "+" : ""}{r.pt}pt)</span>}
+                </span>
+              </div>
+              {/* 1人ずつの内訳 */}
+              <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${t.bd}44` }}>
+                {detail("素点", r.raw.toLocaleString(), r.raw < 0 ? t.rd : t.tx)}
+                {detail("返し点", (-returnPt).toLocaleString(), t.dm)}
+                {r.oka > 0 && detail("オカ", pm(r.oka), t.gd)}
+                {hasUma && detail("小計", pm(r.sub), t.tx)}
+                {hasUma && detail("五捨六入", pm(r.roundedPt * 1000), t.tx)}
+                {hasUma && detail("ウマ", pm(r.umaPt * 1000), r.umaPt > 0 ? t.gd : r.umaPt < 0 ? t.rd : t.dm)}
+                {r.gold !== null && detail("レート換算",
+                  `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${ruleSet.rateUnit || "G"}`,
+                  r.gold > 0 ? t.gd : r.gold < 0 ? t.rd : t.dm)}
               </div>
             </div>
           ))}
           {!!ruleSet.rate && (
-            <div style={{ fontSize: 10, color: t.dm, marginTop: 6, lineHeight: 1.8 }}>
+            <div style={{ fontSize: 12, color: t.dm, marginTop: 8, lineHeight: 1.9 }}>
               レート 1点 = {RATE_LABEL(ruleSet.rate)} {ruleSet.rateUnit || "G"}。
               <span style={{ display: "inline-block" }}>1,000点単位に五捨六入してから掛けています</span>
-              {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (
-                <span style={{ display: "inline-block" }}>（ウマ込みの金額は下の「ポイント」を見てください）</span>
-              )}
             </div>
           )}
         </div>
-
-        {/* ウマ込みのポイント（要素数が人数と違うウマは合計が崩れるため適用しない） */}
-        {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (() => {
-          const uma = ruleSet.uma;
-          const gosha = (v) => { const s = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return s * (a - f > 0.5 ? f + 1 : f); };
-          const rk = scores.map((s, i) => ({ i, s })).sort((a3, b3) => (b3.s - a3.s) || (a3.i - b3.i));
-          const res = new Array(PC);
-          rk.forEach((x, rank) => {
-            res[x.i] = { rank: rank + 1, pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0) };
-          });
-          const order = [...res.map((r, i) => ({ ...r, i }))].sort((a3, b3) => a3.rank - b3.rank);
-          return (
-            <div style={card}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>
-                ポイント（ウマ・オカ込み）
-              </div>
-              <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>
-                素点を五捨六入し、オカとウマを加えたものです
-              </div>
-              {order.map(o => (
-                <div key={o.i} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
-                  padding: "11px 14px", borderRadius: 10, marginBottom: 6,
-                  background: o.rank === 1 ? t.gdS : "transparent",
-                  border: o.rank === 1 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
-                    <span style={{ fontSize: 15, fontWeight: 900, width: 24, flexShrink: 0, color: o.rank === 1 ? t.gd : t.dm }}>{o.rank}</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{players[o.i]}</span>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
-                    <span style={{
-                      fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
-                      color: o.pt > 0 ? t.gn : o.pt < 0 ? t.rd : t.tx,
-                    }}>{o.pt > 0 ? "+" : ""}{o.pt}</span>
-                    {!!(gameConfig?.rules?.rate) && (
-                      <div style={{
-                        fontSize: 16, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums",
-                        whiteSpace: "nowrap", lineHeight: 1.2,
-                        color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm,
-                      }}>
-                        {o.pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate))}
-                        <span style={{ fontSize: 12, marginLeft: 3, opacity: 0.85 }}>{gameConfig.rules.rateUnit || "G"}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {!!(gameConfig?.rules?.rate) && (
-                <div style={{ fontSize: 10, color: t.dm, textAlign: "right", marginTop: 6 }}>
-                  レート 1点 = {RATE_LABEL(gameConfig.rules.rate)} {gameConfig.rules.rateUnit || "G"}
-                </div>
-              )}
-            </div>
           );
         })()}
 
@@ -12597,13 +12777,13 @@ input, select { padding: 10px 14px; }
           );
         })()}
 
-        {/* 幅280pxでも1行で収まるよう、狭い画面だけ少し縮める */}
-        <button style={{ ...actionBtn("d"), fontSize: "min(15px, 4.8vw)" }} onClick={() => {
+        {/* 「終了」「再試合」をまず読ませ、説明はそのうしろに小さく置く */}
+        <button style={{ ...actionBtn("d"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }} onClick={() => {
           const lgName = leagues.find(l => l.id === activeLeagueId)?.name;
           if (!window.confirm(
             lgName
-              ? `この結果を「${lgName}」に記録して対局を終了します。\n記録後は変更できません。よろしいですか？`
-              : "この結果を履歴に記録して対局を終了します。\n記録後は変更できません。よろしいですか？"
+              ? `対局を終了して、この結果を「${lgName}」に記録します。\n記録後は変更できません。よろしいですか？`
+              : "対局を終了して、この結果を履歴に記録します。\n記録後は変更できません。よろしいですか？"
           )) return;
           setReviewing(false);
           setShowScoreFix(false);
@@ -12614,12 +12794,21 @@ input, select { padding: 10px 14px; }
           setGameFinished(false);
           if (back) { setLeagueId(back); setLeagueTab("stand"); setView("leaguedetail"); }
           else setView("home");
-        }}>{activeLeagueId ? "✓ 対局終了・リーグに記録する" : "✓ 対局終了・履歴に記録して終了"}</button>
+        }}>
+          <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>✓ 終了</span>
+          <span style={{ width: "100%", fontSize: "min(12px, 3.6vw)", fontWeight: 600, opacity: 0.9, marginTop: 2 }}>
+            {activeLeagueId ? "リーグに記録します" : "履歴に記録して対局を終わります"}
+          </span>
+        </button>
 
         {/* 再試合（リーグ対局はリーグ画面から次戦を始めるため通常対局のみ） */}
         {!activeLeagueId && (
-          <button style={{ ...actionBtn("p"), fontSize: "min(15px, 4.8vw)" }} onClick={() => setRematchPick(true)}>
-            🔁 対局終了・履歴を残して再試合
+          <button style={{ ...actionBtn("p"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}
+            onClick={() => setRematchPick(true)}>
+            <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>🔁 再試合</span>
+            <span style={{ width: "100%", fontSize: "min(12px, 3.6vw)", fontWeight: 600, opacity: 0.9, marginTop: 2 }}>
+              履歴を残して同じメンバーでもう一度
+            </span>
           </button>
         )}
 
@@ -13262,7 +13451,8 @@ input, select { padding: 10px 14px; }
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* 選択の丸・日付・時刻を、狭い画面では折り返して並べる */}
+                    <span style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
                       {histSelMode && (
                         <span style={{
                           width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
@@ -13273,12 +13463,12 @@ input, select { padding: 10px 14px; }
                       )}
                       {g.date}
                       {g.startedAt && g.endedAt && (
-                        <span style={{ fontSize: 11, fontWeight: 400, color: t.dm }}>
-                          {HHMM(g.startedAt)}〜{HHMM(g.endedAt)}
+                        <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, whiteSpace: "nowrap" }}>
+                          {`${HHMM(g.startedAt)}〜${HHMM(g.endedAt)}`}
                         </span>
                       )}
                     </span>
-                    <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
+                    <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
                       {MATCH_LABEL_SHORT(g.matchType)}
                     </span>
                   </div>
@@ -13344,7 +13534,7 @@ input, select { padding: 10px 14px; }
                     <button style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
                       onClick={() => setHistAgg(null)}>✕</button>
                   </div>
-                  <div style={{ fontSize: 10, color: t.dm, marginBottom: 12, lineHeight: 1.7 }}>
+                  <div style={{ fontSize: 12, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
                     順位は合計（素点＋ウマ＋オカ）で決めています。同じ名前は同一人物として合算します
                   </div>
                   {histAgg.rows.map((r, rank) => {
@@ -13355,30 +13545,33 @@ input, select { padding: 10px 14px; }
                       borderBottom: rank < histAgg.rows.length - 1 ? `1px solid ${t.bd}33` : "none",
                     }}>
                       <span style={{
-                        width: 30, height: 30, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                        width: 32, height: 32, borderRadius: "50%", flexShrink: 0, marginTop: 2,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, fontWeight: 900,
+                        fontSize: 15, fontWeight: 900,
                         background: rank === 0 ? t.gdS : t.sf,
                         color: rank === 0 ? t.gd : t.dm,
                         border: `1px solid ${rank === 0 ? t.gd : t.bd}`,
                       }}>{rank + 1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                        {/* 狭い画面では名前が潰れてしまうので、合計点を次の行へ送る */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                           <span style={{
-                            fontSize: 14, fontWeight: 700, color: rank === 0 ? t.gd : t.tx,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+                            fontSize: 16, fontWeight: 700, color: rank === 0 ? t.gd : t.tx,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            minWidth: 0, flex: "1 1 110px",
                           }}>{rank === 0 ? "🏆 " : ""}{r.name}</span>
                           <span style={{
                             fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums", flexShrink: 0,
+                            marginLeft: "auto", whiteSpace: "nowrap",
                             color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx,
                           }}>{pm(r.total)}点</span>
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 10.5, color: t.dm, marginTop: 4, lineHeight: 1.6, fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13, color: t.dm, marginTop: 5, lineHeight: 1.8, fontVariantNumeric: "tabular-nums" }}>
                           <span style={{ whiteSpace: "nowrap" }}>素点 {pm(r.soten)}</span>
                           <span style={{ whiteSpace: "nowrap" }}>ウマ {pm(r.uma)}</span>
                           <span style={{ whiteSpace: "nowrap" }}>オカ {pm(r.oka)}</span>
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 10.5, color: t.dm, marginTop: 2, lineHeight: 1.6, fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13, color: t.dm, marginTop: 3, lineHeight: 1.8, fontVariantNumeric: "tabular-nums" }}>
                           {histAgg.hasRate && (
                             <span style={{ whiteSpace: "nowrap", color: r.gold > 0 ? t.gn : r.gold < 0 ? t.rd : t.dm }}>
                               レート換算 {r.gold > 0 ? "+" : ""}{GOLD_LABEL(r.gold)}{histAgg.unit || "G"}
@@ -13401,15 +13594,15 @@ input, select { padding: 10px 14px; }
           <button style={backBtn} onClick={() => setHistoryDetail(null)}>← 一覧に戻る</button>
           <div style={{ ...card, padding: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, minWidth: 0 }}>
                 {historyDetail.date}
                 {historyDetail.startedAt && historyDetail.endedAt && (
-                  <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, marginLeft: 8 }}>
-                    {HHMM(historyDetail.startedAt)}〜{HHMM(historyDetail.endedAt)}
+                  <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, marginLeft: 8, whiteSpace: "nowrap" }}>
+                    {`${HHMM(historyDetail.startedAt)}〜${HHMM(historyDetail.endedAt)}`}
                   </span>
                 )}
               </span>
-              <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
+              <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
                 {MATCH_LABEL(historyDetail.matchType)}
               </span>
             </div>
@@ -13507,7 +13700,11 @@ input, select { padding: 10px 14px; }
                 else if (view === "leagueform") setView("league");
                 else if (view === "leaguedetail") setView("league");
                 else if (view === "leaguestart") setView("leaguedetail");
-                else if (view === "scorequiz" && sqMode) setSqMode(null);
+                else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
+                  // 問題の途中から解説を見に来たときは、その問題にそのまま戻す
+                  const back = sqLessonBackTo; setSqLessonBackTo(null); setSqMode(back);
+                }
+                else if (view === "scorequiz" && sqMode) { setSqLessonBackTo(null); setSqMode(null); }
                 else setView("home");
               }}
               style={{

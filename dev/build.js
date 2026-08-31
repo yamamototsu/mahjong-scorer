@@ -40,8 +40,8 @@ const html = `<!DOCTYPE html>
 <meta name="description" content="卓上ポンづけ｜卓の真ん中に置いて使う麻雀スコアラー。点数計算と対局スコア管理">
 <title>🀄 卓上ポンづけ｜麻雀スコアラー</title>
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon.svg">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preload" as="image" href="assets/intro.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet">
