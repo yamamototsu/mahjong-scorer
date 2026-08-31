@@ -9908,8 +9908,8 @@ input, select { padding: 10px 14px; }
       }, "削除")));
     })), React.createElement("button", {
       style: actionBtn(),
-      onClick: () => setView(namesBackTo)
-    }, namesBackTo === "leagueform" ? "← リーグ設定に戻る" : namesBackTo === "game" ? "← メンバー決定に戻る" : "メニューに戻る"));
+      onClick: goNamesBack
+    }, namesBackTo === "leagueform" ? "← リーグ設定に戻る" : namesBackTo === "game" ? "← メンバー決定に戻る" : namesBackTo === "members" ? "← メンバーに戻る" : "メニューに戻る"));
   };
   const renderStartGuide = () => {
     const s = GUIDE_STEPS[guideStep];
@@ -11226,6 +11226,12 @@ input, select { padding: 10px 14px; }
   const [editErr, setEditErr] = useState("");
   const [editNameIdx, setEditNameIdx] = useState(null);
   const [namesBackTo, setNamesBackTo] = useState("home");
+  const goNamesBack = () => {
+    if (namesBackTo === "members") {
+      setHomeCat("members");
+      setView("home");
+    } else setView(namesBackTo);
+  };
   const [groups, setGroups] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("mj_groups") || "[]");
@@ -13858,6 +13864,40 @@ input, select { padding: 10px 14px; }
         whiteSpace: "nowrap"
       }
     }, sub));
+    const wideBtn = (icon, label, sub, onClick) => React.createElement("button", {
+      onClick: onClick,
+      style: {
+        width: "100%",
+        padding: "11px 10px",
+        borderRadius: 13,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.card,
+        color: t.tx,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 17,
+        lineHeight: 1,
+        flexShrink: 0
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 800,
+        whiteSpace: "nowrap"
+      }
+    }, label), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        whiteSpace: "nowrap"
+      }
+    }, sub));
     const intro = booting;
     const reveal = i => intro ? {
       opacity: 0,
@@ -14156,29 +14196,30 @@ input, select { padding: 10px 14px; }
       style: {
         display: "flex",
         gap: 8,
+        marginBottom: 8,
         ...reveal(3)
       }
-    }, subBtn("🎓", "練習問題", "点数・役・符", () => {
+    }, subBtn("👤", "メンバー", `${presetNames.length}人・${groups.length}組`, () => {
+      setView("home");
+      setHomeCat("members");
+    }), subBtn("🎓", "練習問題", "点数・役・符", () => {
       setView("home");
       setHomeCat("practice");
     }), subBtn("💡", "使い方", "アプリの説明", () => {
       setView("home");
       setHomeCat("howto");
-    }), subBtn("⚙️", "設定", "ルール初期値", () => {
+    })), React.createElement("div", {
+      style: {
+        ...reveal(4)
+      }
+    }, wideBtn("⚙️", "設定", "ルール初期値", () => {
       setDraftRules({
         ...defaultRules
       });
       setRulesSaved(false);
       setView("home");
       setHomeCat("settings");
-    })), Net.enabled() && React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginTop: 8,
-        ...reveal(4)
-      }
-    }, subBtn("👥", "友達", myCode ? "結果を送り合う" : "オンライン共有", () => setView("friends"))));
+    })));
   };
   const renderHome = () => {
     const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
@@ -14236,6 +14277,10 @@ input, select { padding: 10px 14px; }
     }, "›"));
     if (homeCat === null) return renderTitle();
     const CATS = {
+      members: {
+        title: "メンバー",
+        icon: "👤"
+      },
       practice: {
         title: "練習問題",
         icon: "🎓"
@@ -14349,8 +14394,8 @@ input, select { padding: 10px 14px; }
         fontSize: 13,
         fontWeight: 700
       }
-    }, "麻雀そのものの始め方を見る")), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`), setOpen === "players" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
-      setNamesBackTo("home");
+    }, "麻雀そのものの始め方を見る")), homeCat === "members" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
+      setNamesBackTo("members");
       setView("names");
       setNewNameInput("");
       setEditNameIdx(null);
@@ -14466,7 +14511,9 @@ input, select { padding: 10px 14px; }
         padding: "6px 11px",
         color: t.ac,
         fontSize: 11,
-        cursor: "pointer"
+        cursor: "pointer",
+        minHeight: 34,
+        boxSizing: "border-box"
       }
     }, "編集"), React.createElement("button", {
       onClick: () => {
@@ -14480,7 +14527,9 @@ input, select { padding: 10px 14px; }
         padding: "6px 11px",
         color: t.rd,
         fontSize: 11,
-        cursor: "pointer"
+        cursor: "pointer",
+        minHeight: 34,
+        boxSizing: "border-box"
       }
     }, "削除")))), gEditOpen ? React.createElement("div", {
       style: {
@@ -14612,7 +14661,7 @@ input, select { padding: 10px 14px; }
         setGEditId(null);
         setGEditName("");
         setGEditMembers([]);
-        setNamesBackTo("home");
+        setNamesBackTo("members");
         setView("names");
         setNewNameInput("");
         setEditNameIdx(null);
@@ -14700,7 +14749,58 @@ input, select { padding: 10px 14px; }
         fontSize: 13,
         fontWeight: 700
       }
-    }, "＋ グループを作る"))), secHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値"), setOpen === "rules" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }, "＋ グループを作る")), React.createElement("div", {
+      style: {
+        marginTop: 12
+      }
+    }, Net.enabled() ? menuItem("👥", "友達", myCode ? "結果を送り合う" : "オンライン共有", () => setView("friends")) : React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 8
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 20,
+        width: 40,
+        height: 40,
+        borderRadius: 11,
+        background: t.acS,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0
+      }
+    }, "👥"), React.createElement("div", {
+      style: {
+        minWidth: 0
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: t.tx
+      }
+    }, "友達"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        textWrap: "balance"
+      }
+    }, "オンライン共有・いまは使えません"))), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        textWrap: "balance"
+      }
+    }, "対局結果を友達と送り合う機能です。このアプリでは準備中のため、いまは名前とグループだけが使えます。")))), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値"), setOpen === "rules" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -25956,7 +26056,7 @@ input, select { padding: 10px 14px; }
     }
   }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) && !(view === "calc" && calcStep > 0) ? React.createElement("button", {
     onClick: () => {
-      if (view === "names") setView(namesBackTo);else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
+      if (view === "names") goNamesBack();else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
         const back = sqLessonBackTo;
         setSqLessonBackTo(null);
         setSqMode(back);

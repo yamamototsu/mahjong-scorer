@@ -5167,8 +5167,10 @@ input, select { padding: 10px 14px; }
           })}
         </div>
 
-        <button style={actionBtn()} onClick={() => setView(namesBackTo)}>
-          {namesBackTo === "leagueform" ? "← リーグ設定に戻る" : namesBackTo === "game" ? "← メンバー決定に戻る" : "メニューに戻る"}
+        <button style={actionBtn()} onClick={goNamesBack}>
+          {namesBackTo === "leagueform" ? "← リーグ設定に戻る"
+            : namesBackTo === "game" ? "← メンバー決定に戻る"
+              : namesBackTo === "members" ? "← メンバーに戻る" : "メニューに戻る"}
         </button>
       </div>
     );
@@ -5799,6 +5801,11 @@ input, select { padding: 10px 14px; }
   const [editNameIdx, setEditNameIdx] = useState(null);
   // 名前登録画面の戻り先（リーグ作成やセットアップから開いたときは、そこへ戻す）
   const [namesBackTo, setNamesBackTo] = useState("home");
+  // メンバー画面はメニュー画面の中のひとつなので、開き直してから戻す
+  const goNamesBack = () => {
+    if (namesBackTo === "members") { setHomeCat("members"); setView("home"); }
+    else setView(namesBackTo);
+  };
 
   // ── よく打つ4人の組み合わせ（グループ） ──
   const [groups, setGroups] = useState(() => {
@@ -7438,6 +7445,18 @@ input, select { padding: 10px 14px; }
         <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
+    // 横いっぱいの一行版。3つ並びのタイルより背が低い
+    const wideBtn = (icon, label, sub, onClick) => (
+      <button onClick={onClick} style={{
+        width: "100%", padding: "11px 10px", borderRadius: 13, cursor: "pointer",
+        border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+      }}>
+        <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
+      </button>
+    );
     // 起動直後はタイトルだけを見せる。演出が終わったらメニューを順に出す。
     // 中身は常に置いたまま透明にするので、メニューが出るときに位置が飛ばない。
     const intro = booting;
@@ -7610,18 +7629,17 @@ input, select { padding: 10px 14px; }
           {subBtn("🔢", "一局計算", "翻・符から", () => { resetCalc(); setView("calc"); })}
           {subBtn("📋", "対局履歴", `${gameHistory.length}件`, () => { setActiveLeagueId(null); setView("history"); })}
         </div>
-        <div style={{ display: "flex", gap: 8, ...reveal(3) }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, ...reveal(3) }}>
+          {subBtn("👤", "メンバー", `${presetNames.length}人・${groups.length}組`, () => { setView("home"); setHomeCat("members"); })}
           {subBtn("🎓", "練習問題", "点数・役・符", () => { setView("home"); setHomeCat("practice"); })}
           {subBtn("💡", "使い方", "アプリの説明", () => { setView("home"); setHomeCat("howto"); })}
-          {subBtn("⚙️", "設定", "ルール初期値", () => {
+        </div>
+        {/* 設定だけは横いっぱいの一行にして、3つずつの並びを崩さない */}
+        <div style={{ ...reveal(4) }}>
+          {wideBtn("⚙️", "設定", "ルール初期値", () => {
             setDraftRules({ ...defaultRules }); setRulesSaved(false); setView("home"); setHomeCat("settings");
           })}
         </div>
-        {Net.enabled() && (
-          <div style={{ display: "flex", gap: 8, marginTop: 8, ...reveal(4) }}>
-            {subBtn("👥", "友達", myCode ? "結果を送り合う" : "オンライン共有", () => setView("friends"))}
-          </div>
-        )}
 
       </div>
     );
@@ -7656,6 +7674,7 @@ input, select { padding: 10px 14px; }
     if (homeCat === null) return renderTitle();
 
     const CATS = {
+      members: { title: "メンバー", icon: "👤" },
       practice: { title: "練習問題", icon: "🎓" },
       howto: { title: "使い方", icon: "💡" },
       settings: { title: "設定", icon: "⚙️" },
@@ -7726,12 +7745,11 @@ input, select { padding: 10px 14px; }
           </div>
         )}
 
-        {homeCat === "settings" && (
+        {homeCat === "members" && (
           <>
-            {secHdr("players", "👤", "プレーヤー名・グループ設定", `${presetNames.length}人を登録中・グループ${groups.length}件`)}
-            {setOpen === "players" && (<>
+            {/* 名前・グループ・友達をここにまとめた（設定からは外してある） */}
             {menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
-              setNamesBackTo("home"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
+              setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
             })}
 
             {/* グループ */}
@@ -7777,6 +7795,7 @@ input, select { padding: 10px 14px; }
                     }} style={{
                       background: "none", border: `1px solid ${t.bd}`, borderRadius: 8,
                       padding: "6px 11px", color: t.ac, fontSize: 11, cursor: "pointer",
+                      minHeight: 34, boxSizing: "border-box",
                     }}>編集</button>
                     <button onClick={() => {
                       if (!window.confirm(`グループ「${g.name}」を削除しますか？`)) return;
@@ -7784,6 +7803,7 @@ input, select { padding: 10px 14px; }
                     }} style={{
                       background: "none", border: `1px solid ${t.bd}`, borderRadius: 8,
                       padding: "6px 11px", color: t.rd, fontSize: 11, cursor: "pointer",
+                      minHeight: 34, boxSizing: "border-box",
                     }}>削除</button>
                   </div>
                 </div>
@@ -7855,7 +7875,7 @@ input, select { padding: 10px 14px; }
                       </div>
                       <button onClick={() => {
                         setGEditOpen(false); setGEditId(null); setGEditName(""); setGEditMembers([]);
-                        setNamesBackTo("home"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
+                        setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
                       }} style={{
                         width: "100%", padding: "10px 8px", borderRadius: 9, cursor: "pointer",
                         border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700,
@@ -7893,8 +7913,36 @@ input, select { padding: 10px 14px; }
                   }}>＋ グループを作る</button>
               )}
             </div>
-            </>)}
 
+            {/* 友達（オンライン共有）。使えないときは、その旨だけ出す */}
+            <div style={{ marginTop: 12 }}>
+              {Net.enabled() ? (
+                menuItem("👥", "友達",
+                  myCode ? "結果を送り合う" : "オンライン共有",
+                  () => setView("friends"))
+              ) : (
+                <div style={{ ...card, padding: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{
+                      fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
+                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>👥</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>友達</div>
+                      <div style={{ fontSize: 11, color: t.dm, textWrap: "balance" }}>オンライン共有・いまは使えません</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textWrap: "balance" }}>
+                    {"対局結果を友達と送り合う機能です。このアプリでは準備中のため、いまは名前とグループだけが使えます。"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {homeCat === "settings" && (
+          <>
             {secHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値")}
             {setOpen === "rules" && (<>
             {/* ルールのデフォルト */}
@@ -13860,7 +13908,7 @@ input, select { padding: 10px 14px; }
             <button
               onClick={() => {
                 // ページ側の「← 戻る」は置かず、ヘッダーの戻る1つで階層を戻す
-                if (view === "names") setView(namesBackTo);
+                if (view === "names") goNamesBack();
                 else if (view === "leagueform") setView("league");
                 else if (view === "leaguedetail") setView("league");
                 else if (view === "leaguestart") setView("leaguedetail");
