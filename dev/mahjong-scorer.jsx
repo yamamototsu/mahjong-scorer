@@ -4922,18 +4922,24 @@ input, select { padding: 10px 14px; }
     const addName = () => {
       const v = newNameInput.trim();
       if (!v) return;
-      if (presetNames.includes(v)) { setNewNameInput(""); return; }
+      // 黙って消えると理由が分からないので、その場で伝える
+      if (presetNames.includes(v)) { setNameErr(`「${v}」はすでに登録されています`); return; }
       savePresetNames([...presetNames, v]);
-      setNewNameInput("");
+      setNewNameInput(""); setNameErr("");
     };
     const removeName = (idx) => savePresetNames(presetNames.filter((_, i) => i !== idx));
     const commitEdit = () => {
       const v = editNameVal.trim();
-      if (!v) { setEditNameIdx(null); return; }
+      if (!v) { setEditNameIdx(null); setEditErr(""); return; }
+      // 自分以外に同じ名前があれば直させる
+      if (presetNames.some((n, i) => i !== editNameIdx && n === v)) {
+        setEditErr(`「${v}」はすでに登録されています`);
+        return;
+      }
       const arr = [...presetNames];
       arr[editNameIdx] = v;
       savePresetNames(arr);
-      setEditNameIdx(null);
+      setEditNameIdx(null); setEditErr("");
     };
     return (
       <div style={body}>
@@ -4949,7 +4955,7 @@ input, select { padding: 10px 14px; }
           <div style={{ display: "flex", gap: 8 }}>
             <input
               value={newNameInput}
-              onChange={e => setNewNameInput(e.target.value)}
+              onChange={e => { setNewNameInput(e.target.value); if (nameErr) setNameErr(""); }}
               onKeyDown={e => { if (e.key === "Enter") addName(); }}
               placeholder="名前を入力"
               style={{
@@ -4964,6 +4970,9 @@ input, select { padding: 10px 14px; }
               color: "#fff", fontSize: 14, fontWeight: 700, whiteSpace: "nowrap",
             }}>追加</button>
           </div>
+          {nameErr && (
+            <div style={{ fontSize: 12, color: t.rd, marginTop: 8, lineHeight: 1.7 }}>{nameErr}</div>
+          )}
         </div>
 
         {/* 一覧 */}
@@ -5017,15 +5026,17 @@ input, select { padding: 10px 14px; }
               WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none",
             }}>
               {editNameIdx === i ? (
-                <>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input
                     value={editNameVal}
-                    onChange={e => setEditNameVal(e.target.value)}
+                    onChange={e => { setEditNameVal(e.target.value); if (editErr) setEditErr(""); }}
                     onKeyDown={e => { if (e.key === "Enter") commitEdit(); }}
                     autoFocus
                     style={{
-                      flex: 1, padding: "8px 10px", fontSize: 15,
-                      background: t.sf, border: `2px solid ${t.ac}`, borderRadius: 8,
+                      // 入力欄は既定の最小幅が広く、狭い画面で保存・✕を押し出すので縮められるようにする
+                      flex: "1 1 auto", minWidth: 0, padding: "8px 10px", fontSize: 15,
+                      background: t.sf, border: `2px solid ${editErr ? t.rd : t.ac}`, borderRadius: 8,
                       color: t.tx, outline: "none", boxSizing: "border-box",
                     }}
                   />
@@ -5033,16 +5044,20 @@ input, select { padding: 10px 14px; }
                     padding: "8px 12px", borderRadius: 8, border: "none",
                     background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
                   }}>保存</button>
-                  <button onClick={() => setEditNameIdx(null)} style={{
+                  <button onClick={() => { setEditNameIdx(null); setEditErr(""); }} style={{
                     padding: "8px 10px", borderRadius: 8, border: `1px solid ${t.bd}`,
                     background: "transparent", color: t.dm, fontSize: 12, cursor: "pointer",
                   }}>✕</button>
-                </>
+                  </div>
+                  {editErr && (
+                    <div style={{ fontSize: 12, color: t.rd, marginTop: 6, lineHeight: 1.7 }}>{editErr}</div>
+                  )}
+                </div>
               ) : (
                 <>
-                  <span style={{ flexShrink: 0, color: t.dm, fontSize: 20, lineHeight: 1, padding: "0 4px", touchAction: "none", cursor: "grab" }}>≡</span>
+                  <span style={{ flexShrink: 0, color: t.dm, fontSize: 20, lineHeight: 1.2, padding: "0 4px", touchAction: "none", cursor: "grab" }}>≡</span>
                   <span style={{ flex: 1, fontSize: 16, fontWeight: 600, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n}</span>
-                  <button onClick={() => { setEditNameIdx(i); setEditNameVal(n); }} style={{
+                  <button onClick={() => { setEditNameIdx(i); setEditNameVal(n); setEditErr(""); }} style={{
                     padding: "7px 12px", borderRadius: 8, border: `1px solid ${t.bd}`,
                     background: "transparent", color: t.dm, fontSize: 12, cursor: "pointer",
                   }}>編集</button>
@@ -5616,6 +5631,12 @@ input, select { padding: 10px 14px; }
   // 対局開始のルール設定用（設定画面とは別に開閉を持つ）
   const gsHdr = (id, icon, title, sub) => secHdrBase(gsOpen, setGsOpen, id, icon, title, sub);
   const [showPayView, setShowPayView] = useState(false);  // 卓上表示（点数の受け渡しを矢印で表示）
+  // アガリ結果: 卓のところまでスクロールしたら、上のまとめカードを引っ込める
+  const [hideWinCard, setHideWinCard] = useState(false);
+  const hideWinRef = React.useRef(false);       // スクロール中に今の状態を読むための控え
+  const winScrollerRef = React.useRef(null);    // 実際にスクロールしている枠
+  const payAreaRef = React.useRef(null);        // 卓（受け渡しの図）
+  const keepPayTopRef = React.useRef(null);     // 切り替えの前後で卓を動かさないための位置
   const [yakuInfo, setYakuInfo] = useState(null);         // 長押しで説明を出す役
   const [startSplash, setStartSplash] = useState(null);   // 対局開始の演出 { league, gameNo, matchType, date, seats }
   const splashTimer = React.useRef(null);
@@ -5678,6 +5699,8 @@ input, select { padding: 10px 14px; }
     try { localStorage.setItem("mj_preset_names", JSON.stringify(arr)); } catch {}
   };
   const [newNameInput, setNewNameInput] = useState("");
+  const [nameErr, setNameErr] = useState("");   // 名簿への追加で同じ名前だったとき
+  const [editErr, setEditErr] = useState("");   // 名簿の編集で同じ名前になったとき
   const [editNameIdx, setEditNameIdx] = useState(null);
   // 名前登録画面の戻り先（リーグ作成やセットアップから開いたときは、そこへ戻す）
   const [namesBackTo, setNamesBackTo] = useState("home");
@@ -5855,6 +5878,55 @@ input, select { padding: 10px 14px; }
     };
   }, [keepAwake, wakeSupported]);
 
+
+  React.useEffect(() => {
+    const on = showGW && gStep === 7 && !!gResult;
+    if (!on) {
+      hideWinRef.current = false;
+      setHideWinCard(false);
+      return;
+    }
+    const sc = winScrollerRef.current;
+    if (!sc) return;
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const el = payAreaRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const h = window.innerHeight || 1;
+      const cur = hideWinRef.current;
+      // 隠すのは卓が画面の半分より上まで来たとき。
+      // 戻すのはいちばん上まで巻き戻したときだけにして、境目で出たり消えたり
+      // しないようにする（カードを隠すと下が短くなるので、途中の位置を
+      // 戻す条件にすると二度と戻らなくなる）
+      if (!cur && top < h * 0.5) {
+        hideWinRef.current = true;
+        keepPayTopRef.current = top;   // 隠しても卓が動かないように位置を控える
+        setHideWinCard(true);
+      } else if (cur && sc.scrollTop <= 8) {
+        // 上に戻したときは、ふつうに先頭から読める形に戻す（位置の補正はしない）
+        hideWinRef.current = false;
+        keepPayTopRef.current = null;
+        setHideWinCard(false);
+      }
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check); };
+    sc.addEventListener("scroll", onScroll, { passive: true });
+    check();
+    return () => { sc.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [showGW, gStep, gResult]);
+
+  // カードを出し入れすると上の高さが変わるので、卓が指の下で動かないよう位置を補正する
+  React.useLayoutEffect(() => {
+    const want = keepPayTopRef.current;
+    keepPayTopRef.current = null;
+    if (want == null) return;
+    const el = payAreaRef.current, sc = winScrollerRef.current;
+    if (!el || !sc) return;
+    const d = el.getBoundingClientRect().top - want;
+    if (Math.abs(d) > 0.5) sc.scrollTop += d;
+  }, [hideWinCard]);
 
   const rollDice = () => {
     playDiceSound();
@@ -10391,7 +10463,15 @@ input, select { padding: 10px 14px; }
       )}
 
       {/* Step 0: 参加者 */}
-      {setupStep === 0 && (
+      {setupStep === 0 && (() => {
+      // 同じ名前になっている席（空欄は対象外）
+      const seatNames = players.slice(0, PC).map(x => (x || "").trim());
+      const dupSeats = new Set();
+      seatNames.forEach((v, i) => {
+        if (v && seatNames.some((w, j) => j !== i && w === v)) dupSeats.add(i);
+      });
+      const seatsReady = seatNames.every(Boolean) && !!matchType && dupSeats.size === 0;
+      return (
         <div style={card}>
           <Back onClick={() => setSetupStep(3)} />
           <Dots total={5} cur={1} />
@@ -10483,7 +10563,9 @@ input, select { padding: 10px 14px; }
                   width: "100%", padding: "10px 8px", borderRadius: 9, cursor: "pointer",
                   border: `1px dashed ${t.bd}`, background: "transparent", color: t.dm,
                   fontSize: 12, fontWeight: 700, opacity: players.slice(0, PC).every(p => p.trim()) ? 1 : 0.4,
-                }}>＋ 今の{PC}人をグループとして保存</button>
+                }}>{[`＋ 今の${PC}人を`, "グループとして保存"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}</button>
             )}
                 </>
               );
@@ -10518,13 +10600,18 @@ input, select { padding: 10px 14px; }
                 onContextMenu={(e) => { if (dragSeat || seatSuppressClick.current) e.preventDefault(); }}
                 style={{
                   marginBottom: 10, position: "relative",
-                  display: "flex", alignItems: "center", gap: 10,
+                  display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                   zIndex: isDragging ? 10 : 1,
                   WebkitUserSelect: "none", userSelect: "none", WebkitTouchCallout: "none",
+                  // 同じ名前の席は、その行で分かるようにしておく
+                  ...(dupSeats.has(i) ? {
+                    padding: "6px 8px", margin: "0 -8px 10px", borderRadius: 10,
+                    background: t.rdS, border: `1px solid ${t.rd}55`,
+                  } : null),
                 }}>
                 {/* 風マークは席に固定（動かさない）。席決め前なので「仮」を添える */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, flexShrink: 0 }}>
-                  <span style={{ fontSize: 9, color: t.dm, lineHeight: 1, letterSpacing: "0.1em" }}>仮</span>
+                  <span style={{ fontSize: 10, color: t.dm, lineHeight: 1.2, letterSpacing: "0.1em" }}>仮</span>
                   <span style={{
                     fontSize: 18, fontWeight: 900, lineHeight: 1,
                     color: i === 0 ? "#1a1a1a" : t.tx,
@@ -10602,18 +10689,31 @@ input, select { padding: 10px 14px; }
                       <option value="__custom__">✏️ 直接入力…</option>
                     </select>
                   )}
-                  <span style={{ flexShrink: 0, color: t.dm, fontSize: 20, lineHeight: 1, padding: "0 2px", touchAction: "none", cursor: "grab" }}>≡</span>
+                  <span style={{ flexShrink: 0, color: t.dm, fontSize: 20, lineHeight: 1.2, padding: "0 2px", touchAction: "none", cursor: "grab" }}>≡</span>
                 </div>
               </div>
             );
           })}
           <div style={{ marginTop: 8 }}>
+            {/* 同じ名前が2人以上いると、対局中の表示も履歴もリーグの集計も
+                人を見分けられなくなるので、先へ進ませない */}
+            {dupSeats.size > 0 && (
+              <div style={{
+                padding: "9px 11px", marginBottom: 8, borderRadius: 9,
+                background: t.rdS, border: `1px solid ${t.rd}55`,
+                fontSize: 12, fontWeight: 700, color: t.rd, lineHeight: 1.7, textAlign: "center",
+              }}>
+                {["同じ名前の人がいます。", "どちらかを変えてください"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </div>
+            )}
             <button
               style={{
                 ...actionBtn("p"),
-                opacity: (players.slice(0, PC).every(p => p.trim()) && matchType) ? 1 : 0.4,
+                opacity: seatsReady ? 1 : 0.4,
               }}
-              disabled={!players.slice(0, PC).every(p => p.trim()) || !matchType}
+              disabled={!seatsReady}
               onClick={() => {
                 // 直接入力のまま進んだ名前もリストへ自動登録
                 const adds = players.slice(0, PC)
@@ -10628,9 +10728,9 @@ input, select { padding: 10px 14px; }
                 ...actionBtn(),
                 marginTop: 8, marginBottom: 0,
                 border: `1px solid ${t.gn}66`, color: t.gn, fontWeight: 800,
-                opacity: (players.slice(0, PC).every(p => p.trim()) && matchType) ? 1 : 0.4,
+                opacity: seatsReady ? 1 : 0.4,
               }}
-              disabled={!players.slice(0, PC).every(p => p.trim()) || !matchType}
+              disabled={!seatsReady}
               onClick={() => {
                 const adds = players.slice(0, PC)
                   .map(x => (x || "").trim())
@@ -10650,7 +10750,8 @@ input, select { padding: 10px 14px; }
             )}
           </div>
         </div>
-      )}
+      );
+      })()}
 
       {/* Step 4: 確認 */}
       {setupStep === 4 && (
@@ -11706,7 +11807,7 @@ input, select { padding: 10px 14px; }
 
       {/* ── Round Wizard Modal ── */}
       {showGW && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div ref={winScrollerRef} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             {/* 確認画面の「訂正」から来たときは、どのステップからでも
                 やめて確認画面に戻れるようにする */}
@@ -12034,11 +12135,15 @@ input, select { padding: 10px 14px; }
                     </button>
                   )}
                 </div>
-                <ScoreDisplay han={gHan} fu={gFu} limit={gLimit} result={gResult} tsumo={gTsumo} parent={gParent}
-                  winnerName={players[gWinner]} loserName={gLoser !== null ? players[gLoser] : null}
-                  honbaAdd={honbaGet()} sticks={riichiSticks()} />
+                {/* 卓まで下りてきたら引っ込める。作り直さずに隠すだけにして、
+                    戻したときも同じ中身がそのまま出るようにする */}
+                <div style={{ display: hideWinCard ? "none" : "block" }}>
+                  <ScoreDisplay han={gHan} fu={gFu} limit={gLimit} result={gResult} tsumo={gTsumo} parent={gParent}
+                    winnerName={players[gWinner]} loserName={gLoser !== null ? players[gLoser] : null}
+                    honbaAdd={honbaGet()} sticks={riichiSticks()} />
+                </div>
                 {/* 点数の受け渡し（開かなくても最初から見えるように埋め込む。タップで大きく表示） */}
-                <div onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
+                <div ref={payAreaRef} onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
                   <PayTableBox boxW="min(100vw - 32px, 400px)" />
                   <PayBreakdown />
                   <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>

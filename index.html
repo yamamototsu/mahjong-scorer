@@ -9477,23 +9477,30 @@ input, select { padding: 10px 14px; }
       const v = newNameInput.trim();
       if (!v) return;
       if (presetNames.includes(v)) {
-        setNewNameInput("");
+        setNameErr(`「${v}」はすでに登録されています`);
         return;
       }
       savePresetNames([...presetNames, v]);
       setNewNameInput("");
+      setNameErr("");
     };
     const removeName = idx => savePresetNames(presetNames.filter((_, i) => i !== idx));
     const commitEdit = () => {
       const v = editNameVal.trim();
       if (!v) {
         setEditNameIdx(null);
+        setEditErr("");
+        return;
+      }
+      if (presetNames.some((n, i) => i !== editNameIdx && n === v)) {
+        setEditErr(`「${v}」はすでに登録されています`);
         return;
       }
       const arr = [...presetNames];
       arr[editNameIdx] = v;
       savePresetNames(arr);
       setEditNameIdx(null);
+      setEditErr("");
     };
     return React.createElement("div", {
       style: body
@@ -9537,7 +9544,10 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("input", {
       value: newNameInput,
-      onChange: e => setNewNameInput(e.target.value),
+      onChange: e => {
+        setNewNameInput(e.target.value);
+        if (nameErr) setNameErr("");
+      },
       onKeyDown: e => {
         if (e.key === "Enter") addName();
       },
@@ -9569,7 +9579,14 @@ input, select { padding: 10px 14px; }
         fontWeight: 700,
         whiteSpace: "nowrap"
       }
-    }, "追加"))), React.createElement("div", {
+    }, "追加")), nameErr && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.rd,
+        marginTop: 8,
+        lineHeight: 1.7
+      }
+    }, nameErr)), React.createElement("div", {
       style: {
         ...card,
         padding: 14
@@ -9657,19 +9674,34 @@ input, select { padding: 10px 14px; }
           userSelect: "none",
           WebkitTouchCallout: "none"
         }
-      }, editNameIdx === i ? React.createElement(React.Fragment, null, React.createElement("input", {
+      }, editNameIdx === i ? React.createElement("div", {
+        style: {
+          flex: 1,
+          minWidth: 0
+        }
+      }, React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8
+        }
+      }, React.createElement("input", {
         value: editNameVal,
-        onChange: e => setEditNameVal(e.target.value),
+        onChange: e => {
+          setEditNameVal(e.target.value);
+          if (editErr) setEditErr("");
+        },
         onKeyDown: e => {
           if (e.key === "Enter") commitEdit();
         },
         autoFocus: true,
         style: {
-          flex: 1,
+          flex: "1 1 auto",
+          minWidth: 0,
           padding: "8px 10px",
           fontSize: 15,
           background: t.sf,
-          border: `2px solid ${t.ac}`,
+          border: `2px solid ${editErr ? t.rd : t.ac}`,
           borderRadius: 8,
           color: t.tx,
           outline: "none",
@@ -9688,7 +9720,10 @@ input, select { padding: 10px 14px; }
           cursor: "pointer"
         }
       }, "保存"), React.createElement("button", {
-        onClick: () => setEditNameIdx(null),
+        onClick: () => {
+          setEditNameIdx(null);
+          setEditErr("");
+        },
         style: {
           padding: "8px 10px",
           borderRadius: 8,
@@ -9698,12 +9733,19 @@ input, select { padding: 10px 14px; }
           fontSize: 12,
           cursor: "pointer"
         }
-      }, "✕")) : React.createElement(React.Fragment, null, React.createElement("span", {
+      }, "✕")), editErr && React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: t.rd,
+          marginTop: 6,
+          lineHeight: 1.7
+        }
+      }, editErr)) : React.createElement(React.Fragment, null, React.createElement("span", {
         style: {
           flexShrink: 0,
           color: t.dm,
           fontSize: 20,
-          lineHeight: 1,
+          lineHeight: 1.2,
           padding: "0 4px",
           touchAction: "none",
           cursor: "grab"
@@ -9722,6 +9764,7 @@ input, select { padding: 10px 14px; }
         onClick: () => {
           setEditNameIdx(i);
           setEditNameVal(n);
+          setEditErr("");
         },
         style: {
           padding: "7px 12px",
@@ -10973,6 +11016,11 @@ input, select { padding: 10px 14px; }
   const secHdr = (id, icon, title, sub) => secHdrBase(setOpen, setSetOpen, id, icon, title, sub);
   const gsHdr = (id, icon, title, sub) => secHdrBase(gsOpen, setGsOpen, id, icon, title, sub);
   const [showPayView, setShowPayView] = useState(false);
+  const [hideWinCard, setHideWinCard] = useState(false);
+  const hideWinRef = React.useRef(false);
+  const winScrollerRef = React.useRef(null);
+  const payAreaRef = React.useRef(null);
+  const keepPayTopRef = React.useRef(null);
   const [yakuInfo, setYakuInfo] = useState(null);
   const [startSplash, setStartSplash] = useState(null);
   const splashTimer = React.useRef(null);
@@ -11054,6 +11102,8 @@ input, select { padding: 10px 14px; }
     } catch {}
   };
   const [newNameInput, setNewNameInput] = useState("");
+  const [nameErr, setNameErr] = useState("");
+  const [editErr, setEditErr] = useState("");
   const [editNameIdx, setEditNameIdx] = useState(null);
   const [namesBackTo, setNamesBackTo] = useState("home");
   const [groups, setGroups] = useState(() => {
@@ -11257,6 +11307,55 @@ input, select { padding: 10px 14px; }
       }
     };
   }, [keepAwake, wakeSupported]);
+  React.useEffect(() => {
+    const on = showGW && gStep === 7 && !!gResult;
+    if (!on) {
+      hideWinRef.current = false;
+      setHideWinCard(false);
+      return;
+    }
+    const sc = winScrollerRef.current;
+    if (!sc) return;
+    let raf = 0;
+    const check = () => {
+      raf = 0;
+      const el = payAreaRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const h = window.innerHeight || 1;
+      const cur = hideWinRef.current;
+      if (!cur && top < h * 0.5) {
+        hideWinRef.current = true;
+        keepPayTopRef.current = top;
+        setHideWinCard(true);
+      } else if (cur && sc.scrollTop <= 8) {
+        hideWinRef.current = false;
+        keepPayTopRef.current = null;
+        setHideWinCard(false);
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(check);
+    };
+    sc.addEventListener("scroll", onScroll, {
+      passive: true
+    });
+    check();
+    return () => {
+      sc.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [showGW, gStep, gResult]);
+  React.useLayoutEffect(() => {
+    const want = keepPayTopRef.current;
+    keepPayTopRef.current = null;
+    if (want == null) return;
+    const el = payAreaRef.current,
+      sc = winScrollerRef.current;
+    if (!el || !sc) return;
+    const d = el.getBoundingClientRect().top - want;
+    if (Math.abs(d) > 0.5) sc.scrollTop += d;
+  }, [hideWinCard]);
   const rollDice = () => {
     playDiceSound();
     setDiceSpin(v => v + 1);
@@ -19505,429 +19604,468 @@ input, select { padding: 10px 14px; }
       textAlign: "center",
       marginTop: 8
     }
-  }, "試合形式を選んでください"))), setupStep === 0 && React.createElement("div", {
-    style: card
-  }, React.createElement(Back, {
-    onClick: () => setSetupStep(3)
-  }), React.createElement(Dots, {
-    total: 5,
-    cur: 1
-  }), React.createElement("div", {
-    style: question
-  }, "メンバー決定"), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.dm,
-      textAlign: "center",
-      marginBottom: 6
-    }
-  }, "名前の欄をタップして選択"), React.createElement("div", {
-    style: {
-      textAlign: "center",
-      marginBottom: 14
-    }
-  }, React.createElement("button", {
-    onClick: () => {
-      setNamesBackTo("game");
-      setView("names");
-      setNewNameInput("");
-      setEditNameIdx(null);
-    },
-    style: {
-      background: "none",
-      border: "none",
-      color: t.ac,
-      fontSize: 11,
-      cursor: "pointer",
-      textDecoration: "underline",
-      padding: "9px 10px"
-    }
-  }, "👤 リストの名前を編集")), React.createElement("div", {
-    style: {
-      marginBottom: 16
-    }
-  }, (() => {
-    const pcGroups = groups.filter(g => (g.members || []).length === PC);
-    return React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "試合形式を選んでください"))), setupStep === 0 && (() => {
+    const seatNames = players.slice(0, PC).map(x => (x || "").trim());
+    const dupSeats = new Set();
+    seatNames.forEach((v, i) => {
+      if (v && seatNames.some((w, j) => j !== i && w === v)) dupSeats.add(i);
+    });
+    const seatsReady = seatNames.every(Boolean) && !!matchType && dupSeats.size === 0;
+    return React.createElement("div", {
+      style: card
+    }, React.createElement(Back, {
+      onClick: () => setSetupStep(3)
+    }), React.createElement(Dots, {
+      total: 5,
+      cur: 1
+    }), React.createElement("div", {
+      style: question
+    }, "メンバー決定"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        textAlign: "center",
+        marginBottom: 6
+      }
+    }, "名前の欄をタップして選択"), React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 14
+      }
+    }, React.createElement("button", {
+      onClick: () => {
+        setNamesBackTo("game");
+        setView("names");
+        setNewNameInput("");
+        setEditNameIdx(null);
+      },
+      style: {
+        background: "none",
+        border: "none",
+        color: t.ac,
+        fontSize: 11,
+        cursor: "pointer",
+        textDecoration: "underline",
+        padding: "9px 10px"
+      }
+    }, "👤 リストの名前を編集")), React.createElement("div", {
+      style: {
+        marginBottom: 16
+      }
+    }, (() => {
+      const pcGroups = groups.filter(g => (g.members || []).length === PC);
+      return React.createElement(React.Fragment, null, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: t.dm,
+          marginBottom: 3
+        }
+      }, "グループ", pcGroups.length > 0 ? `（タップで${PC}人をまとめて選択）` : ""), pcGroups.length === 0 && React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: t.dm,
+          marginBottom: 7,
+          lineHeight: 1.7
+        }
+      }, "いまの", PC, "人をまとめて登録しておくと、次回からワンタップで呼び出せます", groups.length > 0 ? `（${PC === 3 ? 4 : 3}人のグループは${PC === 3 ? "四" : "三"}人麻雀で表示されます）` : ""), pcGroups.length > 0 && React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 7,
+          marginBottom: 9
+        }
+      }, pcGroups.map(g => {
+        const active = g.members.every((m, k) => players[k] === m);
+        return React.createElement("span", {
+          key: g.id,
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: `1px solid ${active ? t.ac : t.bd}`,
+            background: active ? t.acS : "transparent",
+            borderRadius: 9,
+            padding: "7px 8px 7px 11px"
+          }
+        }, React.createElement("button", {
+          onClick: () => {
+            setPlayers(prev => {
+              const np = [...prev];
+              g.members.forEach((m, k) => {
+                np[k] = m;
+              });
+              return np;
+            });
+            setPlayerMode([false, false, false, false]);
+          },
+          style: {
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+            fontSize: 13,
+            fontWeight: 700,
+            color: active ? t.ac : t.tx
+          }
+        }, g.name), React.createElement("button", {
+          onClick: () => {
+            if (!window.confirm(`グループ「${g.name}」を削除しますか？`)) return;
+            saveGroups(groups.filter(x => x.id !== g.id));
+          },
+          style: {
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: "0 2px",
+            color: t.dm,
+            fontSize: 13,
+            lineHeight: 1
+          }
+        }, "✕"));
+      })), showGroupSave ? React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 7
+        }
+      }, React.createElement("input", {
+        type: "text",
+        value: groupNameInput,
+        autoFocus: true,
+        onChange: e => setGroupNameInput(e.target.value),
+        placeholder: "グループ名（例: サークルメンバー）",
+        style: {
+          ...inputStyle,
+          fontSize: 14,
+          flex: 1
+        }
+      }), React.createElement("button", {
+        disabled: !groupNameInput.trim(),
+        onClick: () => {
+          saveGroups([...groups, {
+            id: "g_" + Date.now(),
+            name: groupNameInput.trim(),
+            members: players.slice(0, PC)
+          }]);
+          setGroupNameInput("");
+          setShowGroupSave(false);
+        },
+        style: {
+          padding: "0 16px",
+          borderRadius: 9,
+          border: "none",
+          cursor: "pointer",
+          background: t.ac,
+          color: "#fff",
+          fontSize: 13,
+          fontWeight: 700,
+          opacity: groupNameInput.trim() ? 1 : 0.4,
+          flexShrink: 0
+        }
+      }, "保存"), React.createElement("button", {
+        onClick: () => {
+          setShowGroupSave(false);
+          setGroupNameInput("");
+        },
+        style: {
+          padding: "0 12px",
+          borderRadius: 9,
+          border: `1px solid ${t.bd}`,
+          cursor: "pointer",
+          background: "transparent",
+          color: t.dm,
+          fontSize: 13,
+          flexShrink: 0
+        }
+      }, "✕")) : React.createElement("button", {
+        onClick: () => setShowGroupSave(true),
+        disabled: !players.slice(0, PC).every(p => p.trim()),
+        style: {
+          width: "100%",
+          padding: "10px 8px",
+          borderRadius: 9,
+          cursor: "pointer",
+          border: `1px dashed ${t.bd}`,
+          background: "transparent",
+          color: t.dm,
+          fontSize: 12,
+          fontWeight: 700,
+          opacity: players.slice(0, PC).every(p => p.trim()) ? 1 : 0.4
+        }
+      }, [`＋ 今の${PC}人を`, "グループとして保存"].map((x, k) => React.createElement("span", {
+        key: k,
+        style: {
+          display: "inline-block"
+        }
+      }, x))));
+    })()), React.createElement("div", {
       style: {
         fontSize: 11,
-        fontWeight: 700,
         color: t.dm,
-        marginBottom: 3
+        textAlign: "center",
+        marginBottom: 10,
+        lineHeight: 1.7
       }
-    }, "グループ", pcGroups.length > 0 ? `（タップで${PC}人をまとめて選択）` : ""), pcGroups.length === 0 && React.createElement("div", {
+    }, "並べ替えは行を", React.createElement("b", {
+      style: {
+        color: t.tx
+      }
+    }, "長押し"), "して、そのまま上下にドラッグ"), players.slice(0, PC).map((p, i) => {
+      const isCustom = playerMode[i];
+      const ds = dragSeat;
+      const isDragging = ds && ds.from === i;
+      let shiftY = 0;
+      if (ds && !isDragging) {
+        if (ds.from < ds.target && i > ds.from && i <= ds.target) shiftY = -ds.rowH;else if (ds.from > ds.target && i >= ds.target && i < ds.from) shiftY = ds.rowH;
+      }
+      return React.createElement("div", {
+        key: i,
+        ref: el => {
+          seatRowRefs.current[i] = el;
+        },
+        onTouchStart: e => seatDragStart(e, i),
+        onTouchMove: seatDragPreMove,
+        onTouchEnd: seatDragCancelIfPending,
+        onMouseDown: e => seatDragStart(e, i),
+        onMouseMove: seatDragPreMove,
+        onMouseUp: seatDragCancelIfPending,
+        onMouseLeave: seatDragCancelIfPending,
+        onClickCapture: e => {
+          if (seatSuppressClick.current) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        },
+        onContextMenu: e => {
+          if (dragSeat || seatSuppressClick.current) e.preventDefault();
+        },
+        style: {
+          marginBottom: 10,
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          zIndex: isDragging ? 10 : 1,
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          WebkitTouchCallout: "none",
+          ...(dupSeats.has(i) ? {
+            padding: "6px 8px",
+            margin: "0 -8px 10px",
+            borderRadius: 10,
+            background: t.rdS,
+            border: `1px solid ${t.rd}55`
+          } : null)
+        }
+      }, React.createElement("div", {
+        style: {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 2,
+          flexShrink: 0
+        }
+      }, React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: t.dm,
+          lineHeight: 1.2,
+          letterSpacing: "0.1em"
+        }
+      }, "仮"), React.createElement("span", {
+        style: {
+          fontSize: 18,
+          fontWeight: 900,
+          lineHeight: 1,
+          color: i === 0 ? "#1a1a1a" : t.tx,
+          background: i === 0 ? t.gd : t.sf,
+          border: `1px solid ${i === 0 ? t.gd : t.bd}`,
+          borderRadius: 6,
+          padding: "5px 8px"
+        }
+      }, WINDS[i])), React.createElement("div", {
+        style: {
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          minWidth: 0,
+          position: "relative",
+          transform: isDragging ? `translateY(${ds.offset}px) scale(1.02)` : shiftY ? `translateY(${shiftY}px)` : "none",
+          transition: isDragging ? "none" : "transform 0.15s ease",
+          borderRadius: 12,
+          background: isDragging ? t.sf : "transparent",
+          boxShadow: isDragging ? "0 8px 22px rgba(0,0,0,0.5)" : "none",
+          outline: isDragging ? `2px solid ${t.ac}88` : "none"
+        }
+      }, "                  ", isCustom ? React.createElement(React.Fragment, null, React.createElement("input", {
+        autoFocus: true,
+        style: {
+          ...inputStyle,
+          flex: 1,
+          WebkitUserSelect: "text",
+          userSelect: "text"
+        },
+        placeholder: "名前を入力",
+        value: p,
+        onChange: e => {
+          const np = [...players];
+          np[i] = e.target.value;
+          setPlayers(np);
+        },
+        onKeyDown: e => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        },
+        onBlur: () => {
+          const v = (p || "").trim();
+          if (!v || /^[A-D]プレーヤー$/.test(v)) return;
+          const prev = seatAutoReg.current[i];
+          let list = presetNames;
+          if (prev && prev !== v && list.includes(prev)) list = list.filter(n => n !== prev);
+          if (!list.includes(v)) list = [...list, v];
+          if (list !== presetNames) savePresetNames(list);
+          seatAutoReg.current[i] = v;
+          if (v !== p) {
+            const np = [...players];
+            np[i] = v;
+            setPlayers(np);
+          }
+          const nm = [...playerMode];
+          nm[i] = false;
+          setPlayerMode(nm);
+        }
+      }), React.createElement("button", {
+        style: {
+          background: "none",
+          border: `1px solid ${t.bd}`,
+          borderRadius: 8,
+          padding: "8px 10px",
+          color: t.dm,
+          fontSize: 11,
+          cursor: "pointer",
+          whiteSpace: "nowrap"
+        },
+        onClick: () => {
+          const v = (p || "").trim();
+          if (v && !presetNames.includes(v) && !/^[A-D]プレーヤー$/.test(v)) {
+            savePresetNames([...presetNames, v]);
+          }
+          const nm = [...playerMode];
+          nm[i] = false;
+          setPlayerMode(nm);
+        }
+      }, "リスト")) : React.createElement("select", {
+        value: presetNames.includes(p) ? p : "__current__",
+        onChange: e => {
+          const v = e.target.value;
+          if (v === "__custom__") {
+            const nm = [...playerMode];
+            nm[i] = true;
+            setPlayerMode(nm);
+            const np = [...players];
+            np[i] = "";
+            setPlayers(np);
+          } else {
+            const np = [...players];
+            np[i] = v;
+            setPlayers(np);
+          }
+        },
+        style: {
+          ...selectStyle,
+          flex: 1,
+          fontSize: 15
+        }
+      }, !presetNames.includes(p) && React.createElement("option", {
+        value: "__current__"
+      }, p), presetNames.map(n => {
+        const usedByOther = players.includes(n) && players[i] !== n;
+        return React.createElement("option", {
+          key: n,
+          value: n
+        }, usedByOther ? `${n}（使用中）` : n);
+      }), React.createElement("option", {
+        value: "__custom__"
+      }, "✏️ 直接入力…")), React.createElement("span", {
+        style: {
+          flexShrink: 0,
+          color: t.dm,
+          fontSize: 20,
+          lineHeight: 1.2,
+          padding: "0 2px",
+          touchAction: "none",
+          cursor: "grab"
+        }
+      }, "≡")));
+    }), React.createElement("div", {
+      style: {
+        marginTop: 8
+      }
+    }, dupSeats.size > 0 && React.createElement("div", {
+      style: {
+        padding: "9px 11px",
+        marginBottom: 8,
+        borderRadius: 9,
+        background: t.rdS,
+        border: `1px solid ${t.rd}55`,
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.rd,
+        lineHeight: 1.7,
+        textAlign: "center"
+      }
+    }, ["同じ名前の人がいます。", "どちらかを変えてください"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("button", {
+      style: {
+        ...actionBtn("p"),
+        opacity: seatsReady ? 1 : 0.4
+      },
+      disabled: !seatsReady,
+      onClick: () => {
+        const adds = players.slice(0, PC).map(x => (x || "").trim()).filter(x => x && !presetNames.includes(x) && !/^[A-D]プレーヤー$/.test(x));
+        if (adds.length) savePresetNames([...presetNames, ...Array.from(new Set(adds))]);
+        resetSeatDraw();
+        setSetupStep(1);
+      }
+    }, "席決めへ"), React.createElement("button", {
+      style: {
+        ...actionBtn(),
+        marginTop: 8,
+        marginBottom: 0,
+        border: `1px solid ${t.gn}66`,
+        color: t.gn,
+        fontWeight: 800,
+        opacity: seatsReady ? 1 : 0.4
+      },
+      disabled: !seatsReady,
+      onClick: () => {
+        const adds = players.slice(0, PC).map(x => (x || "").trim()).filter(x => x && !presetNames.includes(x) && !/^[A-D]プレーヤー$/.test(x));
+        if (adds.length) savePresetNames([...presetNames, ...Array.from(new Set(adds))]);
+        setSeatRot(0);
+        startGame();
+      }
+    }, "⚡ クイックスタート"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
-        marginBottom: 7,
-        lineHeight: 1.7
+        textAlign: "center",
+        marginTop: 6,
+        lineHeight: 1.6
       }
-    }, "いまの", PC, "人をまとめて登録しておくと、次回からワンタップで呼び出せます", groups.length > 0 ? `（${PC === 3 ? 4 : 3}人のグループは${PC === 3 ? "四" : "三"}人麻雀で表示されます）` : ""), pcGroups.length > 0 && React.createElement("div", {
+    }, "席決め・親決め・確認をスキップして、この並びのまま開始します"), !matchType && React.createElement("div", {
       style: {
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 7,
-        marginBottom: 9
-      }
-    }, pcGroups.map(g => {
-      const active = g.members.every((m, k) => players[k] === m);
-      return React.createElement("span", {
-        key: g.id,
-        style: {
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          border: `1px solid ${active ? t.ac : t.bd}`,
-          background: active ? t.acS : "transparent",
-          borderRadius: 9,
-          padding: "7px 8px 7px 11px"
-        }
-      }, React.createElement("button", {
-        onClick: () => {
-          setPlayers(prev => {
-            const np = [...prev];
-            g.members.forEach((m, k) => {
-              np[k] = m;
-            });
-            return np;
-          });
-          setPlayerMode([false, false, false, false]);
-        },
-        style: {
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 0,
-          fontSize: 13,
-          fontWeight: 700,
-          color: active ? t.ac : t.tx
-        }
-      }, g.name), React.createElement("button", {
-        onClick: () => {
-          if (!window.confirm(`グループ「${g.name}」を削除しますか？`)) return;
-          saveGroups(groups.filter(x => x.id !== g.id));
-        },
-        style: {
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: "0 2px",
-          color: t.dm,
-          fontSize: 13,
-          lineHeight: 1
-        }
-      }, "✕"));
-    })), showGroupSave ? React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 7
-      }
-    }, React.createElement("input", {
-      type: "text",
-      value: groupNameInput,
-      autoFocus: true,
-      onChange: e => setGroupNameInput(e.target.value),
-      placeholder: "グループ名（例: サークルメンバー）",
-      style: {
-        ...inputStyle,
-        fontSize: 14,
-        flex: 1
-      }
-    }), React.createElement("button", {
-      disabled: !groupNameInput.trim(),
-      onClick: () => {
-        saveGroups([...groups, {
-          id: "g_" + Date.now(),
-          name: groupNameInput.trim(),
-          members: players.slice(0, PC)
-        }]);
-        setGroupNameInput("");
-        setShowGroupSave(false);
-      },
-      style: {
-        padding: "0 16px",
-        borderRadius: 9,
-        border: "none",
-        cursor: "pointer",
-        background: t.ac,
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: 700,
-        opacity: groupNameInput.trim() ? 1 : 0.4,
-        flexShrink: 0
-      }
-    }, "保存"), React.createElement("button", {
-      onClick: () => {
-        setShowGroupSave(false);
-        setGroupNameInput("");
-      },
-      style: {
-        padding: "0 12px",
-        borderRadius: 9,
-        border: `1px solid ${t.bd}`,
-        cursor: "pointer",
-        background: "transparent",
-        color: t.dm,
-        fontSize: 13,
-        flexShrink: 0
-      }
-    }, "✕")) : React.createElement("button", {
-      onClick: () => setShowGroupSave(true),
-      disabled: !players.slice(0, PC).every(p => p.trim()),
-      style: {
-        width: "100%",
-        padding: "10px 8px",
-        borderRadius: 9,
-        cursor: "pointer",
-        border: `1px dashed ${t.bd}`,
-        background: "transparent",
-        color: t.dm,
-        fontSize: 12,
-        fontWeight: 700,
-        opacity: players.slice(0, PC).every(p => p.trim()) ? 1 : 0.4
-      }
-    }, "＋ 今の", PC, "人をグループとして保存"));
-  })()), React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: t.dm,
-      textAlign: "center",
-      marginBottom: 10,
-      lineHeight: 1.7
-    }
-  }, "並べ替えは行を", React.createElement("b", {
-    style: {
-      color: t.tx
-    }
-  }, "長押し"), "して、そのまま上下にドラッグ"), players.slice(0, PC).map((p, i) => {
-    const isCustom = playerMode[i];
-    const ds = dragSeat;
-    const isDragging = ds && ds.from === i;
-    let shiftY = 0;
-    if (ds && !isDragging) {
-      if (ds.from < ds.target && i > ds.from && i <= ds.target) shiftY = -ds.rowH;else if (ds.from > ds.target && i >= ds.target && i < ds.from) shiftY = ds.rowH;
-    }
-    return React.createElement("div", {
-      key: i,
-      ref: el => {
-        seatRowRefs.current[i] = el;
-      },
-      onTouchStart: e => seatDragStart(e, i),
-      onTouchMove: seatDragPreMove,
-      onTouchEnd: seatDragCancelIfPending,
-      onMouseDown: e => seatDragStart(e, i),
-      onMouseMove: seatDragPreMove,
-      onMouseUp: seatDragCancelIfPending,
-      onMouseLeave: seatDragCancelIfPending,
-      onClickCapture: e => {
-        if (seatSuppressClick.current) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      },
-      onContextMenu: e => {
-        if (dragSeat || seatSuppressClick.current) e.preventDefault();
-      },
-      style: {
-        marginBottom: 10,
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        zIndex: isDragging ? 10 : 1,
-        WebkitUserSelect: "none",
-        userSelect: "none",
-        WebkitTouchCallout: "none"
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 2,
-        flexShrink: 0
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 9,
-        color: t.dm,
-        lineHeight: 1,
-        letterSpacing: "0.1em"
-      }
-    }, "仮"), React.createElement("span", {
-      style: {
-        fontSize: 18,
-        fontWeight: 900,
-        lineHeight: 1,
-        color: i === 0 ? "#1a1a1a" : t.tx,
-        background: i === 0 ? t.gd : t.sf,
-        border: `1px solid ${i === 0 ? t.gd : t.bd}`,
-        borderRadius: 6,
-        padding: "5px 8px"
-      }
-    }, WINDS[i])), React.createElement("div", {
-      style: {
-        flex: 1,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        minWidth: 0,
-        position: "relative",
-        transform: isDragging ? `translateY(${ds.offset}px) scale(1.02)` : shiftY ? `translateY(${shiftY}px)` : "none",
-        transition: isDragging ? "none" : "transform 0.15s ease",
-        borderRadius: 12,
-        background: isDragging ? t.sf : "transparent",
-        boxShadow: isDragging ? "0 8px 22px rgba(0,0,0,0.5)" : "none",
-        outline: isDragging ? `2px solid ${t.ac}88` : "none"
-      }
-    }, "                  ", isCustom ? React.createElement(React.Fragment, null, React.createElement("input", {
-      autoFocus: true,
-      style: {
-        ...inputStyle,
-        flex: 1,
-        WebkitUserSelect: "text",
-        userSelect: "text"
-      },
-      placeholder: "名前を入力",
-      value: p,
-      onChange: e => {
-        const np = [...players];
-        np[i] = e.target.value;
-        setPlayers(np);
-      },
-      onKeyDown: e => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      },
-      onBlur: () => {
-        const v = (p || "").trim();
-        if (!v || /^[A-D]プレーヤー$/.test(v)) return;
-        const prev = seatAutoReg.current[i];
-        let list = presetNames;
-        if (prev && prev !== v && list.includes(prev)) list = list.filter(n => n !== prev);
-        if (!list.includes(v)) list = [...list, v];
-        if (list !== presetNames) savePresetNames(list);
-        seatAutoReg.current[i] = v;
-        if (v !== p) {
-          const np = [...players];
-          np[i] = v;
-          setPlayers(np);
-        }
-        const nm = [...playerMode];
-        nm[i] = false;
-        setPlayerMode(nm);
-      }
-    }), React.createElement("button", {
-      style: {
-        background: "none",
-        border: `1px solid ${t.bd}`,
-        borderRadius: 8,
-        padding: "8px 10px",
-        color: t.dm,
         fontSize: 11,
-        cursor: "pointer",
-        whiteSpace: "nowrap"
-      },
-      onClick: () => {
-        const v = (p || "").trim();
-        if (v && !presetNames.includes(v) && !/^[A-D]プレーヤー$/.test(v)) {
-          savePresetNames([...presetNames, v]);
-        }
-        const nm = [...playerMode];
-        nm[i] = false;
-        setPlayerMode(nm);
-      }
-    }, "リスト")) : React.createElement("select", {
-      value: presetNames.includes(p) ? p : "__current__",
-      onChange: e => {
-        const v = e.target.value;
-        if (v === "__custom__") {
-          const nm = [...playerMode];
-          nm[i] = true;
-          setPlayerMode(nm);
-          const np = [...players];
-          np[i] = "";
-          setPlayers(np);
-        } else {
-          const np = [...players];
-          np[i] = v;
-          setPlayers(np);
-        }
-      },
-      style: {
-        ...selectStyle,
-        flex: 1,
-        fontSize: 15
-      }
-    }, !presetNames.includes(p) && React.createElement("option", {
-      value: "__current__"
-    }, p), presetNames.map(n => {
-      const usedByOther = players.includes(n) && players[i] !== n;
-      return React.createElement("option", {
-        key: n,
-        value: n
-      }, usedByOther ? `${n}（使用中）` : n);
-    }), React.createElement("option", {
-      value: "__custom__"
-    }, "✏️ 直接入力…")), React.createElement("span", {
-      style: {
-        flexShrink: 0,
         color: t.dm,
-        fontSize: 20,
-        lineHeight: 1,
-        padding: "0 2px",
-        touchAction: "none",
-        cursor: "grab"
+        textAlign: "center",
+        marginTop: 8
       }
-    }, "≡")));
-  }), React.createElement("div", {
-    style: {
-      marginTop: 8
-    }
-  }, React.createElement("button", {
-    style: {
-      ...actionBtn("p"),
-      opacity: players.slice(0, PC).every(p => p.trim()) && matchType ? 1 : 0.4
-    },
-    disabled: !players.slice(0, PC).every(p => p.trim()) || !matchType,
-    onClick: () => {
-      const adds = players.slice(0, PC).map(x => (x || "").trim()).filter(x => x && !presetNames.includes(x) && !/^[A-D]プレーヤー$/.test(x));
-      if (adds.length) savePresetNames([...presetNames, ...Array.from(new Set(adds))]);
-      resetSeatDraw();
-      setSetupStep(1);
-    }
-  }, "席決めへ"), React.createElement("button", {
-    style: {
-      ...actionBtn(),
-      marginTop: 8,
-      marginBottom: 0,
-      border: `1px solid ${t.gn}66`,
-      color: t.gn,
-      fontWeight: 800,
-      opacity: players.slice(0, PC).every(p => p.trim()) && matchType ? 1 : 0.4
-    },
-    disabled: !players.slice(0, PC).every(p => p.trim()) || !matchType,
-    onClick: () => {
-      const adds = players.slice(0, PC).map(x => (x || "").trim()).filter(x => x && !presetNames.includes(x) && !/^[A-D]プレーヤー$/.test(x));
-      if (adds.length) savePresetNames([...presetNames, ...Array.from(new Set(adds))]);
-      setSeatRot(0);
-      startGame();
-    }
-  }, "⚡ クイックスタート"), React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: t.dm,
-      textAlign: "center",
-      marginTop: 6,
-      lineHeight: 1.6
-    }
-  }, "席決め・親決め・確認をスキップして、この並びのまま開始します"), !matchType && React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: t.dm,
-      textAlign: "center",
-      marginTop: 8
-    }
-  }, "試合形式を選んでください"))), setupStep === 4 && React.createElement("div", null, React.createElement("div", {
+    }, "試合形式を選んでください")));
+  })(), setupStep === 4 && React.createElement("div", null, React.createElement("div", {
     style: card
   }, React.createElement("div", {
     style: {
@@ -21754,6 +21892,7 @@ input, select { padding: 10px 14px; }
       setTimeout(rollDice, 150);
     }
   }, "🎲 サイコロを振る")), DiceModal(), showGW && React.createElement("div", {
+    ref: winScrollerRef,
     style: {
       position: "fixed",
       top: 0,
@@ -22495,7 +22634,11 @@ input, select { padding: 10px 14px; }
     }
   }, gFu, "符"), React.createElement("span", {
     style: editTag
-  }, "訂正")))), React.createElement(ScoreDisplay, {
+  }, "訂正")))), React.createElement("div", {
+    style: {
+      display: hideWinCard ? "none" : "block"
+    }
+  }, React.createElement(ScoreDisplay, {
     han: gHan,
     fu: gFu,
     limit: gLimit,
@@ -22506,7 +22649,8 @@ input, select { padding: 10px 14px; }
     loserName: gLoser !== null ? players[gLoser] : null,
     honbaAdd: honbaGet(),
     sticks: riichiSticks()
-  }), React.createElement("div", {
+  })), React.createElement("div", {
+    ref: payAreaRef,
     onClick: () => setShowPayView(true),
     style: {
       cursor: "pointer",
