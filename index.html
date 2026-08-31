@@ -13115,7 +13115,25 @@ input, select { padding: 10px 14px; }
         color: t.gd,
         fontSize: 14
       }
-    }, myRank, "位"), " ・ ±はこの人との点差")), ranked.map((r, rank) => {
+    }, myRank, "位"), " ・ ±はこの人との点差")), rankPeekGold && ptOf && React.createElement("div", {
+      style: {
+        padding: "9px 11px",
+        marginBottom: 10,
+        borderRadius: 9,
+        background: t.gdS,
+        border: `1px solid ${t.gd}55`,
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.gd,
+        lineHeight: 1.7,
+        textAlign: "center"
+      }
+    }, ["いま終局した場合の点数", "（ウマ・オカ込み）を", `${gameConfig?.rules?.rateUnit || "G"}に換算した値です`].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), ranked.map((r, rank) => {
       const me = r.i === pi;
       const diff = r.v - scores[pi];
       return React.createElement("div", {
@@ -13229,15 +13247,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 800
       },
       onClick: () => setRankPeekGold(v => !v)
-    }, rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`), rankPeekGold && ptOf && React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: t.dm,
-        textAlign: "center",
-        marginTop: 6,
-        lineHeight: 1.6
-      }
-    }, "いま終局した場合の点数（ウマ・オカ込み）を", gameConfig?.rules?.rateUnit || "G", "に換算した値です"), React.createElement("button", {
+    }, rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`), React.createElement("button", {
       style: {
         width: "100%",
         marginTop: 8,
@@ -21493,14 +21503,7 @@ input, select { padding: 10px 14px; }
         cursor: "pointer",
         whiteSpace: "nowrap"
       }
-    }, "↩ 修正をやめる"), React.createElement("div", {
-      style: {
-        fontSize: 10,
-        color: t.dm,
-        textAlign: "center",
-        marginTop: 6
-      }
-    }, "📊 を押すと順位と点差が見られます"), StartSplash(), PayTableView(), RankPeekOverlay(), PlayerHistoryModal(), RoundEditModal());
+    }, "↩ 修正をやめる"), StartSplash(), PayTableView(), RankPeekOverlay(), PlayerHistoryModal(), RoundEditModal());
   };
   const renderGamePlay = () => React.createElement("div", {
     style: body

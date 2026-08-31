@@ -6953,6 +6953,20 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 12, color: t.dm }}>現在 <b style={{ color: t.gd, fontSize: 14 }}>{myRank}位</b> ・ ±はこの人との点差</div>
           </div>
 
+          {/* 換算値だと、数字を見る前に分かるように上へ出す */}
+          {rankPeekGold && ptOf && (
+            <div style={{
+              padding: "9px 11px", marginBottom: 10, borderRadius: 9,
+              background: t.gdS, border: `1px solid ${t.gd}55`,
+              fontSize: 12, fontWeight: 700, color: t.gd, lineHeight: 1.7, textAlign: "center",
+            }}>
+              {["いま終局した場合の点数", "（ウマ・オカ込み）を",
+                `${gameConfig?.rules?.rateUnit || "G"}に換算した値です`].map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}
+            </div>
+          )}
+
           {ranked.map((r, rank) => {
             const me = r.i === pi;
             const diff = r.v - scores[pi];
@@ -7006,11 +7020,6 @@ input, select { padding: 10px 14px; }
             }} onClick={() => setRankPeekGold(v => !v)}>
               {rankPeekGold ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${gameConfig?.rules?.rateUnit || "G"}）`}
             </button>
-          )}
-          {rankPeekGold && ptOf && (
-            <div style={{ fontSize: 13, color: t.dm, textAlign: "center", marginTop: 6, lineHeight: 1.6 }}>
-              いま終局した場合の点数（ウマ・オカ込み）を{gameConfig?.rules?.rateUnit || "G"}に換算した値です
-            </div>
           )}
           <button style={{
             width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
@@ -11564,9 +11573,6 @@ input, select { padding: 10px 14px; }
             fontSize: "clamp(13px, 4vw, 15px)", fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap",
           }}>↩ 修正をやめる</button>
         )}
-        <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>
-          📊 を押すと順位と点差が見られます
-        </div>
         {StartSplash()}
         {PayTableView()}
         {RankPeekOverlay()}
