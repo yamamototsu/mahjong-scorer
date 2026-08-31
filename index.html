@@ -24343,7 +24343,9 @@ input, select { padding: 10px 14px; }
         fontWeight: 700,
         display: "flex",
         alignItems: "center",
-        gap: 8
+        gap: 8,
+        flexWrap: "wrap",
+        minWidth: 0
       }
     }, histSelMode && React.createElement("span", {
       style: {
@@ -24363,17 +24365,20 @@ input, select { padding: 10px 14px; }
       }
     }, sel ? "✓" : ""), g.date, g.startedAt && g.endedAt && React.createElement("span", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 400,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap"
       }
-    }, HHMM(g.startedAt), "〜", HHMM(g.endedAt))), React.createElement("span", {
+    }, `${HHMM(g.startedAt)}〜${HHMM(g.endedAt)}`)), React.createElement("span", {
       style: {
         fontSize: 12,
         color: t.dm,
         padding: "2px 10px",
         background: t.sf,
-        borderRadius: 6
+        borderRadius: 6,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, MATCH_LABEL_SHORT(g.matchType))), React.createElement("div", {
       style: {
@@ -24516,10 +24521,10 @@ input, select { padding: 10px 14px; }
     onClick: () => setHistAgg(null)
   }, "✕")), React.createElement("div", {
     style: {
-      fontSize: 10,
+      fontSize: 12,
       color: t.dm,
       marginBottom: 12,
-      lineHeight: 1.7
+      lineHeight: 1.8
     }
   }, "順位は合計（素点＋ウマ＋オカ）で決めています。同じ名前は同一人物として合算します"), histAgg.rows.map((r, rank) => {
     const pm = v => (v > 0 ? "+" : "") + v.toLocaleString();
@@ -24534,15 +24539,15 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("span", {
       style: {
-        width: 30,
-        height: 30,
+        width: 32,
+        height: 32,
         borderRadius: "50%",
         flexShrink: 0,
         marginTop: 2,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: 900,
         background: rank === 0 ? t.gdS : t.sf,
         color: rank === 0 ? t.gd : t.dm,
@@ -24558,17 +24563,19 @@ input, select { padding: 10px 14px; }
         display: "flex",
         justifyContent: "space-between",
         alignItems: "baseline",
-        gap: 8
+        gap: 8,
+        flexWrap: "wrap"
       }
     }, React.createElement("span", {
       style: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 700,
         color: rank === 0 ? t.gd : t.tx,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
-        minWidth: 0
+        minWidth: 0,
+        flex: "1 1 110px"
       }
     }, rank === 0 ? "🏆 " : "", r.name), React.createElement("span", {
       style: {
@@ -24576,17 +24583,19 @@ input, select { padding: 10px 14px; }
         fontWeight: 900,
         fontVariantNumeric: "tabular-nums",
         flexShrink: 0,
+        marginLeft: "auto",
+        whiteSpace: "nowrap",
         color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx
       }
     }, pm(r.total), "点")), React.createElement("div", {
       style: {
         display: "flex",
         flexWrap: "wrap",
-        gap: "2px 10px",
-        fontSize: 10.5,
+        gap: "2px 12px",
+        fontSize: 13,
         color: t.dm,
-        marginTop: 4,
-        lineHeight: 1.6,
+        marginTop: 5,
+        lineHeight: 1.8,
         fontVariantNumeric: "tabular-nums"
       }
     }, React.createElement("span", {
@@ -24605,11 +24614,11 @@ input, select { padding: 10px 14px; }
       style: {
         display: "flex",
         flexWrap: "wrap",
-        gap: "2px 10px",
-        fontSize: 10.5,
+        gap: "2px 12px",
+        fontSize: 13,
         color: t.dm,
-        marginTop: 2,
-        lineHeight: 1.6,
+        marginTop: 3,
+        lineHeight: 1.8,
         fontVariantNumeric: "tabular-nums"
       }
     }, histAgg.hasRate && React.createElement("span", {
@@ -24647,22 +24656,26 @@ input, select { padding: 10px 14px; }
   }, React.createElement("span", {
     style: {
       fontSize: 16,
-      fontWeight: 700
+      fontWeight: 700,
+      minWidth: 0
     }
   }, historyDetail.date, historyDetail.startedAt && historyDetail.endedAt && React.createElement("span", {
     style: {
       fontSize: 12,
       fontWeight: 400,
       color: t.dm,
-      marginLeft: 8
+      marginLeft: 8,
+      whiteSpace: "nowrap"
     }
-  }, HHMM(historyDetail.startedAt), "〜", HHMM(historyDetail.endedAt))), React.createElement("span", {
+  }, `${HHMM(historyDetail.startedAt)}〜${HHMM(historyDetail.endedAt)}`)), React.createElement("span", {
     style: {
       fontSize: 12,
       color: t.dm,
       padding: "2px 10px",
       background: t.sf,
-      borderRadius: 6
+      borderRadius: 6,
+      whiteSpace: "nowrap",
+      flexShrink: 0
     }
   }, MATCH_LABEL(historyDetail.matchType))), React.createElement("div", {
     style: {

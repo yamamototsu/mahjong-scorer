@@ -12966,7 +12966,8 @@ input, select { padding: 10px 14px; }
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* 選択の丸・日付・時刻を、狭い画面では折り返して並べる */}
+                    <span style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
                       {histSelMode && (
                         <span style={{
                           width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
@@ -12977,12 +12978,12 @@ input, select { padding: 10px 14px; }
                       )}
                       {g.date}
                       {g.startedAt && g.endedAt && (
-                        <span style={{ fontSize: 11, fontWeight: 400, color: t.dm }}>
-                          {HHMM(g.startedAt)}〜{HHMM(g.endedAt)}
+                        <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, whiteSpace: "nowrap" }}>
+                          {`${HHMM(g.startedAt)}〜${HHMM(g.endedAt)}`}
                         </span>
                       )}
                     </span>
-                    <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
+                    <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
                       {MATCH_LABEL_SHORT(g.matchType)}
                     </span>
                   </div>
@@ -13045,7 +13046,7 @@ input, select { padding: 10px 14px; }
                     <button style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
                       onClick={() => setHistAgg(null)}>✕</button>
                   </div>
-                  <div style={{ fontSize: 10, color: t.dm, marginBottom: 12, lineHeight: 1.7 }}>
+                  <div style={{ fontSize: 12, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
                     順位は合計（素点＋ウマ＋オカ）で決めています。同じ名前は同一人物として合算します
                   </div>
                   {histAgg.rows.map((r, rank) => {
@@ -13056,30 +13057,33 @@ input, select { padding: 10px 14px; }
                       borderBottom: rank < histAgg.rows.length - 1 ? `1px solid ${t.bd}33` : "none",
                     }}>
                       <span style={{
-                        width: 30, height: 30, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                        width: 32, height: 32, borderRadius: "50%", flexShrink: 0, marginTop: 2,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 13, fontWeight: 900,
+                        fontSize: 15, fontWeight: 900,
                         background: rank === 0 ? t.gdS : t.sf,
                         color: rank === 0 ? t.gd : t.dm,
                         border: `1px solid ${rank === 0 ? t.gd : t.bd}`,
                       }}>{rank + 1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                        {/* 狭い画面では名前が潰れてしまうので、合計点を次の行へ送る */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
                           <span style={{
-                            fontSize: 14, fontWeight: 700, color: rank === 0 ? t.gd : t.tx,
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0,
+                            fontSize: 16, fontWeight: 700, color: rank === 0 ? t.gd : t.tx,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            minWidth: 0, flex: "1 1 110px",
                           }}>{rank === 0 ? "🏆 " : ""}{r.name}</span>
                           <span style={{
                             fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums", flexShrink: 0,
+                            marginLeft: "auto", whiteSpace: "nowrap",
                             color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx,
                           }}>{pm(r.total)}点</span>
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 10.5, color: t.dm, marginTop: 4, lineHeight: 1.6, fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13, color: t.dm, marginTop: 5, lineHeight: 1.8, fontVariantNumeric: "tabular-nums" }}>
                           <span style={{ whiteSpace: "nowrap" }}>素点 {pm(r.soten)}</span>
                           <span style={{ whiteSpace: "nowrap" }}>ウマ {pm(r.uma)}</span>
                           <span style={{ whiteSpace: "nowrap" }}>オカ {pm(r.oka)}</span>
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", fontSize: 10.5, color: t.dm, marginTop: 2, lineHeight: 1.6, fontVariantNumeric: "tabular-nums" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13, color: t.dm, marginTop: 3, lineHeight: 1.8, fontVariantNumeric: "tabular-nums" }}>
                           {histAgg.hasRate && (
                             <span style={{ whiteSpace: "nowrap", color: r.gold > 0 ? t.gn : r.gold < 0 ? t.rd : t.dm }}>
                               レート換算 {r.gold > 0 ? "+" : ""}{GOLD_LABEL(r.gold)}{histAgg.unit || "G"}
@@ -13102,15 +13106,15 @@ input, select { padding: 10px 14px; }
           <button style={backBtn} onClick={() => setHistoryDetail(null)}>← 一覧に戻る</button>
           <div style={{ ...card, padding: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, minWidth: 0 }}>
                 {historyDetail.date}
                 {historyDetail.startedAt && historyDetail.endedAt && (
-                  <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, marginLeft: 8 }}>
-                    {HHMM(historyDetail.startedAt)}〜{HHMM(historyDetail.endedAt)}
+                  <span style={{ fontSize: 12, fontWeight: 400, color: t.dm, marginLeft: 8, whiteSpace: "nowrap" }}>
+                    {`${HHMM(historyDetail.startedAt)}〜${HHMM(historyDetail.endedAt)}`}
                   </span>
                 )}
               </span>
-              <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6 }}>
+              <span style={{ fontSize: 12, color: t.dm, padding: "2px 10px", background: t.sf, borderRadius: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
                 {MATCH_LABEL(historyDetail.matchType)}
               </span>
             </div>
