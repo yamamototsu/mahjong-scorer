@@ -20805,19 +20805,46 @@ input, select { padding: 10px 14px; }
       })
     });
     const rowSeat = flip => ((flip && PC === 4 ? 2 : 0) + seatRot) % PC;
+    const BAR_GAP = "clamp(4px, 1.6vw, 8px)";
+    const barIcon = fs => ({
+      ...smallBtn(),
+      flex: "0 0 clamp(32px, 10vw, 44px)",
+      fontSize: fs || "clamp(15px, 4.6vw, 19px)",
+      padding: "10px 0"
+    });
+    const barMain = v => ({
+      ...smallBtn(v),
+      width: "auto",
+      flex: "1 1 auto",
+      minWidth: 0,
+      padding: "11px 4px",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      fontSize: "clamp(11px, 3.2vw, 14px)"
+    });
     const rankBtn = flip => React.createElement("button", {
       "aria-label": "順位と点差",
       style: {
-        ...smallBtn(),
-        flex: "0 0 40px",
-        fontSize: 17,
-        padding: "10px 0"
+        ...barIcon("clamp(14px, 4.2vw, 17px)")
       },
       onClick: () => {
         setRankPeekGold(false);
         setRankPeek(rowSeat(flip));
       }
     }, "📊");
+    const rotateBtn = () => React.createElement("button", {
+      "aria-label": "席順を回す",
+      style: {
+        ...barIcon(),
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      },
+      onClick: () => setSeatRot(r => (r + PC - 1) % PC)
+    }, React.createElement(RotateIcon, {
+      size: 20
+    }));
     const actionRow = flip => flip && (reviewing || correctingDrawIdx !== null) ? null : React.createElement("div", {
       style: {
         transform: flip ? "rotate(180deg)" : "none",
@@ -20952,74 +20979,30 @@ input, select { padding: 10px 14px; }
     }, "キャンセル"))) : reviewing && fixIdx === null ? React.createElement("div", {
       style: {
         display: "flex",
-        gap: 8,
-        flexWrap: "wrap",
-        rowGap: 8
+        gap: BAR_GAP
       }
     }, React.createElement("button", {
       "aria-label": "ルール確認",
-      style: {
-        ...smallBtn(),
-        flex: "0 0 46px",
-        fontSize: 19,
-        padding: "10px 0"
-      },
+      style: barIcon(),
       onClick: () => setShowRuleCheck(flip ? "flip" : true)
     }, "📋"), React.createElement("button", {
-      style: {
-        ...smallBtn("p"),
-        flex: 1,
-        padding: "11px 4px",
-        whiteSpace: "nowrap"
-      },
+      style: barMain("p"),
       onClick: () => {
         setEditingRoundIdx(null);
         setShowRoundEdit(true);
       }
-    }, "✏️ 局を選んで修正"), React.createElement("div", {
+    }, "✏️ 局を選んで修正"), rankBtn(flip), rotateBtn()) : React.createElement("div", {
       style: {
         display: "flex",
-        gap: 8,
-        flex: "0 0 auto",
-        marginLeft: "auto"
-      }
-    }, rankBtn(flip), React.createElement("button", {
-      "aria-label": "席順を回す",
-      style: {
-        ...smallBtn(),
-        flex: "0 0 46px",
-        padding: "10px 0",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      },
-      onClick: () => setSeatRot(r => (r + PC - 1) % PC)
-    }, React.createElement(RotateIcon, {
-      size: 22
-    })))) : React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        flexWrap: "wrap",
-        rowGap: 8
+        gap: BAR_GAP
       }
     }, React.createElement("button", {
       "aria-label": "メニュー",
-      style: {
-        ...smallBtn(),
-        flex: "0 0 46px",
-        fontSize: 19,
-        padding: "10px 0"
-      },
+      style: barIcon(),
       onClick: () => setTmMenu(flip ? "flip" : true)
     }, "📋"), React.createElement("button", {
       "aria-label": "対局を保留",
-      style: {
-        ...smallBtn(),
-        flex: "0 0 46px",
-        fontSize: 19,
-        padding: "10px 0"
-      },
+      style: barIcon(),
       onClick: () => {
         setSuspendedGame({
           config: gameConfig,
@@ -21036,12 +21019,7 @@ input, select { padding: 10px 14px; }
         setView("title");
       }
     }, "⏸"), React.createElement("button", {
-      style: {
-        ...smallBtn("p"),
-        flex: 1,
-        padding: "11px 4px",
-        whiteSpace: "nowrap"
-      },
+      style: barMain("p"),
       onClick: () => {
         resetGW();
         setGRiichi(fixSeedRiichi());
@@ -21052,37 +21030,12 @@ input, select { padding: 10px 14px; }
         setTmWinStep("winner");
       }
     }, "アガリ入力"), React.createElement("button", {
-      style: {
-        ...smallBtn(),
-        flex: 1,
-        padding: "11px 4px",
-        whiteSpace: "nowrap"
-      },
+      style: barMain(),
       onClick: () => {
         setDrawTenpai(fixSeedTenpai());
         setTmDrawMode(true);
       }
-    }, "流局"), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        flex: "0 0 auto",
-        marginLeft: "auto"
-      }
-    }, rankBtn(flip), React.createElement("button", {
-      "aria-label": "席順を回す",
-      style: {
-        ...smallBtn(),
-        flex: "0 0 46px",
-        padding: "10px 0",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center"
-      },
-      onClick: () => setSeatRot(r => (r + PC - 1) % PC)
-    }, React.createElement(RotateIcon, {
-      size: 22
-    })))));
+    }, "流局"), rankBtn(flip), rotateBtn()));
     return React.createElement("div", {
       style: {
         padding: "6px 8px 10px",

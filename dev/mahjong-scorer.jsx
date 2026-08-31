@@ -11129,10 +11129,32 @@ input, select { padding: 10px 14px; }
     });
     // 順位ビューはボタンを押した側の席の人を基準にする（上のバーは対面向き）
     const rowSeat = (flip) => (((flip && PC === 4) ? 2 : 0) + seatRot) % PC;
+    // 操作バーは端末によって文字の出方が変わり、固定サイズだと横にはみ出す。
+    // すき間・アイコン幅・文字を画面幅に合わせて縮め、さらに文字ボタンは
+    // minWidth:0 にして、どうしても足りないときは枠から出ずに詰まるようにする
+    const BAR_GAP = "clamp(4px, 1.6vw, 8px)";
+    const barIcon = (fs) => ({
+      ...smallBtn(), flex: "0 0 clamp(32px, 10vw, 44px)",
+      fontSize: fs || "clamp(15px, 4.6vw, 19px)", padding: "10px 0",
+    });
+    // basis を中身の幅にしておくと、余った幅を分け合っても
+    // 「アガリ入力」だけ足りなくなることがない
+    const barMain = (v) => ({
+      // smallBtn の width:100% が残っていると basis が枠いっぱいになってしまうので戻す
+      ...smallBtn(v), width: "auto", flex: "1 1 auto", minWidth: 0, padding: "11px 4px",
+      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+      fontSize: "clamp(11px, 3.2vw, 14px)",
+    });
     const rankBtn = (flip) => (
-      <button aria-label="順位と点差" style={{
-        ...smallBtn(), flex: "0 0 40px", fontSize: 17, padding: "10px 0",
-      }} onClick={() => { setRankPeekGold(false); setRankPeek(rowSeat(flip)); }}>📊</button>
+      <button aria-label="順位と点差" style={{ ...barIcon("clamp(14px, 4.2vw, 17px)") }}
+        onClick={() => { setRankPeekGold(false); setRankPeek(rowSeat(flip)); }}>📊</button>
+    );
+    const rotateBtn = () => (
+      <button aria-label="席順を回す" style={{
+        ...barIcon(), display: "flex", alignItems: "center", justifyContent: "center",
+      }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}>
+        <RotateIcon size={20} />
+      </button>
     );
     const actionRow = (flip) => (flip && (reviewing || correctingDrawIdx !== null)) ? null : (
       <div style={{
@@ -11217,39 +11239,27 @@ input, select { padding: 10px 14px; }
         ) : (reviewing && fixIdx === null) ? (
           /* 結果画面から戻ってきた直後。まだ直す局を選んでいないので
              「アガリ入力」「流局」は出さない（押すと局が増えてしまう） */
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", rowGap: 8 }}>
-            <button aria-label="ルール確認" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+          <div style={{ display: "flex", gap: BAR_GAP }}>
+            <button aria-label="ルール確認" style={barIcon()}
               onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
-            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }}
+            <button style={barMain("p")}
               onClick={() => { setEditingRoundIdx(null); setShowRoundEdit(true); }}>✏️ 局を選んで修正</button>
-            <div style={{ display: "flex", gap: 8, flex: "0 0 auto", marginLeft: "auto" }}>
-              {rankBtn(flip)}
-              <button aria-label="席順を回す" style={{
-                ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}><RotateIcon size={22} /></button>
-            </div>
+            {rankBtn(flip)}
+            {rotateBtn()}
           </div>
         ) : (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", rowGap: 8 }}>
-            <button aria-label="メニュー" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+          <div style={{ display: "flex", gap: BAR_GAP }}>
+            <button aria-label="メニュー" style={barIcon()}
               onClick={() => setTmMenu(flip ? "flip" : true)}>📋</button>
-            <button aria-label="対局を保留" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
+            <button aria-label="対局を保留" style={barIcon()}
               onClick={() => {
                 setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
-            {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
-            <button style={{ ...smallBtn("p"), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
-            <button style={{ ...smallBtn(), flex: 1, padding: "11px 4px", whiteSpace: "nowrap" }} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
-            {/* 順位と席回しは、折り返すときも一緒に動かして右端にそろえる */}
-            <div style={{ display: "flex", gap: 8, flex: "0 0 auto", marginLeft: "auto" }}>
-              {rankBtn(flip)}
-              <button aria-label="席順を回す" style={{
-                ...smallBtn(), flex: "0 0 46px", padding: "10px 0",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}><RotateIcon size={22} /></button>
-            </div>
+            <button style={barMain("p")} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={barMain()} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
+            {rankBtn(flip)}
+            {rotateBtn()}
           </div>
         )}
       </div>
