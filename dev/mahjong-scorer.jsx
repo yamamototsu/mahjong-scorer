@@ -1,5 +1,58 @@
 import React, { useState, useCallback, useMemo } from "react";
 
+// ══════════════════════════════════
+// ── オンライン共有（友達機能）の接続設定 ──
+// ══════════════════════════════════
+// Firebase コンソールで作ったプロジェクトの設定をここに貼ると「友達」機能が有効になる。
+// null の間は友達機能がボタンごと非表示になり、ほかの機能には一切影響しない。
+// プロジェクトの作り方とセキュリティルールは dev/ONLINE_SETUP.md を参照。
+const FIREBASE_CONFIG = null;
+// 例）const FIREBASE_CONFIG = {
+//   apiKey: "AIza...", authDomain: "xxxx.firebaseapp.com",
+//   databaseURL: "https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app",
+//   projectId: "xxxx", appId: "1:1234:web:abcd",
+// };
+
+// オンライン入出力はすべてこの Net 経由で行う（テストでは window.__MJ_TEST_NET に差し替える）。
+// Firebase SDK は友達機能を最初に使う瞬間に読み込む（起動時のアプリは重くしない）
+const Net = (() => {
+  let readyPromise = null;
+  const loadScript = (srcUrl) => new Promise((ok, ng) => {
+    const s = document.createElement("script");
+    s.src = srcUrl; s.onload = ok; s.onerror = () => ng(new Error("load failed: " + srcUrl));
+    document.head.appendChild(s);
+  });
+  const real = {
+    enabled: () => !!FIREBASE_CONFIG,
+    ensureReady() {
+      if (!readyPromise) readyPromise = (async () => {
+        const base = "https://www.gstatic.com/firebasejs/10.14.1/";
+        await loadScript(base + "firebase-app-compat.js");
+        await Promise.all([
+          loadScript(base + "firebase-auth-compat.js"),
+          loadScript(base + "firebase-database-compat.js"),
+        ]);
+        if (!window.firebase.apps.length) window.firebase.initializeApp(FIREBASE_CONFIG);
+        const cred = await window.firebase.auth().signInAnonymously();
+        return { uid: cred.user.uid };
+      })().catch((e) => { readyPromise = null; throw e; });   // 失敗したら次回やり直せるように
+      return readyPromise;
+    },
+    ref: (path) => window.firebase.database().ref(path),
+    async get(path) { const s = await real.ref(path).get(); return s.exists() ? s.val() : null; },
+    async set(path, val) { await real.ref(path).set(val); },
+    async update(path, patch) { await real.ref(path).update(patch); },
+    async remove(path) { await real.ref(path).remove(); },
+    async push(path, val) { const r = real.ref(path).push(); await r.set(val); return r.key; },
+  };
+  return new Proxy(real, { get: (t, k) => (window.__MJ_TEST_NET && window.__MJ_TEST_NET[k]) || t[k] });
+})();
+// 友達コード: 見まちがえやすい文字（0/O/1/I/L/2/Z など）を除いた6文字
+const CODE_CHARS = "3456789ABCDEFGHJKMNPQRSTUVWXY";
+const genFriendCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
+// 友達追加用のリンク（QRに入れる。開くとコード入力済みの友達画面が出る）
+const FRIEND_LINK = (code) => location.origin + location.pathname + "?fr=" + code;
+
 // ── Score Engine ──
 function calcBasePoints(fu, han, kiriage) {
   if (han >= 13) return 8000 * Math.max(1, Math.floor(han / 13)); // 13=役満, 26=ダブル役満, 39=トリプル役満
@@ -277,6 +330,18 @@ export default function MahjongScorer() {
   React.useEffect(() => {
     try { localStorage.setItem("mj_history", JSON.stringify(gameHistory)); } catch {}
   }, [gameHistory]);
+  // 受け取った対局を履歴へ合流させる（同じidは二重登録しない）。戻り値は追加できた件数。
+  // バックアップの読み込みと、友達から受け取った結果の取り込みで共用する
+  const mergeIntoHistory = (incoming) => {
+    const existingIds = new Set(gameHistory.map(g => g.id));
+    const fresh = (incoming || []).filter(g => g && g.id && !existingIds.has(g.id));
+    if (fresh.length > 0) {
+      const merged = [...gameHistory, ...fresh];
+      merged.sort((a, b) => (a.id || 0) - (b.id || 0));
+      setGameHistory(merged);
+    }
+    return fresh.length;
+  };
   // 保留中・進行中の対局。端末に保存して、リロードや電池切れの後も再開できるようにする
   const [suspendedGame, setSuspendedGame] = useState(() => {
     try {
@@ -7294,6 +7359,11 @@ input, select { padding: 10px 14px; }
             setDraftRules({ ...defaultRules }); setRulesSaved(false); setView("home"); setHomeCat("settings");
           })}
         </div>
+        {Net.enabled() && (
+          <div style={{ display: "flex", gap: 8, marginTop: 8, ...reveal(4) }}>
+            {subBtn("👥", "友達", myCode ? "結果を送り合う" : "オンライン共有", () => setView("friends"))}
+          </div>
+        )}
 
       </div>
     );
@@ -12662,6 +12732,344 @@ input, select { padding: 10px 14px; }
   };
 
   // ══════════════════════════════════
+  // ── 友達とオンライン共有 ──
+  // ══════════════════════════════════
+  // アプリ同士を友達コードでつなぎ、選んだ対局結果をサーバ（Firebase）経由で送り合う。
+  // FIREBASE_CONFIG が null の間は入口ごと非表示になる（Net.enabled()）
+  const [myName, setMyName] = useState(() => { try { return localStorage.getItem("mj_my_name") || ""; } catch { return ""; } });
+  const [myCode, setMyCode] = useState(() => { try { return localStorage.getItem("mj_my_code") || ""; } catch { return ""; } });
+  const [friendsMap, setFriendsMap] = useState({});      // { uid: { name, addedAt } }
+  const [inboxItems, setInboxItems] = useState(null);    // 受信箱。null=まだ読んでいない
+  const [frBusy, setFrBusy] = useState(false);
+  const [frError, setFrError] = useState(null);
+  const [frNotice, setFrNotice] = useState(null);
+  const [frNameInput, setFrNameInput] = useState("");
+  const [frEditingName, setFrEditingName] = useState(false);
+  const [frAddInput, setFrAddInput] = useState("");
+  const [sendPick, setSendPick] = useState(null);        // 送信モーダル { ids: [対局id] }
+  const [sendSel, setSendSel] = useState([]);            // 送り先に選んだ友達uid
+  const [myQR, setMyQR] = useState(null);                // 自分の友達リンクのQR（SVG文字列）
+
+  const NET_FAIL = "通信できませんでした。電波を確認してもう一度お試しください。";
+
+  // 友達リストと受信箱を読み直す
+  const refreshFriends = async () => {
+    if (!Net.enabled() || !myCode) return;
+    setFrBusy(true); setFrError(null);
+    try {
+      const { uid } = await Net.ensureReady();
+      const [fr, inb] = await Promise.all([Net.get("friends/" + uid), Net.get("inbox/" + uid)]);
+      setFriendsMap(fr || {});
+      setInboxItems(Object.entries(inb || {}).map(([k, v]) => ({ key: k, ...v }))
+        .sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0)));
+    } catch { setFrError(NET_FAIL); }
+    setFrBusy(false);
+  };
+
+  // はじめて使うとき: 名前を決めて自分のコードを発行する
+  const frRegister = async () => {
+    const nm = frNameInput.trim();
+    if (!nm) { setFrError("名前を入れてください"); return; }
+    setFrBusy(true); setFrError(null);
+    try {
+      const { uid } = await Net.ensureReady();
+      let code = "";
+      for (let i = 0; i < 10 && !code; i++) {              // 万一かぶったら引き直す
+        const c = genFriendCode();
+        if ((await Net.get("codes/" + c)) === null) code = c;
+      }
+      if (!code) throw new Error("no code");
+      await Net.set("codes/" + code, uid);
+      await Net.set("users/" + uid, { name: nm, code, createdAt: Date.now() });
+      setMyName(nm); setMyCode(code); setFrNameInput("");
+      try { localStorage.setItem("mj_my_name", nm); localStorage.setItem("mj_my_code", code); } catch {}
+      setFrNotice("登録しました。コードを友達に伝えて追加してもらいましょう");
+    } catch { setFrError(NET_FAIL); }
+    setFrBusy(false);
+  };
+
+  const frRename = async () => {
+    const nm = frNameInput.trim();
+    if (!nm) { setFrError("名前を入れてください"); return; }
+    setFrBusy(true); setFrError(null);
+    try {
+      const { uid } = await Net.ensureReady();
+      await Net.update("users/" + uid, { name: nm });
+      setMyName(nm); setFrEditingName(false); setFrNameInput("");
+      try { localStorage.setItem("mj_my_name", nm); } catch {}
+    } catch { setFrError(NET_FAIL); }
+    setFrBusy(false);
+  };
+
+  // コードで友達追加（追加するとお互いのリストに入る）
+  const frAddFriend = async () => {
+    const code = frAddInput.trim().toUpperCase();
+    if (code.length !== 6) { setFrError("6文字のコードを入れてください"); return; }
+    if (code === myCode) { setFrError("それはあなた自身のコードです"); return; }
+    setFrBusy(true); setFrError(null);
+    try {
+      const { uid } = await Net.ensureReady();
+      const fid = await Net.get("codes/" + code);
+      const info = fid ? await Net.get("users/" + fid) : null;
+      if (!fid || !info) { setFrError("このコードの人が見つかりませんでした"); setFrBusy(false); return; }
+      await Net.update("friends/" + uid + "/" + fid, { name: info.name, addedAt: Date.now() });
+      await Net.update("friends/" + fid + "/" + uid, { name: myName, addedAt: Date.now() });
+      setFrAddInput("");
+      setFrNotice(info.name + " さんと友達になりました");
+      await refreshFriends();
+    } catch { setFrError(NET_FAIL); }
+    setFrBusy(false);
+  };
+
+  const frRemoveFriend = async (fid, name) => {
+    if (!window.confirm(name + " さんを友達から削除しますか？")) return;
+    setFrBusy(true); setFrError(null);
+    try {
+      const { uid } = await Net.ensureReady();
+      await Net.remove("friends/" + uid + "/" + fid);
+      await refreshFriends();
+    } catch { setFrError(NET_FAIL); }
+    setFrBusy(false);
+  };
+
+  // 選んだ対局を、選んだ友達の受信箱へ送る
+  const frSendGames = async () => {
+    const games = gameHistory.filter(g => sendPick.ids.includes(g.id));
+    const toCount = sendSel.length, gameCount = games.length;
+    setFrBusy(true); setFrError(null);
+    try {
+      const { uid } = await Net.ensureReady();
+      for (const fid of sendSel) {
+        for (const g of games) {
+          await Net.push("inbox/" + fid, { from: uid, fromName: myName, sentAt: Date.now(), game: g });
+        }
+      }
+      setSendPick(null); setSendSel([]);
+      setHistSelMode(false); setHistSel([]); setHistSelPurpose("agg");
+      setFrNotice(toCount + "人に" + gameCount + "件の対局結果を送りました");
+      setView("friends");
+    } catch { setFrError(NET_FAIL); }
+    setFrBusy(false);
+  };
+
+  // 受信箱の対局を履歴に取り込み、取り込んだ分をサーバから消す
+  const frImportInbox = async (items) => {
+    const added = mergeIntoHistory(items.map(i => i.game));
+    try {
+      const { uid } = await Net.ensureReady();
+      for (const i of items) await Net.remove("inbox/" + uid + "/" + i.key);
+    } catch {}   // サーバ側の削除に失敗しても、次の取り込みで重複除外されるので実害はない
+    setInboxItems(prev => (prev || []).filter(p => !items.some(i => i.key === p.key)));
+    setFrNotice(added > 0 ? added + "件を履歴に取り込みました" : "すでに取り込み済みの対局でした");
+  };
+
+  // 友達画面を開いたら受信箱を自動で読み直す。離れたら通知類を消す
+  React.useEffect(() => {
+    if (view === "friends" && myCode) refreshFriends();
+    if (view !== "friends") { setFrError(null); setFrNotice(null); setFrEditingName(false); }
+  }, [view]);
+
+  // 友達リンク（?fr=コード）で開かれたら、コード入力済みの友達画面から始める
+  React.useEffect(() => {
+    try {
+      const m = /[?&]fr=([A-Za-z0-9]{6})/.exec(location.search);
+      if (m) {
+        history.replaceState(null, "", location.pathname);
+        if (Net.enabled()) { setFrAddInput(m[1].toUpperCase()); setView("friends"); }
+      }
+    } catch {}
+  }, []);
+
+  // 自分のQR（コード表示の補助。オフラインなどで作れなければコード文字だけ出す）
+  React.useEffect(() => {
+    if (view !== "friends" || !myCode || myQR) return;
+    let dead = false;
+    (async () => {
+      try {
+        if (!window.qrcode) await new Promise((ok, ng) => {
+          const s = document.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
+          s.onload = ok; s.onerror = ng; document.head.appendChild(s);
+        });
+        const qr = window.qrcode(0, "M");
+        qr.addData(FRIEND_LINK(myCode)); qr.make();
+        if (!dead) setMyQR(qr.createSvgTag({ cellSize: 3, margin: 0 }));
+      } catch {}
+    })();
+    return () => { dead = true; };
+  }, [view, myCode, myQR]);
+
+  const frInput = { width: "100%", padding: "13px 12px", borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 16, boxSizing: "border-box" };
+
+  const renderFriends = () => (
+    <div style={body}>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>👥 友達とオンライン共有</div>
+
+      {frNotice && (
+        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.gn}`, color: t.gn, fontSize: 13, fontWeight: 700, textAlign: "center" }}>✓ {frNotice}</div>
+      )}
+      {frError && (
+        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.rd}`, color: t.rd, fontSize: 13, fontWeight: 700, textAlign: "center" }}>{frError}</div>
+      )}
+
+      {!myCode ? (
+        <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>はじめての設定</div>
+          <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
+            友達に表示される名前を決めてください。登録すると、あなたの友達コード（6文字）が発行されます。
+            対局結果を送り合うときだけ、結果（名前と点数）がサーバを経由します。
+          </div>
+          <input value={frNameInput} onChange={(e) => setFrNameInput(e.target.value)} maxLength={10}
+            placeholder="例）たかし" style={{ ...frInput, marginBottom: 10 }} />
+          <button disabled={frBusy} onClick={frRegister}
+            style={{ ...actionBtn("p"), marginBottom: 0, opacity: frBusy ? 0.5 : 1 }}>
+            {frBusy ? "登録しています…" : "この名前で登録する"}
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* 自分のコード */}
+          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myName}</span>
+              <button style={{ padding: "8px 12px", borderRadius: 8, cursor: "pointer", border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}
+                onClick={() => { setFrEditingName(v => !v); setFrNameInput(myName); }}>✏️ 名前を変える</button>
+            </div>
+            {frEditingName && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input value={frNameInput} onChange={(e) => setFrNameInput(e.target.value)} maxLength={10} style={{ ...frInput, flex: 1, minWidth: 0 }} />
+                <button disabled={frBusy} onClick={frRename} style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700 }}>保存</button>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>あなたの友達コード</div>
+            <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "0.18em", textAlign: "center", marginBottom: 10 }}>{myCode}</div>
+            {myQR && (
+              <div style={{ textAlign: "center", marginBottom: 10 }}>
+                <span style={{ display: "inline-block", padding: 10, background: "#fff", borderRadius: 10, lineHeight: 0 }}
+                  dangerouslySetInnerHTML={{ __html: myQR }} />
+              </div>
+            )}
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8 }}>
+              このコードを友達のアプリで入力（またはQRを読み取り）してもらうと、お互いの友達リストに入ります。
+            </div>
+          </div>
+
+          {/* 受信箱 */}
+          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 14, fontWeight: 800, flex: 1, minWidth: 0 }}>📥 受信箱{inboxItems && inboxItems.length > 0 ? `（${inboxItems.length}件）` : ""}</span>
+              <button disabled={frBusy} onClick={refreshFriends}
+                style={{ flexShrink: 0, padding: "8px 12px", borderRadius: 8, cursor: "pointer", border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700, opacity: frBusy ? 0.5 : 1, whiteSpace: "nowrap" }}>
+                {frBusy ? "通信中…" : "🔄 更新"}
+              </button>
+            </div>
+            {(!inboxItems || inboxItems.length === 0) ? (
+              <div style={{ fontSize: 12, color: t.dm }}>届いている対局結果はありません</div>
+            ) : (
+              <>
+                {inboxItems.map((it, ii) => (
+                  <div key={it.key} style={{ marginTop: ii === 0 ? 0 : 10, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.6 }}>
+                      <span style={{ fontWeight: 700 }}>{it.fromName}</span> さんから
+                      <span style={{ display: "block", color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {it.game?.date} {MATCH_LABEL_SHORT(it.game?.matchType)} — {(it.game?.players || []).join("・")}
+                      </span>
+                    </span>
+                    <button onClick={() => frImportInbox([it])}
+                      style={{ flexShrink: 0, padding: "10px 12px", borderRadius: 8, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700 }}>取り込む</button>
+                  </div>
+                ))}
+                {inboxItems.length >= 2 && (
+                  <button onClick={() => frImportInbox(inboxItems)} style={{ ...actionBtn("p"), marginTop: 10, marginBottom: 0, fontSize: 13, padding: "12px 8px" }}>
+                    ぜんぶ取り込む
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* 結果を送る */}
+          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>📤 対局結果を送る</div>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 10 }}>
+              履歴から対局を選んで、友達の受信箱へ送ります。受け取った人が取り込むと、その人の履歴と通算成績に反映されます。
+            </div>
+            <button disabled={gameHistory.length === 0}
+              onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("send"); setHistoryDetail(null); setView("history"); }}
+              style={{ ...actionBtn(), marginBottom: 0, opacity: gameHistory.length === 0 ? 0.45 : 1 }}>
+              履歴から対局を選ぶ
+            </button>
+          </div>
+
+          {/* 友達リスト */}
+          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>友達リスト{Object.keys(friendsMap).length > 0 ? `（${Object.keys(friendsMap).length}人）` : ""}</div>
+            {Object.keys(friendsMap).length === 0 ? (
+              <div style={{ fontSize: 12, color: t.dm, marginBottom: 12 }}>まだ友達がいません。下でコードを入力して追加してください。</div>
+            ) : (
+              <div style={{ marginBottom: 12 }}>
+                {Object.entries(friendsMap).map(([fid, f], fi) => (
+                  <div key={fid} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: fi === 0 ? 0 : 10 }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                    <button aria-label="友達を削除" onClick={() => frRemoveFriend(fid, f.name)}
+                      style={{ flexShrink: 0, width: 40, height: 36, borderRadius: 8, cursor: "pointer", border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 14 }}>🗑</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>友達のコードを入力して追加</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.toUpperCase())} maxLength={6}
+                placeholder="例）ABC345" autoCapitalize="characters" autoCorrect="off"
+                style={{ ...frInput, flex: 1, minWidth: 0, letterSpacing: "0.12em", fontWeight: 700 }} />
+              <button disabled={frBusy} onClick={frAddFriend}
+                style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // 送信モーダル（選んだ対局をどの友達に送るか）
+  const renderSendModal = () => {
+    const games = gameHistory.filter(g => sendPick.ids.includes(g.id));
+    const fids = Object.keys(friendsMap);
+    return (
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ width: "100%", maxWidth: 400 }}>
+          <div style={card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <span style={{ fontSize: 16, fontWeight: 800 }}>📤 {games.length}件を友達に送る</span>
+              <button style={{ background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
+                onClick={() => { setSendPick(null); setSendSel([]); }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.7, marginBottom: 12 }}>送り先を選んでください。</div>
+            {frError && <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, marginBottom: 10 }}>{frError}</div>}
+            {fids.length === 0 ? (
+              <div style={{ fontSize: 13, color: t.dm, marginBottom: 12 }}>まだ友達がいません。先に友達画面でコードを追加してください。</div>
+            ) : fids.map((fid) => {
+              const on = sendSel.includes(fid);
+              return (
+                <button key={fid} onClick={() => setSendSel(prev => on ? prev.filter(x => x !== fid) : [...prev, fid])}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 12px", marginBottom: 8, borderRadius: 10, cursor: "pointer", textAlign: "left",
+                    border: on ? `2px solid ${t.ac}` : `1px solid ${t.bd}`, background: on ? t.acS : t.sf, color: t.tx, boxSizing: "border-box" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, border: `2px solid ${on ? t.ac : t.bd}`, background: on ? t.ac : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1 }}>{on ? "✓" : ""}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friendsMap[fid].name}</span>
+                </button>
+              );
+            })}
+            <button disabled={frBusy || sendSel.length === 0 || fids.length === 0} onClick={frSendGames}
+              style={{ ...actionBtn("p"), marginTop: 6, marginBottom: 0, opacity: (frBusy || sendSel.length === 0) ? 0.45 : 1 }}>
+              {frBusy ? "送信しています…" : sendSel.length > 0 ? `${sendSel.length}人に送る` : "送り先を選んでください"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ══════════════════════════════════
   // ── HISTORY VIEW ──
   // ══════════════════════════════════
   const [historyDetail, setHistoryDetail] = useState(null);
@@ -12670,6 +13078,7 @@ input, select { padding: 10px 14px; }
   // 対局を選んで、素点合計・ウマオカ込みpt合計・レート換算・参加数・トップ数を出す
   const [histSelMode, setHistSelMode] = useState(false);
   const [histSel, setHistSel] = useState([]);     // 選択した対局のid
+  const [histSelPurpose, setHistSelPurpose] = useState("agg");   // "agg"=集計 / "send"=友達に送る
   const [histAgg, setHistAgg] = useState(null);   // 集計結果 { rows, count, unit, hasRate }
 
   // 対局ごとに素点（返し点との差）・ウマ・オカを点数で出して、名前ごとに合算する。
@@ -12768,12 +13177,9 @@ input, select { padding: 10px 14px; }
         const data = JSON.parse(ev.target.result);
         const incoming = data.history || (Array.isArray(data) ? data : null);
         if (!incoming) { setRestoreMsg({ ok: false, text: "ファイル形式が正しくありません" }); return; }
-        // 既存とマージ（id重複は除外）
-        const existingIds = new Set(gameHistory.map(g => g.id));
-        const merged = [...gameHistory, ...incoming.filter(g => !existingIds.has(g.id))];
-        merged.sort((a, b) => (a.id || 0) - (b.id || 0));
-        setGameHistory(merged);   // 保存は mj_history の useEffect が行う
-        setRestoreMsg({ ok: true, text: `${incoming.filter(g => !existingIds.has(g.id)).length}件を追加しました（合計${merged.length}件）` });
+        // 既存とマージ（id重複は除外。保存は mj_history の useEffect が行う）
+        const added = mergeIntoHistory(incoming);
+        setRestoreMsg({ ok: true, text: `${added}件を追加しました（合計${gameHistory.length + added}件）` });
       } catch {
         setRestoreMsg({ ok: false, text: "読み込みに失敗しました" });
       }
@@ -12813,14 +13219,20 @@ input, select { padding: 10px 14px; }
 
           {/* 対局を選んで集計 */}
           {gameHistory.length >= 2 && !histSelMode && (
-            <button onClick={() => { setHistSelMode(true); setHistSel([]); }} style={{
+            <button onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("agg"); }} style={{
               width: "100%", padding: "13px 10px", borderRadius: 12, cursor: "pointer", marginBottom: 14,
               border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 14, fontWeight: 700,
             }}>☑ 対局を選んで集計する</button>
           )}
+          {Net.enabled() && myCode && gameHistory.length >= 1 && !histSelMode && (
+            <button onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("send"); }} style={{
+              width: "100%", padding: "13px 10px", borderRadius: 12, cursor: "pointer", marginBottom: 14,
+              border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 14, fontWeight: 700,
+            }}>📤 対局を選んで友達に送る</button>
+          )}
           {histSelMode && (
             <div style={{ fontSize: 12, color: t.ac, fontWeight: 700, textAlign: "center", marginBottom: 10, lineHeight: 1.7 }}>
-              集計したい対局をタップで選んでください（{histSel.length}件選択中）
+              {histSelPurpose === "send" ? "送りたい" : "集計したい"}対局をタップで選んでください（{histSel.length}件選択中）
             </div>
           )}
 
@@ -12909,11 +13321,14 @@ input, select { padding: 10px 14px; }
             }}>
               <div style={{ display: "flex", gap: 8, maxWidth: 400, margin: "0 auto" }}>
                 <button disabled={histSel.length === 0}
-                  onClick={() => setHistAgg(aggregateGames(histSel))}
+                  onClick={() => {
+                    if (histSelPurpose === "send") { setSendPick({ ids: [...histSel] }); setSendSel([]); }
+                    else setHistAgg(aggregateGames(histSel));
+                  }}
                   style={{ ...actionBtn("p"), marginBottom: 0, flex: 1.3, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap", opacity: histSel.length === 0 ? 0.45 : 1 }}>
-                  {histSel.length}件を集計する
+                  {histSel.length}件を{histSelPurpose === "send" ? "送る" : "集計する"}
                 </button>
-                <button onClick={() => { setHistSelMode(false); setHistSel([]); }}
+                <button onClick={() => { setHistSelMode(false); setHistSel([]); setHistSelPurpose("agg"); }}
                   style={{ ...actionBtn(), marginBottom: 0, flex: 1, fontSize: 14, padding: "14px 6px", whiteSpace: "nowrap" }}>やめる</button>
               </div>
             </div>
@@ -13025,6 +13440,13 @@ input, select { padding: 10px 14px; }
               }
             </div>
 
+            {Net.enabled() && myCode && (
+              <button style={{ width: "100%", padding: "12px 8px", marginBottom: 14, borderRadius: 10, cursor: "pointer", border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 13, fontWeight: 700, boxSizing: "border-box" }}
+                onClick={() => { setSendPick({ ids: [historyDetail.id] }); setSendSel([]); }}>
+                📤 この対局を友達に送る
+              </button>
+            )}
+
             {/* Round history */}
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8 }}>局の記録</div>
             {historyDetail.rounds.map((r, idx) => (
@@ -13116,6 +13538,8 @@ input, select { padding: 10px 14px; }
         {view === "table" && renderTable()}
         {view === "startguide" && renderStartGuide()}
         {view === "names" && renderNames()}
+        {view === "friends" && renderFriends()}
+        {sendPick && renderSendModal()}
         {showFuHelp && FuHelpModal()}
       </div>
     </>
