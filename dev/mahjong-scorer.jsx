@@ -5784,8 +5784,14 @@ input, select { padding: 10px 14px; }
   const [keepAwake, setKeepAwake] = useState(() => {
     try { return localStorage.getItem("mj_keep_awake") !== "0"; } catch { return true; }
   });
-  const [wakeActive, setWakeActive] = useState(false);
+  // "idle" = まだ取っていない／他のアプリに移って外れた、"on" = 効いている、
+  // "failed" = 端末に断られた（iPhoneの低電力モードなど）。
+  // 画面を出した直後はまだ結果が返っていないので "idle"。ここで失敗を出さない
+  const [wakeState, setWakeState] = useState("idle");
   const wakeLockRef = React.useRef(null);
+  // 失敗したあとに、その場でもう一度試せるようにしておく
+  const wakeAcquireRef = React.useRef(null);
+  const retryWakeLock = () => { if (wakeAcquireRef.current) wakeAcquireRef.current(); };
   const saveKeepAwake = (v) => { setKeepAwake(v); try { localStorage.setItem("mj_keep_awake", v ? "1" : "0"); } catch {} };
 
   React.useEffect(() => {
@@ -5799,18 +5805,22 @@ input, select { padding: 10px 14px; }
         const wl = await navigator.wakeLock.request("screen");
         if (cancelled) { try { await wl.release(); } catch {} return; }
         wakeLockRef.current = wl;
-        setWakeActive(true);
+        setWakeState("on");
         wl.addEventListener("release", () => {
+          // 他のアプリに切り替えたときにも呼ばれる。これは失敗ではない
           wakeLockRef.current = null;
-          setWakeActive(false);
+          setWakeState("idle");
         });
-      } catch { setWakeActive(false); }
+      } catch {
+        // 端末に断られたときだけ失敗として覚える
+        setWakeState("failed");
+      }
     };
 
     const release = async () => {
       const wl = wakeLockRef.current;
       wakeLockRef.current = null;
-      setWakeActive(false);
+      setWakeState("idle");
       if (wl) { try { await wl.release(); } catch {} }
     };
 
@@ -5818,6 +5828,7 @@ input, select { padding: 10px 14px; }
       if (document.visibilityState === "visible") acquire();
     };
 
+    wakeAcquireRef.current = acquire;
     if (keepAwake) {
       acquire();
       document.addEventListener("visibilitychange", onVisible);
@@ -5827,6 +5838,7 @@ input, select { padding: 10px 14px; }
 
     return () => {
       cancelled = true;
+      wakeAcquireRef.current = null;
       document.removeEventListener("visibilitychange", onVisible);
       if (!keepAwake) return;
       const wl = wakeLockRef.current;
@@ -6247,19 +6259,33 @@ input, select { padding: 10px 14px; }
           fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>💡</span>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>画面をスリープさせない</div>
-          <div style={{ fontSize: 11, color: t.dm }}>対局中に画面が暗くなるのを防ぎます</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: t.tx, textWrap: "balance" }}>画面をスリープさせない</div>
+          <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.7, textWrap: "balance" }}>アプリを開いている間、画面が暗くなるのを防ぎます</div>
         </div>
       </div>
       {wakeSupported ? (
         <>
           {toggleRow("スリープ防止を有効にする", keepAwake, () => saveKeepAwake(!keepAwake))}
-          <div style={{ fontSize: 10, color: keepAwake && wakeActive ? t.gn : t.dm, marginTop: 8 }}>
-            {keepAwake
-              ? (wakeActive ? "● 動作中 — このアプリを開いている間は画面が消えません" : "他のアプリに切り替えると一時停止し、戻ると再開します")
-              : "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います"}
+          <div style={{
+            fontSize: 12, marginTop: 8, lineHeight: 1.8, textWrap: "balance",
+            color: !keepAwake ? t.dm : wakeState === "on" ? t.gn : wakeState === "failed" ? t.gd : t.dm,
+          }}>
+            {!keepAwake
+              ? "iPhone本体の「設定 → 画面表示と明るさ → 自動ロック」に従います"
+              : wakeState === "on"
+                ? "● 動作中 — このアプリを開いている間は画面が消えません"
+                : wakeState === "failed"
+                  ? "⚠ 有効にできませんでした — iPhoneが低電力モードのときは使えません。オフにしてからもう一度お試しください"
+                  : "他のアプリに切り替えると一時停止し、戻ると再開します"}
           </div>
+          {keepAwake && wakeState === "failed" && (
+            <button onClick={retryWakeLock} style={{
+              marginTop: 8, padding: "10px 14px", minHeight: 34, borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${t.gd}66`, background: t.gdS, color: t.gd,
+              fontSize: 13, fontWeight: 800,
+            }}>もう一度試す</button>
+          )}
         </>
       ) : (
         <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.7 }}>
@@ -6460,7 +6486,7 @@ input, select { padding: 10px 14px; }
                 ["voice", "🔊", "音の設定",
                   `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`],
                 ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`],
-                ["screen", "💡", "画面設定", "対局中のスリープ防止"],
+                ["screen", "💡", "画面設定", "開いている間のスリープ防止"],
               ].map(([id, icon, title, sub]) => (
                 <React.Fragment key={id}>
                   <button onClick={() => setRcSet(v => (v === id ? null : id))} style={{
@@ -6471,7 +6497,7 @@ input, select { padding: 10px 14px; }
                     <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 13.5, fontWeight: 700, color: t.tx }}>{title}</span>
-                      <span style={{ display: "block", fontSize: 10.5, color: t.dm, marginTop: 1 }}>{sub}</span>
+                      <span style={{ display: "block", fontSize: 10.5, color: t.dm, marginTop: 1, textWrap: "balance" }}>{sub}</span>
                     </span>
                     <span style={{
                       color: rcSet === id ? t.ac : t.dm, fontSize: 12, flexShrink: 0,
@@ -7801,7 +7827,7 @@ input, select { padding: 10px 14px; }
               `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
             {setOpen === "voice" && voicePanelCard()}
 
-            {secHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
+            {secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
             {setOpen === "screen" && screenPanelCard()}
 
             {/* ルール類の保存（変更があるときだけ表示）。横並び1行の小さめボタン */}
@@ -10329,7 +10355,7 @@ input, select { padding: 10px 14px; }
             `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
           {gsOpen === "voice" && voicePanelCard()}
 
-          {gsHdr("screen", "💡", "画面設定", "対局中のスリープ防止")}
+          {gsHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
           {gsOpen === "screen" && screenPanelCard()}
           </>)}
 
