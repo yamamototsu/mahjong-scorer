@@ -3165,6 +3165,50 @@ function MahjongScorer() {
     style: backBtn,
     onClick: onClick
   }, "← 戻る");
+  const gwBack = onClick => {
+    const nm = gWinner !== null ? players[gWinner] : null;
+    return React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 18
+      }
+    }, React.createElement("button", {
+      style: {
+        ...backBtn,
+        marginBottom: 0,
+        flexShrink: 0
+      },
+      onClick: onClick
+    }, "← 戻る"), nm && !multiRon && React.createElement("div", {
+      style: {
+        flex: "1 1 auto",
+        minWidth: 0,
+        display: "flex",
+        alignItems: "baseline",
+        justifyContent: "flex-end",
+        gap: 4
+      }
+    }, React.createElement("span", {
+      style: {
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        fontSize: 17,
+        fontWeight: 800,
+        color: t.tx
+      }
+    }, nm), React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.dm
+      }
+    }, "の手")));
+  };
   const FuHelpModal = () => React.createElement("div", {
     style: {
       position: "fixed",
@@ -9881,7 +9925,9 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, guideStep + 1, " / ", GUIDE_STEPS.length), React.createElement("button", {
       style: {
@@ -13049,7 +13095,7 @@ input, select { padding: 10px 14px; }
           top: `${pos.y}%`,
           left: `${pos.x}%`,
           transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
-          padding: `${fs(4)} ${fs(5)}`,
+          padding: `${fs(3)} ${fs(5)}`,
           borderRadius: 12,
           background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
           border: `2px solid ${isWin ? t.gd : net < 0 ? t.rd : t.bd}`,
@@ -13072,10 +13118,10 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("span", {
         style: {
-          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))) * (rows.some(r => r.own) ? 0.75 : rows.length >= 4 ? 0.85 : 1))),
+          fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))) * (rows.some(r => r.own) ? 0.85 : rows.length >= 4 ? 0.9 : 1))),
           fontWeight: 800,
           color: "#fff",
-          lineHeight: 1.2,
+          lineHeight: 1.1,
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -13104,28 +13150,28 @@ input, select { padding: 10px 14px; }
             alignItems: "baseline",
             width: "100%",
             gap: 2,
-            lineHeight: tight ? 1 : many ? 1.18 : 1.3,
+            lineHeight: tight ? 1.05 : many ? 1.2 : 1.3,
             borderTop: r2.strong ? `1px solid rgba(255,255,255,0.28)` : "none",
             marginTop: r2.strong ? fs(many ? 1 : 2) : 0,
             paddingTop: r2.strong ? fs(many ? 1 : 2) : 0
           }
         }, React.createElement("span", {
           style: {
-            fontSize: fs(many ? 10 : 10.5),
+            fontSize: fs(many ? 10.5 : 11),
             fontWeight: r2.strong ? 900 : 700,
             whiteSpace: "nowrap",
             color: r2.strong ? "#fff" : "rgba(255,255,255,0.78)"
           }
         }, r2.lb), r2.sticks !== undefined ? React.createElement("span", {
           style: {
-            fontSize: fs(tight ? 11 : many ? 13 : 15),
+            fontSize: fs(tight ? 12.5 : many ? 14 : 15),
             fontWeight: 900,
             whiteSpace: "nowrap",
             color: r2.sticks > 0 ? t.gd : "#ff8a8a"
           }
         }, r2.sticks > 0 ? "+" : "-", Math.abs(r2.sticks), "本") : React.createElement("span", {
           style: {
-            fontSize: fs((r2.strong ? tight ? 13 : many ? 15 : 17.5 : tight ? 11 : many ? 13 : 15) * (`${r2.v}`.replace("-", "").length >= 6 ? 0.86 : `${r2.v}`.replace("-", "").length >= 5 ? 0.93 : 1)),
+            fontSize: fs((r2.strong ? tight ? 15 : many ? 15.5 : 17.5 : tight ? 12.5 : many ? 14 : 15) * (`${r2.v}`.replace("-", "").length >= 6 ? 0.86 : `${r2.v}`.replace("-", "").length >= 5 ? 0.93 : 1)),
             fontWeight: 900,
             fontVariantNumeric: "tabular-nums",
             whiteSpace: "nowrap",
@@ -17312,7 +17358,9 @@ input, select { padding: 10px 14px; }
       }, "800 / 1,600"), React.createElement("br", null), React.createElement("span", {
         style: {
           fontSize: 12,
-          color: t.dm
+          color: t.dm,
+          whiteSpace: "nowrap",
+          flexShrink: 0
         }
       }, "合計は 800×2 + 1,600 = 3,200点")), React.createElement("div", {
         style: {
@@ -17568,7 +17616,9 @@ input, select { padding: 10px 14px; }
       }, React.createElement("span", {
         style: {
           fontSize: 12,
-          color: t.dm
+          color: t.dm,
+          whiteSpace: "nowrap",
+          flexShrink: 0
         }
       }, "⚡ ", FLASH_TYPES.find(([k]) => k === flashType)?.[1], " ・ ", flashOrder === "seq" ? "順番" : "ランダム"), React.createElement("span", {
         style: {
@@ -17836,12 +17886,16 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, sqMode === "choice" ? "選択式" : "入力式"), React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, "正解 ", sqScore.ok, " / ", sqScore.total, sqScore.total > 0 && `（${Math.round(sqScore.ok / sqScore.total * 100)}%）`)), React.createElement("div", {
       style: card
@@ -18324,12 +18378,16 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, termIdx + 1, " / ", termOrder.length), React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, "わかる ", termScore.known, " / ", termScore.total)), React.createElement("div", {
       style: {
@@ -22073,7 +22131,9 @@ input, select { padding: 10px 14px; }
   }, React.createElement("span", {
     style: {
       fontSize: 12,
-      color: t.dm
+      color: t.dm,
+      whiteSpace: "nowrap",
+      flexShrink: 0
     }
   }, "STEP 1"), React.createElement("button", {
     style: {
@@ -22107,11 +22167,9 @@ input, select { padding: 10px 14px; }
     }
   }, SEAT_WINDS[(i - dealerIdx + PC) % PC], i === dealerIdx ? " (親)" : ""), React.createElement("div", null, p))))), gStep === 2 && React.createElement("div", {
     style: card
-  }, React.createElement(Back, {
-    onClick: () => {
-      setGStep(1);
-      setGWinner(null);
-    }
+  }, gwBack(() => {
+    setGStep(1);
+    setGWinner(null);
   }), React.createElement("div", {
     style: {
       fontSize: 12,
@@ -22141,11 +22199,9 @@ input, select { padding: 10px 14px; }
     })
   }, "ロン"))), gStep === 3 && React.createElement("div", {
     style: card
-  }, React.createElement(Back, {
-    onClick: () => {
-      setGStep(2);
-      setGTsumo(null);
-    }
+  }, gwBack(() => {
+    setGStep(2);
+    setGTsumo(null);
   }), React.createElement("div", {
     style: {
       fontSize: 12,
@@ -22178,15 +22234,13 @@ input, select { padding: 10px 14px; }
     }
   }, p))))), gStep === 4 && React.createElement("div", {
     style: card
-  }, React.createElement(Back, {
-    onClick: () => {
-      if (gTsumo) {
-        setGStep(2);
-        setGTsumo(null);
-      } else {
-        setGStep(3);
-        setGLoser(null);
-      }
+  }, gwBack(() => {
+    if (gTsumo) {
+      setGStep(2);
+      setGTsumo(null);
+    } else {
+      setGStep(3);
+      setGLoser(null);
     }
   }), React.createElement("div", {
     style: {
@@ -22281,20 +22335,18 @@ input, select { padding: 10px 14px; }
       } else setGStep(6);
     },
     onCancel: () => setYakuPickerOpen(false)
-  })) : React.createElement(React.Fragment, null, React.createElement(Back, {
-    onClick: () => {
-      if (fixIdx !== null && gHan !== null) {
-        setGStep(7);
-        return;
-      }
-      if (tableMode) {
-        resetGW();
-        setRonPick([]);
-        setMultiRon(null);
-        setTmWinStep(null);
-      } else {
-        setGStep(4);
-      }
+  })) : React.createElement(React.Fragment, null, gwBack(() => {
+    if (fixIdx !== null && gHan !== null) {
+      setGStep(7);
+      return;
+    }
+    if (tableMode) {
+      resetGW();
+      setRonPick([]);
+      setMultiRon(null);
+      setTmWinStep(null);
+    } else {
+      setGStep(4);
     }
   }), multiRon && React.createElement("div", {
     style: {
@@ -22393,12 +22445,10 @@ input, select { padding: 10px 14px; }
     }
   }, "役満"))), gStep === 6 && React.createElement("div", {
     style: card
-  }, !fuGuide && React.createElement(React.Fragment, null, React.createElement(Back, {
-    onClick: () => {
-      setGStep(5);
-      if (fixIdx === null) setGHan(null);
-      resetFuGuide();
-    }
+  }, !fuGuide && React.createElement(React.Fragment, null, gwBack(() => {
+    setGStep(5);
+    if (fixIdx === null) setGHan(null);
+    resetFuGuide();
   }), React.createElement("div", {
     style: {
       fontSize: 12,
@@ -22597,19 +22647,26 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, "あがった人"), React.createElement("span", {
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 7
+        gap: 7,
+        minWidth: 0
       }
     }, React.createElement("span", {
       style: {
         fontSize: 13,
         fontWeight: 700,
-        color: t.tx
+        color: t.tx,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
       }
     }, players[gWinner]), React.createElement("span", {
       style: editTag
@@ -22625,7 +22682,9 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, "あがり方"), React.createElement("span", {
       style: {
@@ -22638,7 +22697,10 @@ input, select { padding: 10px 14px; }
         fontSize: 13,
         fontWeight: 700,
         color: gTsumo ? t.gn : t.rd,
-        textWrap: "balance"
+        textWrap: "balance",
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis"
       }
     }, gTsumo ? "ツモ" : "ロン", !gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""), React.createElement("span", {
       style: editTag
@@ -22647,7 +22709,9 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, "リーチ棒"), React.createElement("span", {
       style: {
@@ -22667,7 +22731,9 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        whiteSpace: "nowrap",
+        flexShrink: 0
       }
     }, "リーチ棒"), React.createElement("span", {
       style: {
@@ -22703,7 +22769,9 @@ input, select { padding: 10px 14px; }
   }, React.createElement("span", {
     style: {
       fontSize: 12,
-      color: t.dm
+      color: t.dm,
+      whiteSpace: "nowrap",
+      flexShrink: 0
     }
   }, "翻数"), React.createElement("span", {
     style: {
@@ -22738,7 +22806,9 @@ input, select { padding: 10px 14px; }
   }, React.createElement("span", {
     style: {
       fontSize: 12,
-      color: t.dm
+      color: t.dm,
+      whiteSpace: "nowrap",
+      flexShrink: 0
     }
   }, "符数"), React.createElement("span", {
     style: {
@@ -22861,7 +22931,9 @@ input, select { padding: 10px 14px; }
   }, React.createElement("span", {
     style: {
       fontSize: 12,
-      color: t.dm
+      color: t.dm,
+      whiteSpace: "nowrap",
+      flexShrink: 0
     }
   }, "流局"), React.createElement("button", {
     style: {

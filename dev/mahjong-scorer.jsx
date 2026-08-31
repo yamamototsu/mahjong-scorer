@@ -2194,6 +2194,30 @@ export default function MahjongScorer() {
   );
 
   const Back = ({ onClick }) => <button style={backBtn} onClick={onClick}>← 戻る</button>;
+  // アガリ入力で、あがった人が決まったあとのステップ。
+  // 誰の手を入れているのか分かるよう、戻るの右に名前を出す。
+  // ダブロンのときは下に「N人目 / ◯◯ さんの手」のバナーが出るので、ここでは出さない
+  const gwBack = (onClick) => {
+    const nm = gWinner !== null ? players[gWinner] : null;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        <button style={{ ...backBtn, marginBottom: 0, flexShrink: 0 }} onClick={onClick}>← 戻る</button>
+        {nm && !multiRon && (
+          <div style={{
+            flex: "1 1 auto", minWidth: 0,
+            display: "flex", alignItems: "baseline", justifyContent: "flex-end", gap: 4,
+          }}>
+            {/* 長い名前は省略する。「の手」は縮めない */}
+            <span style={{
+              minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              fontSize: 17, fontWeight: 800, color: t.tx,
+            }}>{nm}</span>
+            <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: t.dm }}>の手</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const FuHelpModal = () => (
     <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', overflowY: "auto" }}>
@@ -5155,7 +5179,7 @@ input, select { padding: 10px 14px; }
     return (
       <div style={body}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 12, color: t.dm }}>{guideStep + 1} / {GUIDE_STEPS.length}</span>
+          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>{guideStep + 1} / {GUIDE_STEPS.length}</span>
           <button style={{ background: "none", border: "none", color: t.dm, fontSize: 12, cursor: "pointer" }}
             onClick={() => setView("home")}>✕ 閉じる</button>
         </div>
@@ -6952,7 +6976,7 @@ input, select { padding: 10px 14px; }
                 transform: `translate(-50%,-50%) rotate(${pos.rot}deg)`,
                 // 余白を%にすると卓全体の幅が基準になり、枠に対して大きくなりすぎて
                 // 名前が入らなくなる。卓の大きさに比例する fs() で指定する
-                padding: `${fs(4)} ${fs(5)}`, borderRadius: 12,
+                padding: `${fs(3)} ${fs(5)}`, borderRadius: 12,
                 background: isWin ? "rgba(234,179,8,0.18)" : "rgba(0,0,0,0.5)",
                 border: `2px solid ${isWin ? t.gd : net < 0 ? t.rd : t.bd}`,
                 width: "38%", height: "26%", boxSizing: "border-box",
@@ -6964,8 +6988,8 @@ input, select { padding: 10px 14px; }
                   gap: 3, width: "100%", maxWidth: "100%",
                 }}>
                   <span style={{
-                    fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))) * (rows.some(r => r.own) ? 0.75 : rows.length >= 4 ? 0.85 : 1))),
-                    fontWeight: 800, color: "#fff", lineHeight: 1.2,
+                    fontSize: fs(Math.max(10, Math.min(14, Math.floor(14 * 5.5 / Math.max(5.5, (players[i] || "").length + (i === dealerIdx ? 0.3 : 0)))) * (rows.some(r => r.own) ? 0.85 : rows.length >= 4 ? 0.9 : 1))),
+                    fontWeight: 800, color: "#fff", lineHeight: 1.1,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0,
                   }}>{players[i]}</span>
                   {i === dealerIdx && <span style={{ fontSize: fs(10), color: t.gd, lineHeight: 1.2, flexShrink: 0 }}>親</span>}
@@ -6981,26 +7005,26 @@ input, select { padding: 10px 14px; }
                   <React.Fragment key={k2}>
                   <div style={{
                     display: "flex", justifyContent: "space-between", alignItems: "baseline",
-                    width: "100%", gap: 2, lineHeight: tight ? 1 : many ? 1.18 : 1.3,
+                    width: "100%", gap: 2, lineHeight: tight ? 1.05 : many ? 1.2 : 1.3,
                     // 合計は内訳と区切って見せる
                     borderTop: r2.strong ? `1px solid rgba(255,255,255,0.28)` : "none",
                     marginTop: r2.strong ? fs(many ? 1 : 2) : 0, paddingTop: r2.strong ? fs(many ? 1 : 2) : 0,
                   }}>
                     <span style={{
-                      fontSize: fs(many ? 10 : 10.5), fontWeight: r2.strong ? 900 : 700, whiteSpace: "nowrap",
+                      fontSize: fs(many ? 10.5 : 11), fontWeight: r2.strong ? 900 : 700, whiteSpace: "nowrap",
                       color: r2.strong ? "#fff" : "rgba(255,255,255,0.78)",
                     }}>{r2.lb}</span>
                     {r2.sticks !== undefined ? (
                       /* リーチ棒は本数で示す */
                       <span style={{
-                        fontSize: fs(tight ? 11 : many ? 13 : 15),
+                        fontSize: fs(tight ? 12.5 : many ? 14 : 15),
                         fontWeight: 900, whiteSpace: "nowrap",
                         color: r2.sticks > 0 ? t.gd : "#ff8a8a",
                       }}>{r2.sticks > 0 ? "+" : "-"}{Math.abs(r2.sticks)}本</span>
                     ) : (
                     <span style={{
                       // 役満など桁数が多い点数は少し縮めて行に収める
-                      fontSize: fs((r2.strong ? (tight ? 13 : many ? 15 : 17.5) : (tight ? 11 : many ? 13 : 15))
+                      fontSize: fs((r2.strong ? (tight ? 15 : many ? 15.5 : 17.5) : (tight ? 12.5 : many ? 14 : 15))
                         * (`${r2.v}`.replace("-", "").length >= 6 ? 0.86 : `${r2.v}`.replace("-", "").length >= 5 ? 0.93 : 1)),
                       fontWeight: 900, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
                       color: r2.v > 0 ? t.gd : r2.v < 0 ? "#ff8a8a" : "rgba(255,255,255,0.45)",
@@ -9298,7 +9322,7 @@ input, select { padding: 10px 14px; }
               ① 100 × 2<sup>(2+1)</sup> = 100 × 8 = <b style={{ color: t.gd }}>800</b><br />
               ② 子は 800 × 1 = 800 ／ 親は 800 × 2 = 1,600<br />
               ③ どちらも端数なし → <b style={{ color: t.gn, whiteSpace: "nowrap" }}>800 / 1,600</b><br />
-              <span style={{ fontSize: 12, color: t.dm }}>合計は 800×2 + 1,600 = 3,200点</span>
+              <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>合計は 800×2 + 1,600 = 3,200点</span>
             </div>
 
             <div style={{ height: 1, background: t.bd, margin: "16px 0" }} />
@@ -9428,7 +9452,7 @@ input, select { padding: 10px 14px; }
       return (
         <div style={body}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-            <span style={{ fontSize: 12, color: t.dm }}>
+            <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>
               ⚡ {FLASH_TYPES.find(([k]) => k === flashType)?.[1]} ・ {flashOrder === "seq" ? "順番" : "ランダム"}
             </span>
             <span style={{ fontSize: 12, color: t.dm, fontVariantNumeric: "tabular-nums" }}>
@@ -9545,10 +9569,10 @@ input, select { padding: 10px 14px; }
         <button style={backBtn} onClick={() => { setSqLessonBackTo(null); setSqMode(null); setSqQ(null); }}>← 出題方式を変える</button>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-          <span style={{ fontSize: 12, color: t.dm }}>
+          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>
             {sqMode === "choice" ? "選択式" : "入力式"}
           </span>
-          <span style={{ fontSize: 12, color: t.dm }}>
+          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>
             正解 {sqScore.ok} / {sqScore.total}
             {sqScore.total > 0 && `（${Math.round(sqScore.ok / sqScore.total * 100)}%）`}
           </span>
@@ -9809,8 +9833,8 @@ input, select { padding: 10px 14px; }
         <button style={backBtn} onClick={() => setTermCat(null)}>← 分野を選び直す</button>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <span style={{ fontSize: 12, color: t.dm }}>{termIdx + 1} / {termOrder.length}</span>
-          <span style={{ fontSize: 12, color: t.dm }}>
+          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>{termIdx + 1} / {termOrder.length}</span>
+          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>
             わかる {termScore.known} / {termScore.total}
           </span>
         </div>
@@ -11943,7 +11967,7 @@ input, select { padding: 10px 14px; }
             {gStep === 1 && (
               <div style={card}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, color: t.dm }}>STEP 1</span>
+                  <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>STEP 1</span>
                   <button style={{ background: "none", border: "none", color: t.dm, fontSize: 18, cursor: "pointer" }} onClick={resetGW}>✕</button>
                 </div>
                 <div style={question}>誰があがった？</div>
@@ -11963,7 +11987,7 @@ input, select { padding: 10px 14px; }
             )}
             {gStep === 2 && (
               <div style={card}>
-                <Back onClick={() => { setGStep(1); setGWinner(null); }} />
+                {gwBack(() => { setGStep(1); setGWinner(null); })}
                 <div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>STEP 2</div>
                 <div style={question}>あがり方は？</div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
@@ -11974,7 +11998,7 @@ input, select { padding: 10px 14px; }
             )}
             {gStep === 3 && (
               <div style={card}>
-                <Back onClick={() => { setGStep(2); setGTsumo(null); }} />
+                {gwBack(() => { setGStep(2); setGTsumo(null); })}
                 <div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>STEP 3</div>
                 <div style={question}>誰から？</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
@@ -11989,7 +12013,7 @@ input, select { padding: 10px 14px; }
             )}
             {gStep === 4 && (
               <div style={card}>
-                <Back onClick={() => { if (gTsumo) { setGStep(2); setGTsumo(null); } else { setGStep(3); setGLoser(null); } }} />
+                {gwBack(() => { if (gTsumo) { setGStep(2); setGTsumo(null); } else { setGStep(3); setGLoser(null); } })}
                 <div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>リーチ棒</div>
                 <div style={question}>リーチした人は？</div>
                 <div style={{ fontSize: 12, color: t.dm, textAlign: "center", marginBottom: 12 }}>
@@ -12047,7 +12071,7 @@ input, select { padding: 10px 14px; }
                   })
                 ) : (
                   <>
-                    <Back onClick={() => {
+                    {gwBack(() => {
                       // 修正モード中は結果画面（サマリ）に戻る
                       if (fixIdx !== null && gHan !== null) { setGStep(7); return; }
                       // 卓上モードはこの画面から入るので、戻る＝入力をやめて卓に戻る
@@ -12056,7 +12080,7 @@ input, select { padding: 10px 14px; }
                       } else {
                         setGStep(4);
                       }
-                    }} />
+                    })}
                     {multiRon && (
                       <div style={{
                         padding: "9px 12px", borderRadius: 10, marginBottom: 10,
@@ -12109,7 +12133,7 @@ input, select { padding: 10px 14px; }
             )}
             {gStep === 6 && (
               <div style={card}>
-                {!fuGuide && <><Back onClick={() => { setGStep(5); if (fixIdx === null) setGHan(null); resetFuGuide(); }} /><div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>符数</div></>}
+                {!fuGuide && <>{gwBack(() => { setGStep(5); if (fixIdx === null) setGHan(null); resetFuGuide(); })}<div style={{ fontSize: 12, color: t.dm, marginBottom: 4 }}>符数</div></>}
 
                 {!fuGuide ? (
                   <>
@@ -12195,30 +12219,30 @@ input, select { padding: 10px 14px; }
                       <>
                         <button onClick={() => { setGEditing(true); return (tableMode && fixIdx === null) ? backToTable("winner") : setGStep(1); }}
                           style={{ ...rowStyle, cursor: "pointer" }}>
-                          <span style={{ fontSize: 12, color: t.dm }}>あがった人</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{players[gWinner]}</span>
+                          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>あがった人</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{players[gWinner]}</span>
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
                         <button onClick={() => { setGEditing(true); return (tableMode && fixIdx === null) ? backToTable("how") : setGStep(2); }}
                           style={{ ...rowStyle, cursor: "pointer" }}>
-                          <span style={{ fontSize: 12, color: t.dm }}>あがり方</span>
+                          <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>あがり方</span>
                           <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: gTsumo ? t.gn : t.rd, textWrap: "balance" }}>{gTsumo ? "ツモ" : "ロン"}{!gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: gTsumo ? t.gn : t.rd, textWrap: "balance", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{gTsumo ? "ツモ" : "ロン"}{!gTsumo && gLoser !== null ? ` ← ${players[gLoser]}` : ""}</span>
                             <span style={editTag}>訂正</span>
                           </span>
                         </button>
                         {(tableMode && fixIdx === null) ? (
                           <div style={rowStyle}>
-                            <span style={{ fontSize: 12, color: t.dm }}>リーチ棒</span>
+                            <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>リーチ棒</span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: declaredRiichi.some(Boolean) ? t.gd : t.dm }}>
                               {declaredRiichi.some(Boolean) ? `${declaredRiichi.filter(Boolean).length}本` : "なし"}
                             </span>
                           </div>
                         ) : (
                           <button onClick={() => { setGEditing(true); setGStep(4); }} style={{ ...rowStyle, cursor: "pointer" }}>
-                            <span style={{ fontSize: 12, color: t.dm }}>リーチ棒</span>
+                            <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>リーチ棒</span>
                             <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                               <span style={{ fontSize: 13, fontWeight: 700, color: gRiichi.some(Boolean) ? t.gd : t.dm }}>{gRiichi.some(Boolean) ? `${gRiichi.filter(Boolean).length}本` : "なし"}</span>
                               <span style={editTag}>訂正</span>
@@ -12229,7 +12253,7 @@ input, select { padding: 10px 14px; }
                     );
                   })()}
                   <button onClick={() => { setGEditing(true); setGStep(5); }} style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
-                    <span style={{ fontSize: 12, color: t.dm }}>翻数</span>
+                    <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>翻数</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{gHan >= 13 ? getLimitName(gHan) : `${gHan}翻`}</span>
                       <span style={editTag}>訂正</span>
@@ -12237,7 +12261,7 @@ input, select { padding: 10px 14px; }
                   </button>
                   {gHan < 5 && (
                     <button onClick={() => { setGEditing(true); setGStep(6); }} style={{ width: "100%", background: "transparent", border: "none", cursor: "pointer", padding: "8px 0", borderBottom: `1px solid ${t.bd}33`, display: "flex", justifyContent: "space-between", textAlign: "left" }}>
-                      <span style={{ fontSize: 12, color: t.dm }}>符数</span>
+                      <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>符数</span>
                       <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{gFu}符</span>
                         <span style={editTag}>訂正</span>
@@ -12289,7 +12313,7 @@ input, select { padding: 10px 14px; }
           <div style={{ width: "100%", maxWidth: 400 }}>
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: t.dm }}>流局</span>
+                <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap", flexShrink: 0 }}>流局</span>
                 <button style={{ background: "none", border: "none", color: t.dm, fontSize: 18, cursor: "pointer" }} onClick={resetDrawWiz}>✕</button>
               </div>
               <div style={question}>テンパイしている人は？</div>
