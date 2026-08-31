@@ -277,7 +277,13 @@ export default function MahjongScorer() {
   React.useEffect(() => {
     try { localStorage.setItem("mj_history", JSON.stringify(gameHistory)); } catch {}
   }, [gameHistory]);
-  const [suspendedGame, setSuspendedGame] = useState(null); // paused game
+  // 保留中・進行中の対局。端末に保存して、リロードや電池切れの後も再開できるようにする
+  const [suspendedGame, setSuspendedGame] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("mj_ongoing") || "null");
+      return s && s.config && Array.isArray(s.scores) ? s : null;
+    } catch { return null; }
+  });
 
   // ── Game Setup Wizard ──
   const [setupStep, setSetupStep] = useState(0);
@@ -5668,6 +5674,24 @@ input, select { padding: 10px 14px; }
   });
   const saveDiceHold = (v) => { setDiceHoldSec(v); try { localStorage.setItem("mj_dice_hold", String(v)); } catch {} };
 
+  // ── 進行中対局の自動保存 ──
+  // リロード・電池切れ・誤操作でアプリが閉じても対局が消えないよう、
+  // 対局中はひと操作ごとに局面を端末へ保存する。タイトルの「つづきを再開」で戻れる。
+  // 消えるのは、履歴やリーグへ記録したとき（recordGame）と、再開カードで破棄したとき。
+  const snapshotGame = () => ({
+    config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds],
+    dealerIdx, roundWind, honba, riichiBets,
+    declaredRiichi: [...declaredRiichi], manualAdj: [...manualAdj],
+    activeLeagueId, tableMode, finished: gameFinished,
+  });
+  React.useEffect(() => {
+    try {
+      if (gameStarted && gameConfig) localStorage.setItem("mj_ongoing", JSON.stringify(snapshotGame()));
+      else if (suspendedGame) localStorage.setItem("mj_ongoing", JSON.stringify(suspendedGame));
+    } catch {}
+  }, [gameStarted, gameFinished, gameConfig, players, scores, rounds, dealerIdx, roundWind,
+      honba, riichiBets, declaredRiichi, manualAdj, activeLeagueId, tableMode, suspendedGame]);
+
   // ── 卓上モード中は画面を固定し、ずれても中央に戻す ──
   const tableLocked = tableMode && gameStarted && !gameFinished && view === "game";
   React.useEffect(() => {
@@ -7067,8 +7091,13 @@ input, select { padding: 10px 14px; }
       setRoundWind(suspendedGame.roundWind);
       setHonba(suspendedGame.honba);
       setRiichiBets(suspendedGame.riichiBets);
-      setGameStarted(true); setGameFinished(false);
-      setTableMode(true);
+      // 宣言中のリーチ・直接修正・リーグとの紐づけも戻す（古い保存データには無いので既定値で補う）
+      setDeclaredRiichi(suspendedGame.declaredRiichi || [false, false, false, false]);
+      setManualAdj(suspendedGame.manualAdj || [0, 0, 0, 0]);
+      setActiveLeagueId(suspendedGame.activeLeagueId || null);
+      setGameStarted(true); setGameFinished(!!suspendedGame.finished);
+      setTableMode(suspendedGame.tableMode !== false);
+      setSuspendedGame(null);   // 再開したらカードを消す（以後は自動保存が引き継ぐ）
       setView("game");
     };
     const startPlay = () => {
@@ -7213,22 +7242,33 @@ input, select { padding: 10px 14px; }
           }}>卓の真ん中に置いて使えます</div>
         </div>
 
-        {/* 保留中があれば最優先で出す */}
+        {/* 続きのある対局（保留した・途中でアプリが閉じた）があれば最優先で出す */}
         {suspendedGame && (
-          <button onClick={resumeGame} style={{
-            width: "100%", padding: "14px 12px", borderRadius: 14, cursor: "pointer", marginBottom: 10,
-            border: `2px solid ${t.gd}`, background: t.gdS, color: t.tx, textAlign: "left",
-            display: "flex", alignItems: "center", gap: 10, ...reveal(0),
-          }}>
-            <span style={{ fontSize: 20 }}>⏸</span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: t.gd }}>保留中の対局を再開</div>
-              <div style={{ fontSize: 10, color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {suspendedGame.config.date} {MATCH_LABEL_SHORT(suspendedGame.config.matchType)} — {suspendedGame.players.join("・")}
-              </div>
-            </span>
-            <span style={{ color: t.gd, fontSize: 18 }}>›</span>
-          </button>
+          <div style={{ display: "flex", gap: 8, marginBottom: 10, ...reveal(0) }}>
+            <button onClick={resumeGame} style={{
+              flex: 1, minWidth: 0, padding: "14px 12px", borderRadius: 14, cursor: "pointer",
+              border: `2px solid ${t.gd}`, background: t.gdS, color: t.tx, textAlign: "left",
+              display: "flex", alignItems: "center", gap: 10,
+            }}>
+              <span style={{ fontSize: 20 }}>⏸</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                {/* 幅280pxでも1行で収まるよう、狭い画面だけ少し縮める */}
+                <div style={{ fontSize: "min(14px, 4.7vw)", fontWeight: 800, color: t.gd }}>対局のつづきを再開</div>
+                <div style={{ fontSize: 10, color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {suspendedGame.config.date} {MATCH_LABEL_SHORT(suspendedGame.config.matchType)} — {suspendedGame.players.join("・")}
+                </div>
+              </span>
+              <span style={{ color: t.gd, fontSize: 18 }}>›</span>
+            </button>
+            <button aria-label="対局のつづきを破棄" onClick={() => {
+              if (!window.confirm("保存されている対局のつづきを破棄しますか？\n破棄すると再開できません。")) return;
+              setSuspendedGame(null);
+              try { localStorage.removeItem("mj_ongoing"); } catch {}
+            }} style={{
+              flex: "0 0 46px", borderRadius: 14, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: t.card, color: t.dm, fontSize: 17,
+            }}>🗑</button>
+          </div>
         )}
 
         {/* メイン */}
@@ -11032,7 +11072,7 @@ input, select { padding: 10px 14px; }
               onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
             <button aria-label="対局を保留" style={{ ...smallBtn(), flex: "0 0 46px", fontSize: 19, padding: "10px 0" }}
               onClick={() => {
-                setSuspendedGame({ config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds], dealerIdx, roundWind, honba, riichiBets });
+                setSuspendedGame(snapshotGame());
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
             {/* 左右の余白を詰めて「アガリ入/力」と途中で折り返さないようにする */}
@@ -12170,16 +12210,7 @@ input, select { padding: 10px 14px; }
       )}
 
       <button style={actionBtn()} onClick={() => {
-        setSuspendedGame({
-          config: gameConfig,
-          players: [...players],
-          scores: [...scores],
-          rounds: [...rounds],
-          dealerIdx,
-          roundWind,
-          honba,
-          riichiBets,
-        });
+        setSuspendedGame(snapshotGame());
         setGameStarted(false);
         setView("home");
       }}>⏸ 対局保留</button>
@@ -12245,6 +12276,9 @@ input, select { padding: 10px 14px; }
         saveLeagues(leagues.map(l => l.id === lg.id
           ? { ...l, games: nextGames, status: reached ? "done" : l.status } : l));
       }
+      // 記録が済んだので、この対局の自動保存データを消す（別の保留中対局は残す）
+      try { localStorage.removeItem("mj_ongoing"); } catch {}
+      setSuspendedGame(s => (s && gameConfig && s.config?.startedAt !== gameConfig.startedAt) ? s : null);
     };
 
     // 記録してから、同じメンバー・同じルールで親決めからやり直す

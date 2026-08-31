@@ -494,7 +494,14 @@ function MahjongScorer() {
       localStorage.setItem("mj_history", JSON.stringify(gameHistory));
     } catch {}
   }, [gameHistory]);
-  const [suspendedGame, setSuspendedGame] = useState(null);
+  const [suspendedGame, setSuspendedGame] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("mj_ongoing") || "null");
+      return s && s.config && Array.isArray(s.scores) ? s : null;
+    } catch {
+      return null;
+    }
+  });
   const [setupStep, setSetupStep] = useState(0);
   const [gameDate, setGameDate] = useState(() => {
     const d = new Date();
@@ -10919,6 +10926,26 @@ input, select { padding: 10px 14px; }
       localStorage.setItem("mj_dice_hold", String(v));
     } catch {}
   };
+  const snapshotGame = () => ({
+    config: gameConfig,
+    players: [...players],
+    scores: [...scores],
+    rounds: [...rounds],
+    dealerIdx,
+    roundWind,
+    honba,
+    riichiBets,
+    declaredRiichi: [...declaredRiichi],
+    manualAdj: [...manualAdj],
+    activeLeagueId,
+    tableMode,
+    finished: gameFinished
+  });
+  React.useEffect(() => {
+    try {
+      if (gameStarted && gameConfig) localStorage.setItem("mj_ongoing", JSON.stringify(snapshotGame()));else if (suspendedGame) localStorage.setItem("mj_ongoing", JSON.stringify(suspendedGame));
+    } catch {}
+  }, [gameStarted, gameFinished, gameConfig, players, scores, rounds, dealerIdx, roundWind, honba, riichiBets, declaredRiichi, manualAdj, activeLeagueId, tableMode, suspendedGame]);
   const tableLocked = tableMode && gameStarted && !gameFinished && view === "game";
   React.useEffect(() => {
     if (!tableLocked) return;
@@ -13263,9 +13290,13 @@ input, select { padding: 10px 14px; }
       setRoundWind(suspendedGame.roundWind);
       setHonba(suspendedGame.honba);
       setRiichiBets(suspendedGame.riichiBets);
+      setDeclaredRiichi(suspendedGame.declaredRiichi || [false, false, false, false]);
+      setManualAdj(suspendedGame.manualAdj || [0, 0, 0, 0]);
+      setActiveLeagueId(suspendedGame.activeLeagueId || null);
       setGameStarted(true);
-      setGameFinished(false);
-      setTableMode(true);
+      setGameFinished(!!suspendedGame.finished);
+      setTableMode(suspendedGame.tableMode !== false);
+      setSuspendedGame(null);
       setView("game");
     };
     const startPlay = () => {
@@ -13495,22 +13526,28 @@ input, select { padding: 10px 14px; }
         animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
         opacity: intro ? undefined : 0.9
       }
-    }, "卓の真ん中に置いて使えます")), suspendedGame && React.createElement("button", {
+    }, "卓の真ん中に置いて使えます")), suspendedGame && React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 10,
+        ...reveal(0)
+      }
+    }, React.createElement("button", {
       onClick: resumeGame,
       style: {
-        width: "100%",
+        flex: 1,
+        minWidth: 0,
         padding: "14px 12px",
         borderRadius: 14,
         cursor: "pointer",
-        marginBottom: 10,
         border: `2px solid ${t.gd}`,
         background: t.gdS,
         color: t.tx,
         textAlign: "left",
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        ...reveal(0)
+        gap: 10
       }
     }, React.createElement("span", {
       style: {
@@ -13523,11 +13560,11 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 14,
+        fontSize: "min(14px, 4.7vw)",
         fontWeight: 800,
         color: t.gd
       }
-    }, "保留中の対局を再開"), React.createElement("div", {
+    }, "対局のつづきを再開"), React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -13541,6 +13578,24 @@ input, select { padding: 10px 14px; }
         fontSize: 18
       }
     }, "›")), React.createElement("button", {
+      "aria-label": "対局のつづきを破棄",
+      onClick: () => {
+        if (!window.confirm("保存されている対局のつづきを破棄しますか？\n破棄すると再開できません。")) return;
+        setSuspendedGame(null);
+        try {
+          localStorage.removeItem("mj_ongoing");
+        } catch {}
+      },
+      style: {
+        flex: "0 0 46px",
+        borderRadius: 14,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.card,
+        color: t.dm,
+        fontSize: 17
+      }
+    }, "🗑")), React.createElement("button", {
       onClick: startPlay,
       style: {
         width: "100%",
@@ -20581,16 +20636,7 @@ input, select { padding: 10px 14px; }
         padding: "10px 0"
       },
       onClick: () => {
-        setSuspendedGame({
-          config: gameConfig,
-          players: [...players],
-          scores: [...scores],
-          rounds: [...rounds],
-          dealerIdx,
-          roundWind,
-          honba,
-          riichiBets
-        });
+        setSuspendedGame(snapshotGame());
         setGameStarted(false);
         setHomeCat(null);
         setView("title");
@@ -22786,16 +22832,7 @@ input, select { padding: 10px 14px; }
   }, "終了して結果を見る")))), React.createElement("button", {
     style: actionBtn(),
     onClick: () => {
-      setSuspendedGame({
-        config: gameConfig,
-        players: [...players],
-        scores: [...scores],
-        rounds: [...rounds],
-        dealerIdx,
-        roundWind,
-        honba,
-        riichiBets
-      });
+      setSuspendedGame(snapshotGame());
       setGameStarted(false);
       setView("home");
     }
@@ -22864,6 +22901,10 @@ input, select { padding: 10px 14px; }
           status: reached ? "done" : l.status
         } : l));
       }
+      try {
+        localStorage.removeItem("mj_ongoing");
+      } catch {}
+      setSuspendedGame(s => s && gameConfig && s.config?.startedAt !== gameConfig.startedAt ? s : null);
     };
     const startRematch = mt => {
       setRematchPick(false);
