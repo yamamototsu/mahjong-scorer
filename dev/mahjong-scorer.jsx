@@ -919,7 +919,6 @@ export default function MahjongScorer() {
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
   const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
   const [voiceSeatOn, setVoiceSeatOn] = useState(() => loadVoicePref("mj_voice_seat"));
-  const [voiceYakuOn, setVoiceYakuOn] = useState(() => loadVoicePref("mj_voice_yaku"));
   const saveVoicePref = (key, setter) => (on) => {
     setter(on);
     try { localStorage.setItem(key, on ? "1" : "0"); } catch {}
@@ -929,7 +928,6 @@ export default function MahjongScorer() {
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
   const saveVoiceSeat = saveVoicePref("mj_voice_seat", setVoiceSeatOn);
-  const saveVoiceYaku = saveVoicePref("mj_voice_yaku", setVoiceYakuOn);
   const voiceOnFor = (text) =>
     text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   // 収録した掛け声。再生できない端末では音声合成にフォールバックする
@@ -1071,23 +1069,6 @@ export default function MahjongScorer() {
     } catch {}
   };
   const speakRound = (wind, dealer, honba2) => speakJa(roundKana(wind, dealer, honba2));
-
-  // 役の読み上げ（役を選んで確定したとき）。YAKU_DATA の yomi を使うので
-  // 「一盃口」を「いちはいくち」と読まれることがない
-  const yakuYomi = (name) => {
-    const y = YAKU_DATA.find(x => x.name === name);
-    if (y && y.yomi && y.yomi[0]) return y.yomi[0];
-    return String(name).replace(/[（(][^）)]*[）)]/g, "");
-  };
-  const speakYaku = (names, totalHan, force) => {
-    if (!force && !voiceYakuOn) return;
-    const parts = (names || []).map(yakuYomi).filter(Boolean);
-    if (pickerDora > 0) parts.push(`どら${pickerDora}`);
-    if (pickerUra > 0) parts.push(`うらどら${pickerUra}`);
-    if (parts.length === 0) return;
-    const tail = totalHan >= 13 ? YAKUMAN_LABEL(totalHan) : `ごうけい${totalHan}はん`;
-    speakJa(parts.join("、") + "、" + tail);
-  };
 
   // 局の読み上げの収録音声（東・南・西・北／1〜4局／オーラス／1〜10本場）。
   // 部品をつないで「なん・にきょく・いっぽんば」のように順に再生する
@@ -6235,9 +6216,6 @@ input, select { padding: 10px 14px; }
           on: voiceRoundOn, save: saveVoiceRound, preview: () => playRoundVoice("東", 0, 1, true) },
         { label: "🀫 席決めの牌の声", desc: "めくった牌に応じて「トン」など",
           on: voiceSeatOn, save: saveVoiceSeat, preview: () => playWindVoice("東", true) },
-        { label: "📖 役の読み上げ", desc: "役を選んで確定したときに「りーち、たんやお、ごうけい2はん」",
-          on: voiceYakuOn, save: saveVoiceYaku,
-          preview: () => speakYaku(["リーチ（立直）", "断么九（タンヤオ）"], 2, true) },
       ].map((row, i) => (
         <div key={i} style={{
           // 狭い画面ではボタン類が下の行へ折り返す（文字を潰さない）
@@ -6511,7 +6489,7 @@ input, select { padding: 10px 14px; }
               </div>
               {[
                 ["voice", "🔊", "音の設定",
-                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`],
+                  `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`],
                 ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`],
                 ["screen", "💡", "画面設定", "開いている間のスリープ防止"],
               ].map(([id, icon, title, sub]) => (
@@ -7851,7 +7829,7 @@ input, select { padding: 10px 14px; }
             {setOpen === "dice" && dicePanelCard()}
 
             {secHdr("voice", "🔊", "音の設定",
-              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
+              `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
             {setOpen === "voice" && voicePanelCard()}
 
             {secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
@@ -9801,7 +9779,6 @@ input, select { padding: 10px 14px; }
                 const pinfu = pickedYaku.includes("平和（ピンフ）");
                 const chiitoi = pickedYaku.includes("七対子（チートイツ）");
                 const naki = pickerNaki === true;
-                speakYaku(pickedYaku, h);
                 setCHan(h); setGKnownNaki(pickerNaki); resetYakuPicker();
                 if (h >= 5) { setCFu(30); setCalcStep(4); }
                 else if (chiitoi) { setCFu(25); setCalcStep(4); }
@@ -10379,7 +10356,7 @@ input, select { padding: 10px 14px; }
           {gsOpen === "dice" && dicePanelCard()}
 
           {gsHdr("voice", "🔊", "音の設定",
-            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`)}
+            `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`)}
           {gsOpen === "voice" && voicePanelCard()}
 
           {gsHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
@@ -11819,7 +11796,6 @@ input, select { padding: 10px 14px; }
                       const pinfu = pickedYaku.includes("平和（ピンフ）");
                       const chiitoi = pickedYaku.includes("七対子（チートイツ）");
                       const naki = pickerNaki === true;
-                      speakYaku(pickedYaku, h);
                       setGHan(h); setGKnownNaki(pickerNaki); resetYakuPicker();
                       if (h >= 5) { setGFu(30); setGStep(7); }
                       else if (chiitoi) { setGFu(25); setGStep(7); }
@@ -12507,47 +12483,90 @@ input, select { padding: 10px 14px; }
           ))}
         </div>
 
-        {/* Oka calculation */}
+        {/* 精算。ウマ・オカも1人ずつの内訳として、このカードにまとめて出す */}
+        {(() => {
+          const uma = ruleSet.uma || [];
+          // 要素数が人数と違うウマは合計が崩れるので使わない
+          const hasUma = uma.length === PC && uma.some(u => u !== 0);
+          // オカとウマは素点の順位で決まる
+          const rk = scores.slice(0, PC).map((sc, i) => ({ i, sc })).sort((a, b) => (b.sc - a.sc) || (a.i - b.i));
+          const rankOf = new Array(PC);
+          rk.forEach((x, r) => { rankOf[x.i] = r; });
+          const rows = players.slice(0, PC).map((name, i) => {
+            const rank0 = rankOf[i];
+            const raw = scores[i];
+            const oka = rank0 === 0 ? okaPool : 0;
+            const sub = raw - returnPt + oka;              // 五捨六入する前の精算
+            const roundedPt = goshaRokunyu(sub / 1000);    // 千点単位に五捨六入
+            const umaPt = hasUma ? (uma[rank0] || 0) : 0;
+            const pt = roundedPt + umaPt;                  // ウマ込みのポイント
+            const total = hasUma ? pt * 1000 : sub;        // この人の最終的な増減（点）
+            const gold = ruleSet.rate ? GOLD(hasUma ? pt : roundedPt, ruleSet.rate) : null;
+            return { i, name, rank0, raw, oka, sub, roundedPt, umaPt, pt, total, gold };
+          }).sort((a, b) => (b.total - a.total) || (a.rank0 - b.rank0));
+          const pm = (v) => (v > 0 ? "+" : "") + v.toLocaleString();
+          const detail = (lb, v, c, note) => (
+            <div key={lb} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "baseline",
+              gap: 10, padding: "3px 0",
+            }}>
+              <span style={{
+                fontSize: 12, color: t.dm, fontWeight: 700, textAlign: "left",
+                minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>{lb}{note && <span style={{ fontWeight: 400, marginLeft: 4 }}>{note}</span>}</span>
+              <span style={{
+                fontSize: 14, fontWeight: 800, color: c || t.tx,
+                whiteSpace: "nowrap", flexShrink: 0, fontVariantNumeric: "tabular-nums",
+              }}>{v}</span>
+            </div>
+          );
+          return (
         <div style={card}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>精算（オカ計算）</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>
+            {hasUma ? "精算（ウマ・オカ込み）" : "精算（オカ計算）"}
+          </div>
           <div style={{ fontSize: 13, color: t.dm, marginBottom: 12, lineHeight: 1.8 }}>
             返し点 {returnPt.toLocaleString()} / オカ {okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし"}
-            {(ruleSet.uma || []).some(u => u !== 0) && ` / ウマ ${(ruleSet.uma || []).map(u => (u > 0 ? "+" : "") + u).join("/")}`}
+            {hasUma && ` / ウマ ${uma.map(u => (u > 0 ? "+" : "") + u).join("/")}`}
+            {/* 五捨六入で小計と合計が数百点ずれるので、その理由をここで断っておく */}
+            {hasUma && (
+              <div style={{ marginTop: 4 }}>
+                {["小計を1,000点未満で", "五捨六入し、そこに", "ウマを足したものが合計です"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </div>
+            )}
           </div>
-          {sorted.map((s, rank) => (
-            <div key={s.idx} style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
+          {rows.map((r, rank) => (
+            <div key={r.i} style={{
               padding: "12px 14px", borderRadius: 10, marginBottom: 6,
               background: rank === 0 ? t.gdS : "transparent",
               border: rank === 0 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
-                <span style={{ fontSize: 18, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24, flexShrink: 0 }}>{rank + 1}</span>
-                <span style={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
-              </div>
-              {tobiTagEl(s.rawScore)}
-              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
-                <span style={{ fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: s.finalPt > 0 ? t.gn : s.finalPt < 0 ? t.rd : t.tx }}>
-                  {s.finalPt > 0 ? "+" : ""}{s.finalPt.toLocaleString()}
-                </span>
-                <div style={{ fontSize: 12, fontVariantNumeric: "tabular-nums", color: s.rawScore < 0 ? t.rd : t.dm }}>
-                  素点 {s.rawScore.toLocaleString()}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
+                  <span style={{ fontSize: 18, fontWeight: 900, color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm, width: 24, flexShrink: 0 }}>{r.rank0 + 1}</span>
+                  <span style={{ fontSize: 15, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
                 </div>
-                {/* レートを決めているときは、いくらになるかも出す */}
-                {!!ruleSet.rate && (() => {
-                  const pt = goshaRokunyu(s.finalPt / 1000);
-                  const gold = GOLD(pt, ruleSet.rate);
-                  return (
-                    <div style={{
-                      fontSize: 17, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums",
-                      whiteSpace: "nowrap", lineHeight: 1.2,
-                      color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm,
-                    }}>
-                      {gold > 0 ? "+" : ""}{GOLD_LABEL(gold)}
-                      <span style={{ fontSize: 12, marginLeft: 3, opacity: 0.85 }}>{ruleSet.rateUnit || "G"}</span>
-                    </div>
-                  );
-                })()}
+                {tobiTagEl(r.raw)}
+                <span style={{
+                  fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums", flexShrink: 0, marginLeft: "auto",
+                  color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx,
+                }}>{pm(r.total)}
+                  {hasUma && <span style={{ fontSize: 12, fontWeight: 800, color: t.dm, marginLeft: 5 }}>({r.pt > 0 ? "+" : ""}{r.pt}pt)</span>}
+                </span>
+              </div>
+              {/* 1人ずつの内訳 */}
+              <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${t.bd}44` }}>
+                {detail("素点", r.raw.toLocaleString(), r.raw < 0 ? t.rd : t.tx)}
+                {detail("返し点", (-returnPt).toLocaleString(), t.dm)}
+                {r.oka > 0 && detail("オカ", pm(r.oka), t.gd)}
+                {hasUma && detail("小計", pm(r.sub), t.tx)}
+                {hasUma && detail("五捨六入", pm(r.roundedPt * 1000), t.tx)}
+                {hasUma && detail("ウマ", pm(r.umaPt * 1000), r.umaPt > 0 ? t.gd : r.umaPt < 0 ? t.rd : t.dm)}
+                {r.gold !== null && detail("レート換算",
+                  `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${ruleSet.rateUnit || "G"}`,
+                  r.gold > 0 ? t.gd : r.gold < 0 ? t.rd : t.dm)}
               </div>
             </div>
           ))}
@@ -12555,66 +12574,9 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 12, color: t.dm, marginTop: 8, lineHeight: 1.9 }}>
               レート 1点 = {RATE_LABEL(ruleSet.rate)} {ruleSet.rateUnit || "G"}。
               <span style={{ display: "inline-block" }}>1,000点単位に五捨六入してから掛けています</span>
-              {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (
-                <span style={{ display: "inline-block" }}>（ウマ込みの金額は下の「ポイント」を見てください）</span>
-              )}
             </div>
           )}
         </div>
-
-        {/* ウマ込みのポイント（要素数が人数と違うウマは合計が崩れるため適用しない） */}
-        {(ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (() => {
-          const uma = ruleSet.uma;
-          const gosha = (v) => { const s = v < 0 ? -1 : 1, a = Math.abs(v), f = Math.floor(a); return s * (a - f > 0.5 ? f + 1 : f); };
-          const rk = scores.map((s, i) => ({ i, s })).sort((a3, b3) => (b3.s - a3.s) || (a3.i - b3.i));
-          const res = new Array(PC);
-          rk.forEach((x, rank) => {
-            res[x.i] = { rank: rank + 1, pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0) };
-          });
-          const order = [...res.map((r, i) => ({ ...r, i }))].sort((a3, b3) => a3.rank - b3.rank);
-          return (
-            <div style={card}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 6, letterSpacing: "0.05em" }}>
-                ポイント（ウマ・オカ込み）
-              </div>
-              <div style={{ fontSize: 11, color: t.dm, marginBottom: 12 }}>
-                素点を五捨六入し、オカとウマを加えたものです
-              </div>
-              {order.map(o => (
-                <div key={o.i} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4, flexWrap: "wrap",
-                  padding: "11px 14px", borderRadius: 10, marginBottom: 6,
-                  background: o.rank === 1 ? t.gdS : "transparent",
-                  border: o.rank === 1 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 60, flex: "1 1 100px" }}>
-                    <span style={{ fontSize: 15, fontWeight: 900, width: 24, flexShrink: 0, color: o.rank === 1 ? t.gd : t.dm }}>{o.rank}</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{players[o.i]}</span>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 8 }}>
-                    <span style={{
-                      fontSize: 17, fontWeight: 900, fontVariantNumeric: "tabular-nums",
-                      color: o.pt > 0 ? t.gn : o.pt < 0 ? t.rd : t.tx,
-                    }}>{o.pt > 0 ? "+" : ""}{o.pt}</span>
-                    {!!(gameConfig?.rules?.rate) && (
-                      <div style={{
-                        fontSize: 16, fontWeight: 900, marginTop: 3, fontVariantNumeric: "tabular-nums",
-                        whiteSpace: "nowrap", lineHeight: 1.2,
-                        color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm,
-                      }}>
-                        {o.pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate))}
-                        <span style={{ fontSize: 12, marginLeft: 3, opacity: 0.85 }}>{gameConfig.rules.rateUnit || "G"}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {!!(gameConfig?.rules?.rate) && (
-                <div style={{ fontSize: 10, color: t.dm, textAlign: "right", marginTop: 6 }}>
-                  レート 1点 = {RATE_LABEL(gameConfig.rules.rate)} {gameConfig.rules.rateUnit || "G"}
-                </div>
-              )}
-            </div>
           );
         })()}
 

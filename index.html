@@ -1285,7 +1285,6 @@ function MahjongScorer() {
   const [voiceRonOn, setVoiceRonOn] = useState(() => loadVoicePref("mj_voice_ron"));
   const [voiceRoundOn, setVoiceRoundOn] = useState(() => loadVoicePref("mj_voice_round"));
   const [voiceSeatOn, setVoiceSeatOn] = useState(() => loadVoicePref("mj_voice_seat"));
-  const [voiceYakuOn, setVoiceYakuOn] = useState(() => loadVoicePref("mj_voice_yaku"));
   const saveVoicePref = (key, setter) => on => {
     setter(on);
     try {
@@ -1297,7 +1296,6 @@ function MahjongScorer() {
   const saveVoiceRon = saveVoicePref("mj_voice_ron", setVoiceRonOn);
   const saveVoiceRound = saveVoicePref("mj_voice_round", setVoiceRoundOn);
   const saveVoiceSeat = saveVoicePref("mj_voice_seat", setVoiceSeatOn);
-  const saveVoiceYaku = saveVoicePref("mj_voice_yaku", setVoiceYakuOn);
   const voiceOnFor = text => text === "リーチ" ? voiceRiichiOn : text === "ツモ" ? voiceTsumoOn : text === "ロン" ? voiceRonOn : true;
   const VOICE_FILES = {
     リーチ: "assets/voice/riichi.mp3",
@@ -1455,20 +1453,6 @@ function MahjongScorer() {
     } catch {}
   };
   const speakRound = (wind, dealer, honba2) => speakJa(roundKana(wind, dealer, honba2));
-  const yakuYomi = name => {
-    const y = YAKU_DATA.find(x => x.name === name);
-    if (y && y.yomi && y.yomi[0]) return y.yomi[0];
-    return String(name).replace(/[（(][^）)]*[）)]/g, "");
-  };
-  const speakYaku = (names, totalHan, force) => {
-    if (!force && !voiceYakuOn) return;
-    const parts = (names || []).map(yakuYomi).filter(Boolean);
-    if (pickerDora > 0) parts.push(`どら${pickerDora}`);
-    if (pickerUra > 0) parts.push(`うらどら${pickerUra}`);
-    if (parts.length === 0) return;
-    const tail = totalHan >= 13 ? YAKUMAN_LABEL(totalHan) : `ごうけい${totalHan}はん`;
-    speakJa(parts.join("、") + "、" + tail);
-  };
   const ROUND_DIR = "assets/voice/round/";
   const ROUND_WIND_FILES = {
     東: "ton.mp3",
@@ -11938,12 +11922,6 @@ input, select { padding: 10px 14px; }
     on: voiceSeatOn,
     save: saveVoiceSeat,
     preview: () => playWindVoice("東", true)
-  }, {
-    label: "📖 役の読み上げ",
-    desc: "役を選んで確定したときに「りーち、たんやお、ごうけい2はん」",
-    on: voiceYakuOn,
-    save: saveVoiceYaku,
-    preview: () => speakYaku(["リーチ（立直）", "断么九（タンヤオ）"], 2, true)
   }].map((row, i) => React.createElement("div", {
     key: i,
     style: {
@@ -12388,7 +12366,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         letterSpacing: "0.05em"
       }
-    }, "音・サイコロ・画面の設定"), [["voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`], ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`], ["screen", "💡", "画面設定", "開いている間のスリープ防止"]].map(([id, icon, title, sub]) => React.createElement(React.Fragment, {
+    }, "音・サイコロ・画面の設定"), [["voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`], ["dice", "🎲", "サイコロ設定", `結果の表示時間 ${diceHoldSec}秒`], ["screen", "💡", "画面設定", "開いている間のスリープ防止"]].map(([id, icon, title, sub]) => React.createElement(React.Fragment, {
       key: id
     }, React.createElement("button", {
       onClick: () => setRcSet(v => v === id ? null : id),
@@ -14753,7 +14731,7 @@ input, select { padding: 10px 14px; }
       onUnitChange: u => editDraft({
         rateUnit: u
       })
-    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止"), setOpen === "screen" && screenPanelCard(), (rulesDirty || rulesSaved) && React.createElement("div", {
+    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止"), setOpen === "screen" && screenPanelCard(), (rulesDirty || rulesSaved) && React.createElement("div", {
       style: {
         ...card,
         padding: 10,
@@ -18398,7 +18376,6 @@ input, select { padding: 10px 14px; }
       const pinfu = pickedYaku.includes("平和（ピンフ）");
       const chiitoi = pickedYaku.includes("七対子（チートイツ）");
       const naki = pickerNaki === true;
-      speakYaku(pickedYaku, h);
       setCHan(h);
       setGKnownNaki(pickerNaki);
       resetYakuPicker();
@@ -19492,7 +19469,7 @@ input, select { padding: 10px 14px; }
       ...r,
       rateUnit: u
     }))
-  })), gsHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), gsOpen === "dice" && dicePanelCard(), gsHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn, voiceYakuOn].filter(Boolean).length}/7 がオン`), gsOpen === "voice" && voicePanelCard(), gsHdr("screen", "💡", "画面設定", "開いている間のスリープ防止"), gsOpen === "screen" && screenPanelCard()), rulesOpen && React.createElement("div", {
+  })), gsHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), gsOpen === "dice" && dicePanelCard(), gsHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`), gsOpen === "voice" && voicePanelCard(), gsHdr("screen", "💡", "画面設定", "開いている間のスリープ防止"), gsOpen === "screen" && screenPanelCard()), rulesOpen && React.createElement("div", {
     style: {
       marginTop: 16
     }
@@ -22045,7 +22022,6 @@ input, select { padding: 10px 14px; }
       const pinfu = pickedYaku.includes("平和（ピンフ）");
       const chiitoi = pickedYaku.includes("七対子（チートイツ）");
       const naki = pickerNaki === true;
-      speakYaku(pickedYaku, h);
       setGHan(h);
       setGKnownNaki(pickerNaki);
       resetYakuPicker();
@@ -23407,168 +23383,119 @@ input, select { padding: 10px 14px; }
         color: s.rawScore < 0 ? t.rd : t.tx,
         flexShrink: 0
       }
-    }, s.rawScore.toLocaleString())))), React.createElement("div", {
-      style: card
-    }, React.createElement("div", {
-      style: {
-        fontSize: 14,
-        fontWeight: 700,
-        color: t.dm,
-        marginBottom: 6,
-        letterSpacing: "0.05em"
-      }
-    }, "精算（オカ計算）"), React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: t.dm,
-        marginBottom: 12,
-        lineHeight: 1.8
-      }
-    }, "返し点 ", returnPt.toLocaleString(), " / オカ ", okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし", (ruleSet.uma || []).some(u => u !== 0) && ` / ウマ ${(ruleSet.uma || []).map(u => (u > 0 ? "+" : "") + u).join("/")}`), sorted.map((s, rank) => React.createElement("div", {
-      key: s.idx,
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 4,
-        flexWrap: "wrap",
-        padding: "12px 14px",
-        borderRadius: 10,
-        marginBottom: 6,
-        background: rank === 0 ? t.gdS : "transparent",
-        border: rank === 0 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        minWidth: 60,
-        flex: "1 1 100px"
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 18,
-        fontWeight: 900,
-        color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm,
-        width: 24,
-        flexShrink: 0
-      }
-    }, rank + 1), React.createElement("span", {
-      style: {
-        fontSize: 15,
-        fontWeight: 600,
-        minWidth: 0,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      }
-    }, s.name)), tobiTagEl(s.rawScore), React.createElement("div", {
-      style: {
-        textAlign: "right",
-        flexShrink: 0,
-        marginLeft: 8
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 18,
-        fontWeight: 800,
-        fontVariantNumeric: "tabular-nums",
-        color: s.finalPt > 0 ? t.gn : s.finalPt < 0 ? t.rd : t.tx
-      }
-    }, s.finalPt > 0 ? "+" : "", s.finalPt.toLocaleString()), React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontVariantNumeric: "tabular-nums",
-        color: s.rawScore < 0 ? t.rd : t.dm
-      }
-    }, "素点 ", s.rawScore.toLocaleString()), !!ruleSet.rate && (() => {
-      const pt = goshaRokunyu(s.finalPt / 1000);
-      const gold = GOLD(pt, ruleSet.rate);
-      return React.createElement("div", {
+    }, s.rawScore.toLocaleString())))), (() => {
+      const uma = ruleSet.uma || [];
+      const hasUma = uma.length === PC && uma.some(u => u !== 0);
+      const rk = scores.slice(0, PC).map((sc, i) => ({
+        i,
+        sc
+      })).sort((a, b) => b.sc - a.sc || a.i - b.i);
+      const rankOf = new Array(PC);
+      rk.forEach((x, r) => {
+        rankOf[x.i] = r;
+      });
+      const rows = players.slice(0, PC).map((name, i) => {
+        const rank0 = rankOf[i];
+        const raw = scores[i];
+        const oka = rank0 === 0 ? okaPool : 0;
+        const sub = raw - returnPt + oka;
+        const roundedPt = goshaRokunyu(sub / 1000);
+        const umaPt = hasUma ? uma[rank0] || 0 : 0;
+        const pt = roundedPt + umaPt;
+        const total = hasUma ? pt * 1000 : sub;
+        const gold = ruleSet.rate ? GOLD(hasUma ? pt : roundedPt, ruleSet.rate) : null;
+        return {
+          i,
+          name,
+          rank0,
+          raw,
+          oka,
+          sub,
+          roundedPt,
+          umaPt,
+          pt,
+          total,
+          gold
+        };
+      }).sort((a, b) => b.total - a.total || a.rank0 - b.rank0);
+      const pm = v => (v > 0 ? "+" : "") + v.toLocaleString();
+      const detail = (lb, v, c, note) => React.createElement("div", {
+        key: lb,
         style: {
-          fontSize: 17,
-          fontWeight: 900,
-          marginTop: 3,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          lineHeight: 1.2,
-          color: gold > 0 ? t.gd : gold < 0 ? t.rd : t.dm
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: 10,
+          padding: "3px 0"
         }
-      }, gold > 0 ? "+" : "", GOLD_LABEL(gold), React.createElement("span", {
+      }, React.createElement("span", {
         style: {
           fontSize: 12,
-          marginLeft: 3,
-          opacity: 0.85
+          color: t.dm,
+          fontWeight: 700,
+          textAlign: "left",
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
         }
-      }, ruleSet.rateUnit || "G"));
-    })()))), !!ruleSet.rate && React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.dm,
-        marginTop: 8,
-        lineHeight: 1.9
-      }
-    }, "レート 1点 = ", RATE_LABEL(ruleSet.rate), " ", ruleSet.rateUnit || "G", "。", React.createElement("span", {
-      style: {
-        display: "inline-block"
-      }
-    }, "1,000点単位に五捨六入してから掛けています"), (ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && React.createElement("span", {
-      style: {
-        display: "inline-block"
-      }
-    }, "（ウマ込みの金額は下の「ポイント」を見てください）"))), (ruleSet.uma || []).length === PC && ruleSet.uma.some(u => u !== 0) && (() => {
-      const uma = ruleSet.uma;
-      const gosha = v => {
-        const s = v < 0 ? -1 : 1,
-          a = Math.abs(v),
-          f = Math.floor(a);
-        return s * (a - f > 0.5 ? f + 1 : f);
-      };
-      const rk = scores.map((s, i) => ({
-        i,
-        s
-      })).sort((a3, b3) => b3.s - a3.s || a3.i - b3.i);
-      const res = new Array(PC);
-      rk.forEach((x, rank) => {
-        res[x.i] = {
-          rank: rank + 1,
-          pt: gosha((x.s - returnPt + (rank === 0 ? okaPool : 0)) / 1000) + (uma[rank] || 0)
-        };
-      });
-      const order = [...res.map((r, i) => ({
-        ...r,
-        i
-      }))].sort((a3, b3) => a3.rank - b3.rank);
+      }, lb, note && React.createElement("span", {
+        style: {
+          fontWeight: 400,
+          marginLeft: 4
+        }
+      }, note)), React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 800,
+          color: c || t.tx,
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+          fontVariantNumeric: "tabular-nums"
+        }
+      }, v));
       return React.createElement("div", {
         style: card
       }, React.createElement("div", {
         style: {
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: 700,
           color: t.dm,
           marginBottom: 6,
           letterSpacing: "0.05em"
         }
-      }, "ポイント（ウマ・オカ込み）"), React.createElement("div", {
+      }, hasUma ? "精算（ウマ・オカ込み）" : "精算（オカ計算）"), React.createElement("div", {
         style: {
-          fontSize: 11,
+          fontSize: 13,
           color: t.dm,
-          marginBottom: 12
+          marginBottom: 12,
+          lineHeight: 1.8
         }
-      }, "素点を五捨六入し、オカとウマを加えたものです"), order.map(o => React.createElement("div", {
-        key: o.i,
+      }, "返し点 ", returnPt.toLocaleString(), " / オカ ", okaPool > 0 ? `+${okaPool.toLocaleString()} (1位へ)` : "なし", hasUma && ` / ウマ ${uma.map(u => (u > 0 ? "+" : "") + u).join("/")}`, hasUma && React.createElement("div", {
+        style: {
+          marginTop: 4
+        }
+      }, ["小計を1,000点未満で", "五捨六入し、そこに", "ウマを足したものが合計です"].map((x, k) => React.createElement("span", {
+        key: k,
+        style: {
+          display: "inline-block"
+        }
+      }, x)))), rows.map((r, rank) => React.createElement("div", {
+        key: r.i,
+        style: {
+          padding: "12px 14px",
+          borderRadius: 10,
+          marginBottom: 6,
+          background: rank === 0 ? t.gdS : "transparent",
+          border: rank === 0 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`
+        }
+      }, React.createElement("div", {
         style: {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 4,
-          flexWrap: "wrap",
-          padding: "11px 14px",
-          borderRadius: 10,
-          marginBottom: 6,
-          background: o.rank === 1 ? t.gdS : "transparent",
-          border: o.rank === 1 ? `1px solid ${t.gd}44` : `1px solid ${t.bd}33`
+          flexWrap: "wrap"
         }
       }, React.createElement("div", {
         style: {
@@ -23580,58 +23507,55 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("span", {
         style: {
-          fontSize: 15,
+          fontSize: 18,
           fontWeight: 900,
+          color: rank === 0 ? t.gd : rank === 1 ? t.tx : t.dm,
           width: 24,
-          flexShrink: 0,
-          color: o.rank === 1 ? t.gd : t.dm
+          flexShrink: 0
         }
-      }, o.rank), React.createElement("span", {
+      }, r.rank0 + 1), React.createElement("span", {
         style: {
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: 600,
           minWidth: 0,
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap"
         }
-      }, players[o.i])), React.createElement("div", {
+      }, r.name)), tobiTagEl(r.raw), React.createElement("span", {
         style: {
-          textAlign: "right",
+          fontSize: 18,
+          fontWeight: 800,
+          fontVariantNumeric: "tabular-nums",
           flexShrink: 0,
-          marginLeft: 8
+          marginLeft: "auto",
+          color: r.total > 0 ? t.gn : r.total < 0 ? t.rd : t.tx
         }
-      }, React.createElement("span", {
-        style: {
-          fontSize: 17,
-          fontWeight: 900,
-          fontVariantNumeric: "tabular-nums",
-          color: o.pt > 0 ? t.gn : o.pt < 0 ? t.rd : t.tx
-        }
-      }, o.pt > 0 ? "+" : "", o.pt), !!gameConfig?.rules?.rate && React.createElement("div", {
-        style: {
-          fontSize: 16,
-          fontWeight: 900,
-          marginTop: 3,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          lineHeight: 1.2,
-          color: o.pt > 0 ? t.gd : o.pt < 0 ? t.rd : t.dm
-        }
-      }, o.pt > 0 ? "+" : "", GOLD_LABEL(GOLD(o.pt, gameConfig.rules.rate)), React.createElement("span", {
+      }, pm(r.total), hasUma && React.createElement("span", {
         style: {
           fontSize: 12,
-          marginLeft: 3,
-          opacity: 0.85
-        }
-      }, gameConfig.rules.rateUnit || "G"))))), !!gameConfig?.rules?.rate && React.createElement("div", {
-        style: {
-          fontSize: 10,
+          fontWeight: 800,
           color: t.dm,
-          textAlign: "right",
-          marginTop: 6
+          marginLeft: 5
         }
-      }, "レート 1点 = ", RATE_LABEL(gameConfig.rules.rate), " ", gameConfig.rules.rateUnit || "G"));
+      }, "(", r.pt > 0 ? "+" : "", r.pt, "pt)"))), React.createElement("div", {
+        style: {
+          marginTop: 8,
+          paddingTop: 7,
+          borderTop: `1px solid ${t.bd}44`
+        }
+      }, detail("素点", r.raw.toLocaleString(), r.raw < 0 ? t.rd : t.tx), detail("返し点", (-returnPt).toLocaleString(), t.dm), r.oka > 0 && detail("オカ", pm(r.oka), t.gd), hasUma && detail("小計", pm(r.sub), t.tx), hasUma && detail("五捨六入", pm(r.roundedPt * 1000), t.tx), hasUma && detail("ウマ", pm(r.umaPt * 1000), r.umaPt > 0 ? t.gd : r.umaPt < 0 ? t.rd : t.dm), r.gold !== null && detail("レート換算", `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${ruleSet.rateUnit || "G"}`, r.gold > 0 ? t.gd : r.gold < 0 ? t.rd : t.dm)))), !!ruleSet.rate && React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: t.dm,
+          marginTop: 8,
+          lineHeight: 1.9
+        }
+      }, "レート 1点 = ", RATE_LABEL(ruleSet.rate), " ", ruleSet.rateUnit || "G", "。", React.createElement("span", {
+        style: {
+          display: "inline-block"
+        }
+      }, "1,000点単位に五捨六入してから掛けています")));
     })(), React.createElement("div", {
       style: card
     }, React.createElement("div", {
