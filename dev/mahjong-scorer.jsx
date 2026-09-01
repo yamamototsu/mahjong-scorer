@@ -5728,12 +5728,6 @@ input, select { padding: 10px 14px; }
   // 対局開始のルール設定用（設定画面とは別に開閉を持つ）
   const gsHdr = (id, icon, title, sub) => secHdrBase(gsOpen, setGsOpen, id, icon, title, sub);
   const [showPayView, setShowPayView] = useState(false);  // 卓上表示（点数の受け渡しを矢印で表示）
-  // アガリ結果: 卓のところまでスクロールしたら、上のまとめカードを引っ込める
-  const [hideWinCard, setHideWinCard] = useState(false);
-  const hideWinRef = React.useRef(false);       // スクロール中に今の状態を読むための控え
-  const winScrollerRef = React.useRef(null);    // 実際にスクロールしている枠
-  const payAreaRef = React.useRef(null);        // 卓（受け渡しの図）
-  const keepPayTopRef = React.useRef(null);     // 切り替えの前後で卓を動かさないための位置
   const [yakuInfo, setYakuInfo] = useState(null);         // 長押しで説明を出す役
   const [startSplash, setStartSplash] = useState(null);   // 対局開始の演出 { league, gameNo, matchType, date, seats }
   const splashTimer = React.useRef(null);
@@ -5997,56 +5991,6 @@ input, select { padding: 10px 14px; }
       if (wl) { try { wl.release(); } catch {} }
     };
   }, [keepAwake, wakeSupported]);
-
-
-  React.useEffect(() => {
-    const on = showGW && gStep === 7 && !!gResult;
-    if (!on) {
-      hideWinRef.current = false;
-      setHideWinCard(false);
-      return;
-    }
-    const sc = winScrollerRef.current;
-    if (!sc) return;
-    let raf = 0;
-    const check = () => {
-      raf = 0;
-      const el = payAreaRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top;
-      const h = window.innerHeight || 1;
-      const cur = hideWinRef.current;
-      // 隠すのは卓が画面の半分より上まで来たとき。
-      // 戻すのはいちばん上まで巻き戻したときだけにして、境目で出たり消えたり
-      // しないようにする（カードを隠すと下が短くなるので、途中の位置を
-      // 戻す条件にすると二度と戻らなくなる）
-      if (!cur && top < h * 0.5) {
-        hideWinRef.current = true;
-        keepPayTopRef.current = top;   // 隠しても卓が動かないように位置を控える
-        setHideWinCard(true);
-      } else if (cur && sc.scrollTop <= 8) {
-        // 上に戻したときは、ふつうに先頭から読める形に戻す（位置の補正はしない）
-        hideWinRef.current = false;
-        keepPayTopRef.current = null;
-        setHideWinCard(false);
-      }
-    };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(check); };
-    sc.addEventListener("scroll", onScroll, { passive: true });
-    check();
-    return () => { sc.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [showGW, gStep, gResult]);
-
-  // カードを出し入れすると上の高さが変わるので、卓が指の下で動かないよう位置を補正する
-  React.useLayoutEffect(() => {
-    const want = keepPayTopRef.current;
-    keepPayTopRef.current = null;
-    if (want == null) return;
-    const el = payAreaRef.current, sc = winScrollerRef.current;
-    if (!el || !sc) return;
-    const d = el.getBoundingClientRect().top - want;
-    if (Math.abs(d) > 0.5) sc.scrollTop += d;
-  }, [hideWinCard]);
 
   const rollDice = () => {
     playDiceSound();
@@ -12018,7 +11962,7 @@ input, select { padding: 10px 14px; }
 
       {/* ── Round Wizard Modal ── */}
       {showGW && (
-        <div ref={winScrollerRef} style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             {/* 確認画面の「訂正」から来たときは、どのステップからでも
                 やめて確認画面に戻れるようにする */}
@@ -12346,15 +12290,11 @@ input, select { padding: 10px 14px; }
                     </button>
                   )}
                 </div>
-                {/* 卓まで下りてきたら引っ込める。作り直さずに隠すだけにして、
-                    戻したときも同じ中身がそのまま出るようにする */}
-                <div style={{ display: hideWinCard ? "none" : "block" }}>
-                  <ScoreDisplay han={gHan} fu={gFu} limit={gLimit} result={gResult} tsumo={gTsumo} parent={gParent}
-                    winnerName={players[gWinner]} loserName={gLoser !== null ? players[gLoser] : null}
-                    honbaAdd={honbaGet()} sticks={riichiSticks()} />
-                </div>
+                <ScoreDisplay han={gHan} fu={gFu} limit={gLimit} result={gResult} tsumo={gTsumo} parent={gParent}
+                  winnerName={players[gWinner]} loserName={gLoser !== null ? players[gLoser] : null}
+                  honbaAdd={honbaGet()} sticks={riichiSticks()} />
                 {/* 点数の受け渡し（開かなくても最初から見えるように埋め込む。タップで大きく表示） */}
-                <div ref={payAreaRef} onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
+                <div onClick={() => setShowPayView(true)} style={{ cursor: "pointer", marginBottom: 4 }}>
                   <PayTableBox boxW="min(100vw - 32px, 400px)" />
                   <PayBreakdown />
                   <div style={{ fontSize: 10, color: t.dm, textAlign: "center", marginTop: 6 }}>

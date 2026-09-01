@@ -11136,11 +11136,6 @@ input, select { padding: 10px 14px; }
   const secHdr = (id, icon, title, sub) => secHdrBase(setOpen, setSetOpen, id, icon, title, sub);
   const gsHdr = (id, icon, title, sub) => secHdrBase(gsOpen, setGsOpen, id, icon, title, sub);
   const [showPayView, setShowPayView] = useState(false);
-  const [hideWinCard, setHideWinCard] = useState(false);
-  const hideWinRef = React.useRef(false);
-  const winScrollerRef = React.useRef(null);
-  const payAreaRef = React.useRef(null);
-  const keepPayTopRef = React.useRef(null);
   const [yakuInfo, setYakuInfo] = useState(null);
   const [startSplash, setStartSplash] = useState(null);
   const splashTimer = React.useRef(null);
@@ -11453,55 +11448,6 @@ input, select { padding: 10px 14px; }
       }
     };
   }, [keepAwake, wakeSupported]);
-  React.useEffect(() => {
-    const on = showGW && gStep === 7 && !!gResult;
-    if (!on) {
-      hideWinRef.current = false;
-      setHideWinCard(false);
-      return;
-    }
-    const sc = winScrollerRef.current;
-    if (!sc) return;
-    let raf = 0;
-    const check = () => {
-      raf = 0;
-      const el = payAreaRef.current;
-      if (!el) return;
-      const top = el.getBoundingClientRect().top;
-      const h = window.innerHeight || 1;
-      const cur = hideWinRef.current;
-      if (!cur && top < h * 0.5) {
-        hideWinRef.current = true;
-        keepPayTopRef.current = top;
-        setHideWinCard(true);
-      } else if (cur && sc.scrollTop <= 8) {
-        hideWinRef.current = false;
-        keepPayTopRef.current = null;
-        setHideWinCard(false);
-      }
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(check);
-    };
-    sc.addEventListener("scroll", onScroll, {
-      passive: true
-    });
-    check();
-    return () => {
-      sc.removeEventListener("scroll", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [showGW, gStep, gResult]);
-  React.useLayoutEffect(() => {
-    const want = keepPayTopRef.current;
-    keepPayTopRef.current = null;
-    if (want == null) return;
-    const el = payAreaRef.current,
-      sc = winScrollerRef.current;
-    if (!el || !sc) return;
-    const d = el.getBoundingClientRect().top - want;
-    if (Math.abs(d) > 0.5) sc.scrollTop += d;
-  }, [hideWinCard]);
   const rollDice = () => {
     playDiceSound();
     setDiceSpin(v => v + 1);
@@ -22202,7 +22148,6 @@ input, select { padding: 10px 14px; }
       setTimeout(rollDice, 150);
     }
   }, "🎲 サイコロを振る")), DiceModal(), showGW && React.createElement("div", {
-    ref: winScrollerRef,
     style: {
       position: "fixed",
       top: 0,
@@ -22956,11 +22901,7 @@ input, select { padding: 10px 14px; }
     }
   }, gFu, "符"), React.createElement("span", {
     style: editTag
-  }, "訂正")))), React.createElement("div", {
-    style: {
-      display: hideWinCard ? "none" : "block"
-    }
-  }, React.createElement(ScoreDisplay, {
+  }, "訂正")))), React.createElement(ScoreDisplay, {
     han: gHan,
     fu: gFu,
     limit: gLimit,
@@ -22971,8 +22912,7 @@ input, select { padding: 10px 14px; }
     loserName: gLoser !== null ? players[gLoser] : null,
     honbaAdd: honbaGet(),
     sticks: riichiSticks()
-  })), React.createElement("div", {
-    ref: payAreaRef,
+  }), React.createElement("div", {
     onClick: () => setShowPayView(true),
     style: {
       cursor: "pointer",
