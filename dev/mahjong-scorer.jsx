@@ -11507,23 +11507,24 @@ input, select { padding: 10px 14px; }
           <div style={{ display: "flex", gap: BAR_GAP }}>
             <button aria-label="ルール確認" style={barIcon()}
               onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
+            {rankBtn(flip)}
             <button style={barMain("p")}
               onClick={() => { setEditingRoundIdx(null); setShowRoundEdit(true); }}>✏️ 局を選んで修正</button>
-            {rankBtn(flip)}
             {rotateBtn()}
           </div>
         ) : (
           <div style={{ display: "flex", gap: BAR_GAP }}>
             <button aria-label="メニュー" style={barIcon()}
               onClick={() => setTmMenu(flip ? "flip" : true)}>📋</button>
+            {rankBtn(flip)}
+            <button style={barMain("p")} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={barMain()} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
+            {/* 対局を保留はめったに押さないので、「アガリ入力」から離して外側に置く */}
             <button aria-label="対局を保留" style={barIcon()}
               onClick={() => {
                 setSuspendedGame(snapshotGame());
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
-            <button style={barMain("p")} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
-            <button style={barMain()} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
-            {rankBtn(flip)}
             {rotateBtn()}
           </div>
         )}

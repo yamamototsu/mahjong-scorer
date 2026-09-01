@@ -21398,13 +21398,13 @@ input, select { padding: 10px 14px; }
       "aria-label": "ルール確認",
       style: barIcon(),
       onClick: () => setShowRuleCheck(flip ? "flip" : true)
-    }, "📋"), React.createElement("button", {
+    }, "📋"), rankBtn(flip), React.createElement("button", {
       style: barMain("p"),
       onClick: () => {
         setEditingRoundIdx(null);
         setShowRoundEdit(true);
       }
-    }, "✏️ 局を選んで修正"), rankBtn(flip), rotateBtn()) : React.createElement("div", {
+    }, "✏️ 局を選んで修正"), rotateBtn()) : React.createElement("div", {
       style: {
         display: "flex",
         gap: BAR_GAP
@@ -21413,16 +21413,7 @@ input, select { padding: 10px 14px; }
       "aria-label": "メニュー",
       style: barIcon(),
       onClick: () => setTmMenu(flip ? "flip" : true)
-    }, "📋"), React.createElement("button", {
-      "aria-label": "対局を保留",
-      style: barIcon(),
-      onClick: () => {
-        setSuspendedGame(snapshotGame());
-        setGameStarted(false);
-        setHomeCat(null);
-        setView("title");
-      }
-    }, "⏸"), React.createElement("button", {
+    }, "📋"), rankBtn(flip), React.createElement("button", {
       style: barMain("p"),
       onClick: () => {
         resetGW();
@@ -21439,7 +21430,16 @@ input, select { padding: 10px 14px; }
         setDrawTenpai(fixSeedTenpai());
         setTmDrawMode(true);
       }
-    }, "流局"), rankBtn(flip), rotateBtn()));
+    }, "流局"), React.createElement("button", {
+      "aria-label": "対局を保留",
+      style: barIcon(),
+      onClick: () => {
+        setSuspendedGame(snapshotGame());
+        setGameStarted(false);
+        setHomeCat(null);
+        setView("title");
+      }
+    }, "⏸"), rotateBtn()));
     return React.createElement("div", {
       style: {
         padding: "6px 8px 10px",
