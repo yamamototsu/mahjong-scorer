@@ -87,6 +87,31 @@ const genFriendCode = () => Array.from({
   length: 6
 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 const FRIEND_LINK = code => location.origin + location.pathname + "?fr=" + code;
+const DIST = "web";
+const STORE_URL = "";
+const APP_URL = () => {
+  try {
+    if (/^https?:$/.test(location.protocol)) {
+      return location.origin + location.pathname.replace(/index\.html$/, "");
+    }
+  } catch {}
+  return "https://yamamototsu.github.io/mahjong-scorer/";
+};
+const SHARE_TITLE = "卓上ポンづけ｜麻雀スコアラー";
+const SHARE_TEXT = "麻雀の点数計算アプリ「卓上ポンづけ」。スマホを卓の真ん中に置くと、4人ぶんの点数がそれぞれの向きで見えます。";
+const SHARE_URL = () => DIST === "native" && STORE_URL ? STORE_URL : APP_URL();
+const isStandalone = () => {
+  try {
+    if (DIST === "native") return true;
+    if (window.navigator.standalone === true) return true;
+    return ["standalone", "fullscreen", "minimal-ui"].some(m => window.matchMedia(`(display-mode: ${m})`).matches);
+  } catch {
+    return false;
+  }
+};
+const UA = () => navigator.userAgent || "";
+const isIOSDevice = () => /iPhone|iPad|iPod/.test(UA()) || /Macintosh/.test(UA()) && (navigator.maxTouchPoints || 0) > 1;
+const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Twitter/.test(UA());
 function calcBasePoints(fu, han, kiriage) {
   if (han >= 13) return 8000 * Math.max(1, Math.floor(han / 13));
   if (han >= 11) return 6000;
@@ -3208,6 +3233,183 @@ function MahjongScorer() {
         color: t.dm
       }
     }, "の手")));
+  };
+  const InstallModal = () => {
+    const ios = isIOSDevice();
+    const inApp = inAppBrowser();
+    const step = (n, txt) => React.createElement("div", {
+      key: n,
+      style: {
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        marginBottom: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        width: 24,
+        height: 24,
+        borderRadius: "50%",
+        background: t.acS,
+        color: t.ac,
+        fontSize: 12,
+        fontWeight: 800,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, n), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        color: t.tx,
+        lineHeight: 1.8,
+        textWrap: "balance"
+      }
+    }, txt));
+    const steps = ios ? ["画面の下にある共有ボタン（□から↑が出ている絵）を押す", "出てきた一覧を下にたどって「ホーム画面に追加」を押す", "右上の「追加」を押す"] : ["右上の「⋮」（点が3つ）を押す", "「ホーム画面に追加」または「アプリをインストール」を押す", "確認が出たら「追加」を押す"];
+    return React.createElement("div", {
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.92)",
+        zIndex: 200,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: 16,
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+        overflowY: "auto"
+      }
+    }, React.createElement("div", {
+      style: {
+        width: "100%",
+        maxWidth: 400
+      }
+    }, React.createElement("div", {
+      style: {
+        ...card,
+        padding: 20
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        fontWeight: 800,
+        minWidth: 0,
+        lineHeight: 1.5,
+        textWrap: "balance"
+      }
+    }, "📲 ホーム画面に追加する"), React.createElement("button", {
+      "aria-label": "閉じる",
+      onClick: () => setShowInstall(false),
+      style: {
+        flexShrink: 0,
+        width: 36,
+        height: 36,
+        borderRadius: 9,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.dm,
+        fontSize: 15
+      }
+    }, "✕")), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 14,
+        textWrap: "balance"
+      }
+    }, "追加すると、アイコンから一発で開けます。ブラウザのふちが消えて画面も広く使えます。入れても中身は同じで、記録もそのまま残ります。"), inApp && React.createElement("div", {
+      style: {
+        background: t.gdS,
+        border: `1px solid ${t.gd}66`,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 800,
+        color: t.gd,
+        marginBottom: 4
+      }
+    }, "先にブラウザで開いてください"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.9,
+        textWrap: "balance"
+      }
+    }, "いまLINEなどのアプリの中で開いています。この画面からはホーム画面に追加できません。メニューから「Safariで開く」「ブラウザで開く」を選んでから、もう一度お試しください。")), pwaPrompt && !inApp && React.createElement("button", {
+      onClick: async () => {
+        try {
+          pwaPrompt.prompt();
+          await pwaPrompt.userChoice;
+        } catch {}
+        setPwaPrompt(null);
+        setShowInstall(false);
+      },
+      style: {
+        ...actionBtn("p"),
+        marginBottom: 14
+      }
+    }, "このまま追加する"), !inApp && React.createElement(React.Fragment, null, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 800,
+        color: t.ac,
+        marginBottom: 8
+      }
+    }, ios ? "iPhone・iPad（Safari）" : "Android（Chrome）"), steps.map((x, i) => step(i + 1, x)), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginTop: 10,
+        textWrap: "balance"
+      }
+    }, ios ? "※ Chromeなど他のブラウザでは追加できないことがあります。うまくいかないときはSafariで開いてください。" : "※ パソコンでは、アドレスバーの右にある「インストール」の印から追加できます。")), React.createElement("button", {
+      onClick: () => {
+        dismissInstallTip();
+        setShowInstall(false);
+      },
+      style: {
+        ...actionBtn(),
+        marginTop: 16,
+        marginBottom: 0,
+        padding: "11px 8px"
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "あとにする"), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: t.dm,
+        marginTop: 2
+      }
+    }, "この案内はもう出しません")))));
   };
   const FuHelpModal = () => React.createElement("div", {
     style: {
@@ -11069,6 +11271,64 @@ input, select { padding: 10px 14px; }
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false);
   const [showRoundEdit, setShowRoundEdit] = useState(false);
+  const [showInstall, setShowInstall] = useState(false);
+  const [installTipOff, setInstallTipOff] = useState(() => {
+    try {
+      return localStorage.getItem("mj_install_tip") === "off";
+    } catch {
+      return false;
+    }
+  });
+  const [pwaPrompt, setPwaPrompt] = useState(null);
+  const [shareMsg, setShareMsg] = useState(null);
+  const [shareFallback, setShareFallback] = useState(null);
+  React.useEffect(() => {
+    const onPrompt = e => {
+      e.preventDefault();
+      setPwaPrompt(e);
+    };
+    const onInstalled = () => {
+      setPwaPrompt(null);
+      setShowInstall(false);
+      setInstallTipOff(true);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+  const needInstallTip = DIST === "web" && !isStandalone();
+  const dismissInstallTip = () => {
+    setInstallTipOff(true);
+    try {
+      localStorage.setItem("mj_install_tip", "off");
+    } catch {}
+  };
+  const shareApp = async () => {
+    const url = SHARE_URL();
+    setShareFallback(null);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: SHARE_TITLE,
+          text: SHARE_TEXT,
+          url
+        });
+        return;
+      } catch (e) {
+        if (e && e.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(SHARE_TEXT + "\n" + url);
+      setShareMsg("リンクをコピーしました。LINEなどに貼って送ってください");
+      setTimeout(() => setShareMsg(null), 4000);
+    } catch {
+      setShareFallback(url);
+    }
+  };
   const [tmMenu, setTmMenu] = useState(false);
   const [seatRot, setSeatRot] = useState(0);
   const [playerDetail, setPlayerDetail] = useState(null);
@@ -14165,7 +14425,73 @@ input, select { padding: 10px 14px; }
       setRulesSaved(false);
       setView("home");
       setHomeCat("settings");
-    })));
+    })), needInstallTip && !installTipOff && !intro && React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginTop: 8,
+        ...reveal(5)
+      }
+    }, React.createElement("button", {
+      onClick: () => setShowInstall(true),
+      style: {
+        flex: "1 1 auto",
+        minWidth: 0,
+        padding: "11px 12px",
+        borderRadius: 12,
+        cursor: "pointer",
+        border: `1px solid ${t.ac}55`,
+        background: t.acS,
+        color: t.tx,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        textAlign: "left"
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        lineHeight: 1,
+        flexShrink: 0
+      }
+    }, "📲"), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        lineHeight: 1.5
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "ホーム画面に追加"), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: t.dm,
+        marginTop: 1
+      }
+    }, "アイコンから開けます")), React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        color: t.ac,
+        fontSize: 15
+      }
+    }, "›")), React.createElement("button", {
+      "aria-label": "この案内を閉じる",
+      onClick: dismissInstallTip,
+      style: {
+        flex: "0 0 40px",
+        borderRadius: 12,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.card,
+        color: t.dm,
+        fontSize: 14
+      }
+    }, "✕")));
   };
   const renderHome = () => {
     const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
@@ -14340,7 +14666,21 @@ input, select { padding: 10px 14px; }
         fontSize: 13,
         fontWeight: 700
       }
-    }, "麻雀そのものの始め方を見る")), homeCat === "members" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
+    }, "麻雀そのものの始め方を見る"), needInstallTip && React.createElement("button", {
+      onClick: () => setShowInstall(true),
+      style: {
+        width: "100%",
+        marginTop: 8,
+        padding: "12px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: "transparent",
+        color: t.ac,
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "📲 ホーム画面に追加する")), homeCat === "members" && React.createElement(React.Fragment, null, menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
       setNamesBackTo("members");
       setView("names");
       setNewNameInput("");
@@ -14696,6 +15036,45 @@ input, select { padding: 10px 14px; }
         fontWeight: 700
       }
     }, "＋ グループを作る")), React.createElement("div", {
+      style: {
+        marginTop: 12
+      }
+    }, menuItem("📤", "このアプリを友達に教える", "リンクを送ります", shareApp), shareMsg && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.gn,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: -4,
+        marginBottom: 12,
+        textWrap: "balance"
+      }
+    }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 14,
+        marginTop: -4
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 8,
+        textWrap: "balance"
+      }
+    }, "この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        background: t.sf,
+        borderRadius: 8,
+        padding: "10px 12px",
+        wordBreak: "break-all",
+        userSelect: "all",
+        lineHeight: 1.7
+      }
+    }, shareFallback))), React.createElement("div", {
       style: {
         marginTop: 12
       }
@@ -26043,7 +26422,7 @@ input, select { padding: 10px 14px; }
       width: 62,
       flexShrink: 0
     }
-  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "friends" && renderFriends(), sendPick && renderSendModal(), showFuHelp && FuHelpModal()));
+  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "friends" && renderFriends(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
 }
 
 ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));

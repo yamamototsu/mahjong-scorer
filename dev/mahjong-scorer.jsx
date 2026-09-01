@@ -53,6 +53,45 @@ const genFriendCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floo
 // 友達追加用のリンク（QRに入れる。開くとコード入力済みの友達画面が出る）
 const FRIEND_LINK = (code) => location.origin + location.pathname + "?fr=" + code;
 
+// ══════════════════════════════════
+// ── 配布のしかた ──
+// ══════════════════════════════════
+// "web"    … URLを開いて使ってもらう（いま）。「ホーム画面に追加」を案内する
+// "native" … ストアのアプリとして配る。すでにアイコンがあるので案内は出さず、
+//            友達に教えるリンクも STORE_URL に変わる
+const DIST = "web";
+const STORE_URL = "";   // ストア配布になったら、ここにストアのURLを入れる
+// アプリのURL。ふつうは今いる場所をそのまま使う（置き場所を変えても直さなくていい）。
+// file:// で開いているときだけ、公開先のURLを返す
+const APP_URL = () => {
+  try {
+    if (/^https?:$/.test(location.protocol)) {
+      return location.origin + location.pathname.replace(/index\.html$/, "");
+    }
+  } catch {}
+  return "https://yamamototsu.github.io/mahjong-scorer/";
+};
+// 友達に送る中身。配布のしかたが変わっても、直すのはここだけ
+const SHARE_TITLE = "卓上ポンづけ｜麻雀スコアラー";
+const SHARE_TEXT = "麻雀の点数計算アプリ「卓上ポンづけ」。スマホを卓の真ん中に置くと、4人ぶんの点数がそれぞれの向きで見えます。";
+const SHARE_URL = () => (DIST === "native" && STORE_URL) ? STORE_URL : APP_URL();
+
+// ホーム画面（またはアプリ）から開かれているか。
+// ブラウザのタブで開かれているときだけ「ホーム画面に追加」を案内する
+const isStandalone = () => {
+  try {
+    if (DIST === "native") return true;
+    if (window.navigator.standalone === true) return true;     // iOS Safari で追加済み
+    return ["standalone", "fullscreen", "minimal-ui"].some(m =>
+      window.matchMedia(`(display-mode: ${m})`).matches);      // Android / PC
+  } catch { return false; }
+};
+const UA = () => (navigator.userAgent || "");
+const isIOSDevice = () => /iPhone|iPad|iPod/.test(UA())
+  || (/Macintosh/.test(UA()) && (navigator.maxTouchPoints || 0) > 1);   // iPadOS
+// LINEやInstagramの中のブラウザは、そのままではホーム画面に追加できない
+const inAppBrowser = () => /Line\/|FBAN|FBAV|Instagram|Twitter/.test(UA());
+
 // ── Score Engine ──
 function calcBasePoints(fu, han, kiriage) {
   if (han >= 13) return 8000 * Math.max(1, Math.floor(han / 13)); // 13=役満, 26=ダブル役満, 39=トリプル役満
@@ -2215,6 +2254,92 @@ export default function MahjongScorer() {
             <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: t.dm }}>の手</span>
           </div>
         )}
+      </div>
+    );
+  };
+
+  // ── ホーム画面に追加するには（端末に合わせて手順を出し分ける）──
+  const InstallModal = () => {
+    const ios = isIOSDevice();
+    const inApp = inAppBrowser();
+    const step = (n, txt) => (
+      <div key={n} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+        <span style={{
+          flexShrink: 0, width: 24, height: 24, borderRadius: "50%", background: t.acS, color: t.ac,
+          fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>{n}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: t.tx, lineHeight: 1.8, textWrap: "balance" }}>{txt}</span>
+      </div>
+    );
+    const steps = ios
+      ? ["画面の下にある共有ボタン（□から↑が出ている絵）を押す",
+         "出てきた一覧を下にたどって「ホーム画面に追加」を押す",
+         "右上の「追加」を押す"]
+      : ["右上の「⋮」（点が3つ）を押す",
+         "「ホーム画面に追加」または「アプリをインストール」を押す",
+         "確認が出たら「追加」を押す"];
+    return (
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 200,
+        display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16,
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)", overflowY: "auto",
+      }}>
+        <div style={{ width: "100%", maxWidth: 400 }}>
+          <div style={{ ...card, padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 16, fontWeight: 800, minWidth: 0, lineHeight: 1.5, textWrap: "balance" }}>📲 ホーム画面に追加する</span>
+              <button aria-label="閉じる" onClick={() => setShowInstall(false)} style={{
+                flexShrink: 0, width: 36, height: 36, borderRadius: 9, cursor: "pointer",
+                border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 15,
+              }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 14, textWrap: "balance" }}>
+              {"追加すると、アイコンから一発で開けます。ブラウザのふちが消えて画面も広く使えます。入れても中身は同じで、記録もそのまま残ります。"}
+            </div>
+
+            {inApp && (
+              <div style={{
+                background: t.gdS, border: `1px solid ${t.gd}66`, borderRadius: 10,
+                padding: 12, marginBottom: 14,
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: t.gd, marginBottom: 4 }}>先にブラウザで開いてください</div>
+                <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.9, textWrap: "balance" }}>
+                  {"いまLINEなどのアプリの中で開いています。この画面からはホーム画面に追加できません。メニューから「Safariで開く」「ブラウザで開く」を選んでから、もう一度お試しください。"}
+                </div>
+              </div>
+            )}
+
+            {/* ブラウザが「入れられます」と言ってきたときは、そのまま入れられる */}
+            {pwaPrompt && !inApp && (
+              <button onClick={async () => {
+                try { pwaPrompt.prompt(); await pwaPrompt.userChoice; } catch {}
+                setPwaPrompt(null); setShowInstall(false);
+              }} style={{ ...actionBtn("p"), marginBottom: 14 }}>このまま追加する</button>
+            )}
+
+            {!inApp && (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 800, color: t.ac, marginBottom: 8 }}>
+                  {ios ? "iPhone・iPad（Safari）" : "Android（Chrome）"}
+                </div>
+                {steps.map((x, i) => step(i + 1, x))}
+                <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.9, marginTop: 10, textWrap: "balance" }}>
+                  {ios
+                    ? "※ Chromeなど他のブラウザでは追加できないことがあります。うまくいかないときはSafariで開いてください。"
+                    : "※ パソコンでは、アドレスバーの右にある「インストール」の印から追加できます。"}
+                </div>
+              </>
+            )}
+
+            <button onClick={() => { dismissInstallTip(); setShowInstall(false); }} style={{
+              ...actionBtn(), marginTop: 16, marginBottom: 0, padding: "11px 8px",
+            }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 700 }}>あとにする</span>
+              <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2 }}>この案内はもう出しません</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   };
@@ -5696,6 +5821,52 @@ input, select { padding: 10px 14px; }
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false); // 卓上モードの流局入力
   const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル（"flip" で180度回転）
+  // ── 配布まわり（ホーム画面に追加の案内 / 友達に教える）──
+  const [showInstall, setShowInstall] = useState(false);     // 追加のしかたの説明
+  const [installTipOff, setInstallTipOff] = useState(() => {
+    try { return localStorage.getItem("mj_install_tip") === "off"; } catch { return false; }
+  });
+  const [pwaPrompt, setPwaPrompt] = useState(null);          // Androidなどが出す「インストール」の合図
+  const [shareMsg, setShareMsg] = useState(null);            // 共有のあとの一言
+  const [shareFallback, setShareFallback] = useState(null);  // 共有もコピーもできない端末に出すURL
+
+  // Android/PC は、ブラウザ側から「入れられますよ」の合図が来る。
+  // 受け取っておくと、説明の中からそのままインストールできる
+  React.useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setPwaPrompt(e); };
+    const onInstalled = () => { setPwaPrompt(null); setShowInstall(false); setInstallTipOff(true); };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  // ホーム画面に追加の案内を出すか。アプリとして開かれていたら出さない
+  const needInstallTip = DIST === "web" && !isStandalone();
+
+  const dismissInstallTip = () => {
+    setInstallTipOff(true);
+    try { localStorage.setItem("mj_install_tip", "off"); } catch {}
+  };
+
+  // アプリのことを友達に教える。共有シート → だめならコピー → だめならURLを出す
+  const shareApp = async () => {
+    const url = SHARE_URL();
+    setShareFallback(null);
+    if (navigator.share) {
+      try { await navigator.share({ title: SHARE_TITLE, text: SHARE_TEXT, url }); return; }
+      // 送るのをやめただけのときは、なにも出さずに終わる
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    try {
+      await navigator.clipboard.writeText(SHARE_TEXT + "\n" + url);
+      setShareMsg("リンクをコピーしました。LINEなどに貼って送ってください");
+      setTimeout(() => setShareMsg(null), 4000);
+    } catch { setShareFallback(url); }
+  };
+
   const [tmMenu, setTmMenu] = useState(false);               // 卓上の📋メニュー（"flip" で180度回転）
   const [seatRot, setSeatRot] = useState(0); // 卓の回転（0-3）自分を手前に持ってくる
   const [playerDetail, setPlayerDetail] = useState(null); // 変動履歴を表示するプレイヤーのindex
@@ -7585,6 +7756,30 @@ input, select { padding: 10px 14px; }
           })}
         </div>
 
+        {/* ブラウザのタブで開かれているときだけ、ホーム画面への追加をすすめる。
+            アプリとして開かれていれば出ない（ストア配布に変えたときも自動で消える） */}
+        {needInstallTip && !installTipOff && !intro && (
+          <div style={{ display: "flex", gap: 6, marginTop: 8, ...reveal(5) }}>
+            <button onClick={() => setShowInstall(true)} style={{
+              flex: "1 1 auto", minWidth: 0, padding: "11px 12px", borderRadius: 12, cursor: "pointer",
+              border: `1px solid ${t.ac}55`, background: t.acS, color: t.tx,
+              display: "flex", alignItems: "center", gap: 8, textAlign: "left",
+            }}>
+              <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>📲</span>
+              {/* 2行に分けて置く。まかせると「ア／イコン」のような切れ方をする */}
+              <span style={{ flex: 1, minWidth: 0, lineHeight: 1.5 }}>
+                <span style={{ display: "block", fontSize: 12, fontWeight: 700 }}>ホーム画面に追加</span>
+                <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 1 }}>アイコンから開けます</span>
+              </span>
+              <span style={{ flexShrink: 0, color: t.ac, fontSize: 15 }}>›</span>
+            </button>
+            <button aria-label="この案内を閉じる" onClick={dismissInstallTip} style={{
+              flex: "0 0 40px", borderRadius: 12, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: t.card, color: t.dm, fontSize: 14,
+            }}>✕</button>
+          </div>
+        )}
+
       </div>
     );
   };
@@ -7686,6 +7881,13 @@ input, select { padding: 10px 14px; }
               width: "100%", marginTop: 14, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
               border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 13, fontWeight: 700,
             }}>麻雀そのものの始め方を見る</button>
+            {/* メニューの案内を閉じたあとでも、ここから追加のしかたを見られる */}
+            {needInstallTip && (
+              <button onClick={() => setShowInstall(true)} style={{
+                width: "100%", marginTop: 8, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+                border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 13, fontWeight: 700,
+              }}>📲 ホーム画面に追加する</button>
+            )}
           </div>
         )}
 
@@ -7855,6 +8057,27 @@ input, select { padding: 10px 14px; }
                     border: `1px dashed ${t.ac}77`, background: "transparent", color: t.ac,
                     fontSize: 13, fontWeight: 700,
                   }}>＋ グループを作る</button>
+              )}
+            </div>
+
+            {/* このアプリ自体を友達にすすめる（オンライン共有が使えなくても意味がある） */}
+            <div style={{ marginTop: 12 }}>
+              {menuItem("📤", "このアプリを友達に教える", "リンクを送ります", shareApp)}
+              {shareMsg && (
+                <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: -4, marginBottom: 12, textWrap: "balance" }}>
+                  ✓ {shareMsg}
+                </div>
+              )}
+              {shareFallback && (
+                <div style={{ ...card, padding: 14, marginTop: -4 }}>
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
+                    {"この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"}
+                  </div>
+                  <div style={{
+                    fontSize: 12, color: t.ac, background: t.sf, borderRadius: 8, padding: "10px 12px",
+                    wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
+                  }}>{shareFallback}</div>
+                </div>
               )}
             </div>
 
@@ -13891,6 +14114,7 @@ input, select { padding: 10px 14px; }
         {view === "friends" && renderFriends()}
         {sendPick && renderSendModal()}
         {showFuHelp && FuHelpModal()}
+        {showInstall && InstallModal()}
       </div>
     </>
   );
