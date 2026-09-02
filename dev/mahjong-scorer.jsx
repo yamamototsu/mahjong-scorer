@@ -13716,7 +13716,6 @@ input, select { padding: 10px 14px; }
       setSendPick(null); setSendSel([]);
       setHistSelMode(false); setHistSel([]); setHistSelPurpose("agg");
       setFrNotice(toCount + "人に" + gameCount + "件の対局結果を送りました");
-      setView("friends");
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
   };
@@ -13732,12 +13731,15 @@ input, select { padding: 10px 14px; }
     setFrNotice(added > 0 ? added + "件を履歴に取り込みました" : "すでに取り込み済みの対局でした");
   };
 
-  // 友達画面を開いたら受信箱を自動で読み直す。離れたら通知類を消す
+  // 受信箱は履歴画面に置いてあるので、そちらを開いたときにも読み直す。
+  // 友達画面は友達リストのために読む。どちらでもないところへ移ったら通知類を消す
+  const FR_VIEWS = ["friends", "history"];
   React.useEffect(() => {
-    if (view === "friends" && myCode) refreshFriends();
+    if (FR_VIEWS.includes(view) && myCode) refreshFriends();
     // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
-    if (view !== "friends") { setFrError(null); setFrNotice(null); setFrEditingName(false); }
+    if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); }
+    if (view !== "friends") setFrEditingName(false);
     // 共有のあとの一言は、画面を移ったら持ち越さない（前の画面の分が残って見える）
     setShareMsg(null); setShareFallback(null);
   }, [view]);
@@ -13848,53 +13850,6 @@ input, select { padding: 10px 14px; }
             <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
               {"このリンクを開いた人は誰でも友達になれます。知らない人に見えるところには貼らないでください。"}
             </div>
-          </div>
-
-          {/* 受信箱 */}
-          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 800, flex: 1, minWidth: 0 }}>📥 受信箱{inboxItems && inboxItems.length > 0 ? `（${inboxItems.length}件）` : ""}</span>
-              <button disabled={frBusy} onClick={refreshFriends}
-                style={{ flexShrink: 0, padding: "8px 12px", borderRadius: 8, cursor: "pointer", border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 12, fontWeight: 700, opacity: frBusy ? 0.5 : 1, whiteSpace: "nowrap" }}>
-                {frBusy ? "通信中…" : "🔄 更新"}
-              </button>
-            </div>
-            {(!inboxItems || inboxItems.length === 0) ? (
-              <div style={{ fontSize: 12, color: t.dm }}>届いている対局結果はありません</div>
-            ) : (
-              <>
-                {inboxItems.map((it, ii) => (
-                  <div key={it.key} style={{ marginTop: ii === 0 ? 0 : 10, display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.6 }}>
-                      <span style={{ fontWeight: 700 }}>{it.fromName}</span> さんから
-                      <span style={{ display: "block", color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {it.game?.date} {MATCH_LABEL_SHORT(it.game?.matchType)} — {(it.game?.players || []).join("・")}
-                      </span>
-                    </span>
-                    <button onClick={() => frImportInbox([it])}
-                      style={{ flexShrink: 0, padding: "10px 12px", borderRadius: 8, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700 }}>取り込む</button>
-                  </div>
-                ))}
-                {inboxItems.length >= 2 && (
-                  <button onClick={() => frImportInbox(inboxItems)} style={{ ...actionBtn("p"), marginTop: 10, marginBottom: 0, fontSize: 13, padding: "12px 8px" }}>
-                    ぜんぶ取り込む
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* 結果を送る */}
-          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>📤 対局結果を送る</div>
-            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 10 }}>
-              履歴から対局を選んで、友達の受信箱へ送ります。受け取った人が取り込むと、その人の履歴と通算成績に反映されます。
-            </div>
-            <button disabled={gameHistory.length === 0}
-              onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("send"); setHistoryDetail(null); setView("history"); }}
-              style={{ ...actionBtn(), marginBottom: 0, opacity: gameHistory.length === 0 ? 0.45 : 1 }}>
-              履歴から対局を選ぶ
-            </button>
           </div>
 
           {/* 友達リスト */}
@@ -14090,41 +14045,74 @@ input, select { padding: 10px 14px; }
         <>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>対局履歴</div>
 
-          {/* バックアップ操作 */}
-          <div style={{ ...card, padding: 14, marginBottom: 14 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4 }}>データのバックアップ</div>
-            <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.6 }}>
-              履歴はこの端末に保存されています。ファイルに書き出せば、機種変更やデータ削除に備えられます。
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-                onClick={exportBackup} disabled={gameHistory.length === 0}>
-                💾 書き出す
-              </button>
-              <label style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center", display: "block" }}>
-                📂 読み込む
-                <input type="file" accept=".json,application/json,text/plain,*/*" onChange={importBackup} style={{ display: "none" }} />
-              </label>
-            </div>
-            {restoreMsg && (
-              <div style={{ marginTop: 10, padding: "8px 10px", borderRadius: 8, fontSize: 12, background: restoreMsg.ok ? t.gnS : t.rdS, color: restoreMsg.ok ? t.gn : t.rd, textAlign: "center" }}>
-                {restoreMsg.ok ? "✓ " : "✕ "}{restoreMsg.text}
+          {/* 友達から届いた対局。取り込むとすぐ下の一覧に入る。
+              届いていないときは1行に畳んで、場所を取らないようにする */}
+          {Net.enabled() && myCode && (
+            <div style={{ ...card, padding: 14, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, flex: 1, minWidth: 0 }}>
+                  📥 受信箱{inboxItems && inboxItems.length > 0 ? `（${inboxItems.length}件）` : ""}
+                </span>
+                {(!inboxItems || inboxItems.length === 0) && (
+                  <span style={{ fontSize: 12, color: t.dm, flexShrink: 0, whiteSpace: "nowrap" }}>届いていません</span>
+                )}
+                <button disabled={frBusy} onClick={refreshFriends} style={{
+                  flexShrink: 0, minHeight: 34, padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+                  border: `1px solid ${t.ac}`, background: "transparent", color: t.ac,
+                  fontSize: 12, fontWeight: 700, opacity: frBusy ? 0.5 : 1, whiteSpace: "nowrap",
+                }}>{frBusy ? "通信中…" : "🔄 更新"}</button>
               </div>
-            )}
-          </div>
-
-          {/* 対局を選んで集計 */}
-          {gameHistory.length >= 2 && !histSelMode && (
-            <button onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("agg"); }} style={{
-              width: "100%", padding: "13px 10px", borderRadius: 12, cursor: "pointer", marginBottom: 14,
-              border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 14, fontWeight: 700,
-            }}>☑ 対局を選んで集計する</button>
+              {inboxItems && inboxItems.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {inboxItems.map((it, ii) => (
+                    <div key={it.key} style={{ marginTop: ii === 0 ? 0 : 10, display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.6 }}>
+                        <span style={{ fontWeight: 700 }}>{it.fromName}</span> さんから
+                        <span style={{ display: "block", color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {it.game?.date} {MATCH_LABEL_SHORT(it.game?.matchType)} — {(it.game?.players || []).join("・")}
+                        </span>
+                      </span>
+                      <button onClick={() => frImportInbox([it])} style={{
+                        flexShrink: 0, minHeight: 38, padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+                        border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700,
+                      }}>取り込む</button>
+                    </div>
+                  ))}
+                  {inboxItems.length >= 2 && (
+                    <button onClick={() => frImportInbox(inboxItems)} style={{ ...actionBtn("p"), marginTop: 10, marginBottom: 0, fontSize: 13, padding: "12px 8px" }}>
+                      ぜんぶ取り込む
+                    </button>
+                  )}
+                </div>
+              )}
+              {/* 取り込みや送信の結果は、この画面で出す */}
+              {frNotice && (
+                <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>✓ {frNotice}</div>
+              )}
+              {frError && (
+                <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>{frError}</div>
+              )}
+            </div>
           )}
-          {Net.enabled() && myCode && gameHistory.length >= 1 && !histSelMode && (
-            <button onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("send"); }} style={{
-              width: "100%", padding: "13px 10px", borderRadius: 12, cursor: "pointer", marginBottom: 14,
-              border: `1px solid ${t.ac}`, background: "transparent", color: t.ac, fontSize: 14, fontWeight: 700,
-            }}>📤 対局を選んで友達に送る</button>
+
+          {/* 選んで集計・選んで送る。横に並べて縦を詰める */}
+          {!histSelMode && (gameHistory.length >= 2 || (Net.enabled() && myCode && gameHistory.length >= 1)) && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              {gameHistory.length >= 2 && (
+                <button onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("agg"); }} style={{
+                  flex: 1, minWidth: 0, minHeight: 44, padding: "11px 6px", borderRadius: 12, cursor: "pointer",
+                  border: `1px solid ${t.ac}`, background: "transparent", color: t.ac,
+                  fontSize: "clamp(12px, 3.4vw, 14px)", fontWeight: 700, whiteSpace: "nowrap",
+                }}>☑ 選んで集計</button>
+              )}
+              {Net.enabled() && myCode && gameHistory.length >= 1 && (
+                <button onClick={() => { setHistSelMode(true); setHistSel([]); setHistSelPurpose("send"); }} style={{
+                  flex: 1, minWidth: 0, minHeight: 44, padding: "11px 6px", borderRadius: 12, cursor: "pointer",
+                  border: `1px solid ${t.ac}`, background: "transparent", color: t.ac,
+                  fontSize: "clamp(12px, 3.4vw, 14px)", fontWeight: 700, whiteSpace: "nowrap",
+                }}>📤 友達に送る</button>
+              )}
+            </div>
           )}
           {histSelMode && (
             <div style={{ fontSize: 12, color: t.ac, fontWeight: 700, textAlign: "center", marginBottom: 10, lineHeight: 1.7 }}>
@@ -14136,7 +14124,12 @@ input, select { padding: 10px 14px; }
             <div style={{ ...card, textAlign: "center", padding: 32 }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
               <div style={{ fontSize: 14, color: t.dm }}>まだ記録がありません</div>
-              <div style={{ fontSize: 12, color: t.dm, marginTop: 4 }}>対局を終了すると自動的に保存されます</div>
+              <div style={{ fontSize: 12, color: t.dm, marginTop: 4, lineHeight: 1.8 }}>
+                {/* 320px幅で語の途中で折り返さないよう、文節ごとに分けて置く */}
+                {["対局を終了すると", "自動的に保存されます"].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </div>
             </div>
           ) : (
             [...gameHistory].reverse().map((g, idx) => {
@@ -14206,6 +14199,34 @@ input, select { padding: 10px 14px; }
                 </div>
               );
             })
+          )}
+
+          {/* バックアップは使う頻度が低いので、一覧の下に置く */}
+          {!histSelMode && (
+            <div style={{ marginTop: 14 }}>
+          {/* バックアップ操作 */}
+          <div style={{ ...card, padding: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4 }}>データのバックアップ</div>
+            <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.6 }}>
+              履歴はこの端末に保存されています。ファイルに書き出せば、機種変更やデータ削除に備えられます。
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                onClick={exportBackup} disabled={gameHistory.length === 0}>
+                💾 書き出す
+              </button>
+              <label style={{ flex: 1, padding: "12px 8px", borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "center", display: "block" }}>
+                📂 読み込む
+                <input type="file" accept=".json,application/json,text/plain,*/*" onChange={importBackup} style={{ display: "none" }} />
+              </label>
+            </div>
+            {restoreMsg && (
+              <div style={{ marginTop: 10, padding: "8px 10px", borderRadius: 8, fontSize: 12, background: restoreMsg.ok ? t.gnS : t.rdS, color: restoreMsg.ok ? t.gn : t.rd, textAlign: "center" }}>
+                {restoreMsg.ok ? "✓ " : "✕ "}{restoreMsg.text}
+              </div>
+            )}
+          </div>
+            </div>
           )}
 
           {/* 下の固定バーに隠れないぶんの余白 */}
