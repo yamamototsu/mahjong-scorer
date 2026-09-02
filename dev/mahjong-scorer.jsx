@@ -7300,18 +7300,18 @@ input, select { padding: 10px 14px; }
     });
     const mode = rate > 0 ? rankPeekMode : (rankPeekMode === "gold" ? "rank" : rankPeekMode);
     const sign = (v) => (v > 0 ? "+" : "");
-    // 差はマイナス方向にしかならないので、色は控えめにする
-    const diffCell = (label, v, none) => (
-      <span key={label} style={{ display: "flex", alignItems: "baseline", gap: 3, flexShrink: 0 }}>
+    // 差はマイナス方向にしかならないので、色は控えめにする。
+    // 1位には出さないので「—」の分岐はいらない
+    const diffCell = (label, text) => (
+      <span style={{ display: "flex", alignItems: "baseline", gap: 4, flexShrink: 0 }}>
         <span style={{ fontSize: 10, color: t.dm, whiteSpace: "nowrap" }}>{label}</span>
         <span style={{
-          fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
-          color: none ? t.dm : t.tx,
-        }}>{none ? "—" : v === 0 ? "±0" : v.toLocaleString()}</span>
+          fontSize: 13, fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: t.tx,
+        }}>{text}</span>
       </span>
     );
     const rankBadge = (rank) => (
-      <span style={{ fontSize: 13, fontWeight: 900, color: rank === 0 ? t.gd : t.dm, width: 30, flexShrink: 0 }}>{rank + 1}位</span>
+      <span style={{ fontSize: 14, fontWeight: 900, color: rank === 0 ? t.gd : t.dm, width: 32, flexShrink: 0 }}>{rank + 1}位</span>
     );
     const windBadge = (i) => (
       <span style={{
@@ -7325,7 +7325,10 @@ input, select { padding: 10px 14px; }
       }}>{SEAT_WINDS[(i - dealerIdx + PC) % PC]}</span>
     );
     const nameCell = (i) => (
-      <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{players[i]}</span>
+      <span style={{
+        flex: 1, minWidth: 0, fontSize: "clamp(14px, 4vw, 16px)", fontWeight: 700, color: t.tx,
+        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+      }}>{players[i]}</span>
     );
     const rowBox = (me) => ({
       padding: "9px 10px", borderRadius: 10, marginBottom: 5,
@@ -7372,7 +7375,6 @@ input, select { padding: 10px 14px; }
             const me = r.i === pi;
             const c = calcOf[r.i];
             const topDiff = r.v - ranked[0].v;                     // トップとの差
-            const prevDiff = rank === 0 ? 0 : r.v - ranked[rank - 1].v;   // ひとつ上との差
             if (mode === "detail") {
               // 上2つは点、暫定スコアはpt。単位が違うので分かるようにする
               const cols = [
@@ -7384,7 +7386,7 @@ input, select { padding: 10px 14px; }
                 <div key={r.i} style={rowBox(me)}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     {rankBadge(rank)}{windBadge(r.i)}{nameCell(r.i)}
-                    <span style={{ fontSize: 13, fontWeight: 800, color: r.v < 0 ? t.rd : t.dm, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{r.v.toLocaleString()}</span>
+                    <span style={{ fontSize: "clamp(13px, 3.9vw, 15px)", fontWeight: 800, color: r.v < 0 ? t.rd : t.dm, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{r.v.toLocaleString()}</span>
                   </div>
                   <div style={{ display: "flex", gap: "clamp(4px, 2vw, 8px)" }}>
                     {cols.map(([lb, v, sub, u]) => (
@@ -7411,70 +7413,73 @@ input, select { padding: 10px 14px; }
                   {rankBadge(rank)}{windBadge(r.i)}{nameCell(r.i)}
                   {mode === "gold" ? (
                     <span style={{ textAlign: "right", flexShrink: 0 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: t.dm, fontVariantNumeric: "tabular-nums", display: "block" }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: t.dm, fontVariantNumeric: "tabular-nums", display: "block" }}>
                         {sign(c.pt)}{(c.pt * 1000).toLocaleString()}<span style={{ fontSize: 10, marginLeft: 1 }}>点</span>
                       </span>
-                      <span style={{ fontSize: 15, fontWeight: 900, fontVariantNumeric: "tabular-nums",
+                      <span style={{ fontSize: "clamp(15px, 4.4vw, 17px)", fontWeight: 900, fontVariantNumeric: "tabular-nums",
                         color: c.pt > 0 ? t.gd : c.pt < 0 ? t.rd : t.dm }}>
                         {sign(c.pt)}{GOLD_LABEL(GOLD(c.pt, rate))}<span style={{ fontSize: 10, marginLeft: 2, opacity: 0.8 }}>{unit}</span>
                       </span>
                     </span>
                   ) : (
-                    <span style={{ fontSize: 15, fontWeight: 800, color: r.v < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{r.v.toLocaleString()}</span>
+                    <span style={{
+                      fontSize: "clamp(15px, 4.6vw, 18px)", fontWeight: 800, flexShrink: 0,
+                      color: r.v < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums",
+                    }}>{r.v.toLocaleString()}</span>
                   )}
                 </div>
-                {/* トップとの差・ひとつ上との差。1位はどちらも無い。
+                {/* トップとの差。1位には出さない。それでも枠は残して、行の高さをそろえる。
                     換算表示のときは、単位をそろえて換算額どうしの差を出す */}
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 3 }}>
-                  {mode === "gold"
-                    ? [["トップと", GOLD(c.pt - calcOf[ranked[0].i].pt, rate)],
-                       ["1つ上と", rank === 0 ? 0 : GOLD(c.pt - calcOf[ranked[rank - 1].i].pt, rate)]]
-                        .map(([lb, v]) => (
-                          <span key={lb} style={{ display: "flex", alignItems: "baseline", gap: 3, flexShrink: 0 }}>
-                            <span style={{ fontSize: 10, color: t.dm, whiteSpace: "nowrap" }}>{lb}</span>
-                            <span style={{ fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: rank === 0 ? t.dm : t.tx }}>
-                              {rank === 0 ? "—" : v === 0 ? "±0" : GOLD_LABEL(v) + unit}
-                            </span>
-                          </span>
-                        ))
-                    : [diffCell("トップと", topDiff, rank === 0), diffCell("1つ上と", prevDiff, rank === 0)]}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 3, minHeight: 18 }}>
+                  {rank > 0 && (mode === "gold"
+                    ? (() => {
+                        const g = GOLD(c.pt - calcOf[ranked[0].i].pt, rate);
+                        return diffCell("トップと", g === 0 ? "±0" : GOLD_LABEL(g) + unit);
+                      })()
+                    : diffCell("トップと", topDiff === 0 ? "±0" : topDiff.toLocaleString()))}
                 </div>
               </div>
             );
           })}
 
-          {/* 詳細には換算額も出るので、詳細を見ている間は換算のボタンを出さない */}
-          {rate > 0 && mode !== "detail" && (
-            <button style={{
-              width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
-              border: `1px solid ${mode === "gold" ? t.gd : t.gd + "55"}`,
-              background: mode === "gold" ? t.gdS : "transparent",
-              color: t.gd, fontSize: 15, fontWeight: 800,
-            }} onClick={() => setRankPeekMode(m => (m === "gold" ? "rank" : "gold"))}>
-              {mode === "gold" ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${unit}）`}
-            </button>
-          )}
-          <button style={{
-            width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
-            border: `1px solid ${mode === "detail" ? t.ac : t.bd}`,
-            background: mode === "detail" ? t.acS : "transparent",
-            color: t.ac, fontSize: 15, fontWeight: 700,
-          }} onClick={() => setRankPeekMode(m => (m === "detail" ? "rank" : "detail"))}>
-            {mode === "detail" ? "順位表示に戻す" : (
-              <>
-                <span style={{ display: "block" }}>📊 詳細</span>
-                <span style={{ display: "block", fontSize: 11, color: t.dm, fontWeight: 700, marginTop: 2 }}>3つの基準でスコアを見る</span>
-              </>
+          {/* ボタンは詰めて、上の一覧に場所をゆずる。指で押せる高さ（36px以上）は残す。
+              詳細には換算額も出るので、詳細を見ている間は換算のボタンを出さない */}
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            {rate > 0 && mode !== "detail" && (
+              <button style={{
+                flex: 1, minWidth: 0, minHeight: 38, padding: "8px 6px", borderRadius: 9, cursor: "pointer",
+                border: `1px solid ${mode === "gold" ? t.gd : t.gd + "55"}`,
+                background: mode === "gold" ? t.gdS : "transparent",
+                color: t.gd, fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 800, lineHeight: 1.4,
+              }} onClick={() => setRankPeekMode(m => (m === "gold" ? "rank" : "gold"))}>
+                {mode === "gold" ? "点数表示に戻す" : (
+                  <>
+                    <span style={{ display: "block", whiteSpace: "nowrap" }}>💰 レート換算</span>
+                    <span style={{ display: "block", fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
+                      1点 = {RATE_LABEL(rate)}{unit}
+                    </span>
+                  </>
+                )}
+              </button>
             )}
-          </button>
+            <button style={{
+              flex: 1, minWidth: 0, minHeight: 38, padding: "8px 6px", borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${mode === "detail" ? t.ac : t.bd}`,
+              background: mode === "detail" ? t.acS : "transparent",
+              color: t.ac, fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 700, whiteSpace: "nowrap",
+            }} onClick={() => setRankPeekMode(m => (m === "detail" ? "rank" : "detail"))}>
+              {mode === "detail" ? "順位表示に戻す" : "📊 詳細"}
+            </button>
+          </div>
           <button style={{
-            width: "100%", marginTop: 8, padding: "13px 8px", borderRadius: 9, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac, fontSize: 15, fontWeight: 700,
-          }} onClick={() => { setPlayerDetail(pi); setRankPeek(null); }}>点数の変動履歴を見る</button>
+            width: "100%", marginTop: 8, minHeight: 38, padding: "8px 6px", borderRadius: 9, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
+            fontSize: "clamp(11px, 3.4vw, 13px)", fontWeight: 700, whiteSpace: "nowrap",
+          }} onClick={() => { setPlayerDetail(pi); setRankPeek(null); }}>📈 点数の変動履歴を見る</button>
 
           <button style={{
-            width: "100%", marginTop: 8, padding: "14px 8px", borderRadius: 11, cursor: "pointer",
-            border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 15, fontWeight: 700,
+            width: "100%", marginTop: 8, minHeight: 44, padding: "10px 8px", borderRadius: 11, cursor: "pointer",
+            border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 14, fontWeight: 700,
           }} onClick={() => setRankPeek(null)}>← 戻る</button>
         </div>
       </div>

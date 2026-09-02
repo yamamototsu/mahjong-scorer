@@ -13581,12 +13581,11 @@ input, select { padding: 10px 14px; }
     });
     const mode = rate > 0 ? rankPeekMode : rankPeekMode === "gold" ? "rank" : rankPeekMode;
     const sign = v => v > 0 ? "+" : "";
-    const diffCell = (label, v, none) => React.createElement("span", {
-      key: label,
+    const diffCell = (label, text) => React.createElement("span", {
       style: {
         display: "flex",
         alignItems: "baseline",
-        gap: 3,
+        gap: 4,
         flexShrink: 0
       }
     }, React.createElement("span", {
@@ -13597,19 +13596,19 @@ input, select { padding: 10px 14px; }
       }
     }, label), React.createElement("span", {
       style: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 800,
         fontVariantNumeric: "tabular-nums",
         whiteSpace: "nowrap",
-        color: none ? t.dm : t.tx
+        color: t.tx
       }
-    }, none ? "—" : v === 0 ? "±0" : v.toLocaleString()));
+    }, text));
     const rankBadge = rank => React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 900,
         color: rank === 0 ? t.gd : t.dm,
-        width: 30,
+        width: 32,
         flexShrink: 0
       }
     }, rank + 1, "位");
@@ -13636,7 +13635,7 @@ input, select { padding: 10px 14px; }
       style: {
         flex: 1,
         minWidth: 0,
-        fontSize: 14,
+        fontSize: "clamp(14px, 4vw, 16px)",
         fontWeight: 700,
         color: t.tx,
         overflow: "hidden",
@@ -13721,7 +13720,6 @@ input, select { padding: 10px 14px; }
       const me = r.i === pi;
       const c = calcOf[r.i];
       const topDiff = r.v - ranked[0].v;
-      const prevDiff = rank === 0 ? 0 : r.v - ranked[rank - 1].v;
       if (mode === "detail") {
         const cols = [["持ち点から", c.raw, null, null], ["返し点から", c.ret, null, null], ["暫定スコア", c.pt, rate > 0 ? GOLD_LABEL(GOLD(c.pt, rate)) + unit : null, "pt"]];
         return React.createElement("div", {
@@ -13736,7 +13734,7 @@ input, select { padding: 10px 14px; }
           }
         }, rankBadge(rank), windBadge(r.i), nameCell(r.i), React.createElement("span", {
           style: {
-            fontSize: 13,
+            fontSize: "clamp(13px, 3.9vw, 15px)",
             fontWeight: 800,
             color: r.v < 0 ? t.rd : t.dm,
             fontVariantNumeric: "tabular-nums",
@@ -13802,7 +13800,7 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("span", {
         style: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 700,
           color: t.dm,
           fontVariantNumeric: "tabular-nums",
@@ -13815,7 +13813,7 @@ input, select { padding: 10px 14px; }
         }
       }, "点")), React.createElement("span", {
         style: {
-          fontSize: 15,
+          fontSize: "clamp(15px, 4.4vw, 17px)",
           fontWeight: 900,
           fontVariantNumeric: "tabular-nums",
           color: c.pt > 0 ? t.gd : c.pt < 0 ? t.rd : t.dm
@@ -13828,110 +13826,104 @@ input, select { padding: 10px 14px; }
         }
       }, unit))) : React.createElement("span", {
         style: {
-          fontSize: 15,
+          fontSize: "clamp(15px, 4.6vw, 18px)",
           fontWeight: 800,
+          flexShrink: 0,
           color: r.v < 0 ? t.rd : t.tx,
-          fontVariantNumeric: "tabular-nums",
-          flexShrink: 0
+          fontVariantNumeric: "tabular-nums"
         }
       }, r.v.toLocaleString())), React.createElement("div", {
         style: {
           display: "flex",
           justifyContent: "flex-end",
-          gap: 10,
-          marginTop: 3
+          marginTop: 3,
+          minHeight: 18
         }
-      }, mode === "gold" ? [["トップと", GOLD(c.pt - calcOf[ranked[0].i].pt, rate)], ["1つ上と", rank === 0 ? 0 : GOLD(c.pt - calcOf[ranked[rank - 1].i].pt, rate)]].map(([lb, v]) => React.createElement("span", {
-        key: lb,
-        style: {
-          display: "flex",
-          alignItems: "baseline",
-          gap: 3,
-          flexShrink: 0
-        }
-      }, React.createElement("span", {
-        style: {
-          fontSize: 10,
-          color: t.dm,
-          whiteSpace: "nowrap"
-        }
-      }, lb), React.createElement("span", {
-        style: {
-          fontSize: 12,
-          fontWeight: 800,
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          color: rank === 0 ? t.dm : t.tx
-        }
-      }, rank === 0 ? "—" : v === 0 ? "±0" : GOLD_LABEL(v) + unit))) : [diffCell("トップと", topDiff, rank === 0), diffCell("1つ上と", prevDiff, rank === 0)]));
-    }), rate > 0 && mode !== "detail" && React.createElement("button", {
+      }, rank > 0 && (mode === "gold" ? (() => {
+        const g = GOLD(c.pt - calcOf[ranked[0].i].pt, rate);
+        return diffCell("トップと", g === 0 ? "±0" : GOLD_LABEL(g) + unit);
+      })() : diffCell("トップと", topDiff === 0 ? "±0" : topDiff.toLocaleString()))));
+    }), React.createElement("div", {
       style: {
-        width: "100%",
-        marginTop: 8,
-        padding: "13px 8px",
+        display: "flex",
+        gap: 8,
+        marginTop: 10
+      }
+    }, rate > 0 && mode !== "detail" && React.createElement("button", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 38,
+        padding: "8px 6px",
         borderRadius: 9,
         cursor: "pointer",
         border: `1px solid ${mode === "gold" ? t.gd : t.gd + "55"}`,
         background: mode === "gold" ? t.gdS : "transparent",
         color: t.gd,
-        fontSize: 15,
-        fontWeight: 800
+        fontSize: "clamp(11px, 3.4vw, 13px)",
+        fontWeight: 800,
+        lineHeight: 1.4
       },
       onClick: () => setRankPeekMode(m => m === "gold" ? "rank" : "gold")
-    }, mode === "gold" ? "点数表示に戻す" : `💰 レート換算を表示（1点 = ${RATE_LABEL(rate)}${unit}）`), React.createElement("button", {
+    }, mode === "gold" ? "点数表示に戻す" : React.createElement(React.Fragment, null, React.createElement("span", {
       style: {
-        width: "100%",
-        marginTop: 8,
-        padding: "13px 8px",
+        display: "block",
+        whiteSpace: "nowrap"
+      }
+    }, "💰 レート換算"), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 10,
+        opacity: 0.85,
+        whiteSpace: "nowrap"
+      }
+    }, "1点 = ", RATE_LABEL(rate), unit))), React.createElement("button", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 38,
+        padding: "8px 6px",
         borderRadius: 9,
         cursor: "pointer",
         border: `1px solid ${mode === "detail" ? t.ac : t.bd}`,
         background: mode === "detail" ? t.acS : "transparent",
         color: t.ac,
-        fontSize: 15,
-        fontWeight: 700
+        fontSize: "clamp(11px, 3.4vw, 13px)",
+        fontWeight: 700,
+        whiteSpace: "nowrap"
       },
       onClick: () => setRankPeekMode(m => m === "detail" ? "rank" : "detail")
-    }, mode === "detail" ? "順位表示に戻す" : React.createElement(React.Fragment, null, React.createElement("span", {
-      style: {
-        display: "block"
-      }
-    }, "📊 詳細"), React.createElement("span", {
-      style: {
-        display: "block",
-        fontSize: 11,
-        color: t.dm,
-        fontWeight: 700,
-        marginTop: 2
-      }
-    }, "3つの基準でスコアを見る"))), React.createElement("button", {
+    }, mode === "detail" ? "順位表示に戻す" : "📊 詳細")), React.createElement("button", {
       style: {
         width: "100%",
         marginTop: 8,
-        padding: "13px 8px",
+        minHeight: 38,
+        padding: "8px 6px",
         borderRadius: 9,
         cursor: "pointer",
         border: `1px solid ${t.bd}`,
         background: "transparent",
         color: t.ac,
-        fontSize: 15,
-        fontWeight: 700
+        fontSize: "clamp(11px, 3.4vw, 13px)",
+        fontWeight: 700,
+        whiteSpace: "nowrap"
       },
       onClick: () => {
         setPlayerDetail(pi);
         setRankPeek(null);
       }
-    }, "点数の変動履歴を見る"), React.createElement("button", {
+    }, "📈 点数の変動履歴を見る"), React.createElement("button", {
       style: {
         width: "100%",
         marginTop: 8,
-        padding: "14px 8px",
+        minHeight: 44,
+        padding: "10px 8px",
         borderRadius: 11,
         cursor: "pointer",
         border: `1px solid ${t.bd}`,
         background: t.sf,
         color: t.tx,
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: 700
       },
       onClick: () => setRankPeek(null)
