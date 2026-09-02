@@ -11279,6 +11279,15 @@ input, select { padding: 10px 14px; }
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false);
   const [showRoundEdit, setShowRoundEdit] = useState(false);
+  const [obNameInput, setObNameInput] = useState("");
+  const [obErr, setObErr] = useState("");
+  const [obDone, setObDone] = useState(() => {
+    try {
+      return localStorage.getItem("mj_onboard") === "1";
+    } catch {
+      return true;
+    }
+  });
   const [showInstall, setShowInstall] = useState(false);
   const [installTipOff, setInstallTipOff] = useState(() => {
     try {
@@ -11466,7 +11475,12 @@ input, select { padding: 10px 14px; }
   const [presetNames, setPresetNames] = useState(() => {
     try {
       const v = JSON.parse(localStorage.getItem("mj_preset_names") || "null");
-      if (!Array.isArray(v)) return [];
+      if (!Array.isArray(v)) {
+        try {
+          localStorage.setItem("mj_preset_cleaned", "1");
+        } catch {}
+        return [];
+      }
       if (localStorage.getItem("mj_preset_cleaned") === "1") return v;
       const cleaned = v.filter(n => !LEGACY_DEFAULT_NAMES.includes(n));
       try {
@@ -14264,6 +14278,7 @@ input, select { padding: 10px 14px; }
         whiteSpace: "nowrap"
       }
     }, sub));
+    const needOnboard = !booting && !obDone && !myName && presetNames.length === 0;
     const intro = booting;
     const reveal = i => intro ? {
       opacity: 0,
@@ -14450,7 +14465,88 @@ input, select { padding: 10px 14px; }
         animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
         opacity: intro ? undefined : 0.9
       }
-    }, "卓の真ん中に置いて使えます")), suspendedGame && React.createElement("div", {
+    }, "卓の真ん中に置いて使えます")), needOnboard ? React.createElement("div", {
+      style: {
+        ...card,
+        padding: 20,
+        marginBottom: 0,
+        ...reveal(1)
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 17,
+        fontWeight: 900,
+        color: t.tx,
+        marginBottom: 7,
+        lineHeight: 1.5
+      }
+    }, "はじめまして"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 14
+      }
+    }, ["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される名前に使います。", "あとで変えられます。"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("input", {
+      value: obNameInput,
+      onChange: e => {
+        setObNameInput(e.target.value);
+        setObErr("");
+      },
+      maxLength: 10,
+      placeholder: "例）つとむ",
+      style: {
+        width: "100%",
+        padding: "13px 12px",
+        borderRadius: 10,
+        marginBottom: obErr ? 8 : 14,
+        border: `1px solid ${obErr ? t.rd : t.bd}`,
+        background: t.sf,
+        color: t.tx,
+        fontSize: 16,
+        boxSizing: "border-box"
+      }
+    }), obErr && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.rd,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginBottom: 12
+      }
+    }, obErr), React.createElement("button", {
+      style: {
+        ...actionBtn("p"),
+        marginBottom: 0
+      },
+      onClick: () => {
+        const nm = obNameInput.trim();
+        if (!nm) {
+          setObErr("名前を入れてください");
+          return;
+        }
+        finishOnboard(nm);
+      }
+    }, "この名前ではじめる"), React.createElement("button", {
+      style: {
+        width: "100%",
+        marginTop: 10,
+        padding: "11px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+        background: "transparent",
+        color: t.dm,
+        fontSize: 13,
+        fontWeight: 700
+      },
+      onClick: () => finishOnboard("")
+    }, "あとで")) : React.createElement(React.Fragment, null, suspendedGame && React.createElement("div", {
       style: {
         display: "flex",
         gap: 8,
@@ -14651,7 +14747,7 @@ input, select { padding: 10px 14px; }
         color: t.dm,
         fontSize: 14
       }
-    }, "✕")));
+    }, "✕"))));
   };
   const renderHome = () => {
     const menuItem = (icon, label, sub, onClick, highlight) => React.createElement("button", {
@@ -25017,6 +25113,18 @@ input, select { padding: 10px 14px; }
       return "";
     }
   });
+  const finishOnboard = nm => {
+    setObDone(true);
+    try {
+      localStorage.setItem("mj_onboard", "1");
+    } catch {}
+    if (!nm) return;
+    setMyName(nm);
+    try {
+      localStorage.setItem("mj_my_name", nm);
+    } catch {}
+    if (!presetNames.includes(nm)) savePresetNames([nm, ...presetNames]);
+  };
   const [friendsMap, setFriendsMap] = useState({});
   const [inboxItems, setInboxItems] = useState(null);
   const [frBusy, setFrBusy] = useState(false);
@@ -25210,6 +25318,7 @@ input, select { padding: 10px 14px; }
   };
   React.useEffect(() => {
     if (view === "friends" && myCode) refreshFriends();
+    if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (view !== "friends") {
       setFrError(null);
       setFrNotice(null);

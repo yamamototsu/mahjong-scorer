@@ -5827,6 +5827,15 @@ input, select { padding: 10px 14px; }
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false); // 卓上モードの流局入力
   const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル（"flip" で180度回転）
+  // ── はじめて開いたとき、名前を1つだけ聞く ──
+  // 名簿（対局のメンバー）と、友達に表示される名前の両方に使う
+  const [obNameInput, setObNameInput] = useState("");
+  const [obErr, setObErr] = useState("");
+  const [obDone, setObDone] = useState(() => {
+    // 読めない環境では聞かない（何度も出るより、出ないほうがまし）
+    try { return localStorage.getItem("mj_onboard") === "1"; } catch { return true; }
+  });
+
   // ── 配布まわり（ホーム画面に追加の案内 / 友達に教える）──
   const [showInstall, setShowInstall] = useState(false);     // 追加のしかたの説明
   const [installTipOff, setInstallTipOff] = useState(() => {
@@ -5951,7 +5960,12 @@ input, select { padding: 10px 14px; }
   const [presetNames, setPresetNames] = useState(() => {
     try {
       const v = JSON.parse(localStorage.getItem("mj_preset_names") || "null");
-      if (!Array.isArray(v)) return [];
+      if (!Array.isArray(v)) {
+        // まだ名簿がない端末には、消すべき昔の初期値もない。ここで掃除済みにして
+        // おかないと、あとから登録した名前が昔の初期値と同じだったときに消える
+        try { localStorage.setItem("mj_preset_cleaned", "1"); } catch {}
+        return [];
+      }
       // 昔の初期値（つとむ・ひろこ・はじめ・こころ）を一度だけ取り除く。
       // 掃除は1回きりにして、自分で登録し直した名前は消さない
       if (localStorage.getItem("mj_preset_cleaned") === "1") return v;
@@ -7668,6 +7682,8 @@ input, select { padding: 10px 14px; }
         <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
+    // はじめて開いたときだけ名前を聞く。すでに記録がある人には出さない
+    const needOnboard = !booting && !obDone && !myName && presetNames.length === 0;
     // 起動直後はタイトルだけを見せる。演出が終わったらメニューを順に出す。
     // 中身は常に置いたまま透明にするので、メニューが出るときに位置が飛ばない。
     const intro = booting;
@@ -7795,6 +7811,42 @@ input, select { padding: 10px 14px; }
           }}>卓の真ん中に置いて使えます</div>
         </div>
 
+        {/* はじめて開いたときだけ、名前を1つ聞く。演出が終わってから出す。
+            聞くのは1回きりで、「あとで」を押せば以後は出さない */}
+        {needOnboard ? (
+          <div style={{ ...card, padding: 20, marginBottom: 0, ...reveal(1) }}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: t.tx, marginBottom: 7, lineHeight: 1.5 }}>はじめまして</div>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 14 }}>
+              {["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される名前に使います。", "あとで変えられます。"].map((x, k) => (
+                <span key={k} style={{ display: "inline-block" }}>{x}</span>
+              ))}
+            </div>
+            <input
+              value={obNameInput}
+              onChange={(e) => { setObNameInput(e.target.value); setObErr(""); }}
+              maxLength={10}
+              placeholder="例）つとむ"
+              style={{
+                width: "100%", padding: "13px 12px", borderRadius: 10, marginBottom: obErr ? 8 : 14,
+                border: `1px solid ${obErr ? t.rd : t.bd}`, background: t.sf, color: t.tx,
+                fontSize: 16, boxSizing: "border-box",
+              }}
+            />
+            {obErr && (
+              <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, lineHeight: 1.8, marginBottom: 12 }}>{obErr}</div>
+            )}
+            <button style={{ ...actionBtn("p"), marginBottom: 0 }} onClick={() => {
+              const nm = obNameInput.trim();
+              if (!nm) { setObErr("名前を入れてください"); return; }
+              finishOnboard(nm);
+            }}>この名前ではじめる</button>
+            <button style={{
+              width: "100%", marginTop: 10, padding: "11px 8px", borderRadius: 10, cursor: "pointer",
+              border: "none", background: "transparent", color: t.dm, fontSize: 13, fontWeight: 700,
+            }} onClick={() => finishOnboard("")}>あとで</button>
+          </div>
+        ) : (<>
+
         {/* 続きのある対局（保留した・途中でアプリが閉じた）があれば最優先で出す */}
         {suspendedGame && (
           <div style={{ display: "flex", gap: 8, marginBottom: 10, ...reveal(0) }}>
@@ -7875,6 +7927,7 @@ input, select { padding: 10px 14px; }
             }}>✕</button>
           </div>
         )}
+        </>)}
 
       </div>
     );
@@ -13433,6 +13486,16 @@ input, select { padding: 10px 14px; }
   // FIREBASE_CONFIG が null の間は入口ごと非表示になる（Net.enabled()）
   const [myName, setMyName] = useState(() => { try { return localStorage.getItem("mj_my_name") || ""; } catch { return ""; } });
   const [myCode, setMyCode] = useState(() => { try { return localStorage.getItem("mj_my_code") || ""; } catch { return ""; } });
+  // はじめの名前を決める（空なら「あとで」＝聞くのをやめるだけ）
+  const finishOnboard = (nm) => {
+    setObDone(true);
+    try { localStorage.setItem("mj_onboard", "1"); } catch {}
+    if (!nm) return;
+    setMyName(nm);
+    try { localStorage.setItem("mj_my_name", nm); } catch {}
+    // 名簿の先頭に入れておくと、メンバー決定ですぐ選べる
+    if (!presetNames.includes(nm)) savePresetNames([nm, ...presetNames]);
+  };
   const [friendsMap, setFriendsMap] = useState({});      // { uid: { name, addedAt } }
   const [inboxItems, setInboxItems] = useState(null);    // 受信箱。null=まだ読んでいない
   const [frBusy, setFrBusy] = useState(false);
@@ -13561,6 +13624,8 @@ input, select { padding: 10px 14px; }
   // 友達画面を開いたら受信箱を自動で読み直す。離れたら通知類を消す
   React.useEffect(() => {
     if (view === "friends" && myCode) refreshFriends();
+    // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
+    if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (view !== "friends") { setFrError(null); setFrNotice(null); setFrEditingName(false); }
   }, [view]);
 
