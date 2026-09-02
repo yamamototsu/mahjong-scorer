@@ -5163,8 +5163,11 @@ input, select { padding: 10px 14px; }
         return;
       }
       const arr = [...presetNames];
+      const before = arr[editNameIdx];
       arr[editNameIdx] = v;
       savePresetNames(arr);
+      // 自分の行を書き換えたときは、友達に表示される名前も一緒に変える
+      if (before && before === myName) applyMyName(v);
       setEditNameIdx(null); setEditErr("");
     };
     return (
@@ -5282,7 +5285,20 @@ input, select { padding: 10px 14px; }
               ) : (
                 <>
                   <span style={{ flexShrink: 0, color: t.dm, fontSize: 20, lineHeight: 1.2, padding: "0 4px", touchAction: "none", cursor: "grab" }}>≡</span>
-                  <span style={{ flex: 1, fontSize: 16, fontWeight: 600, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n}</span>
+                  <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{
+                      minWidth: 0, fontSize: 16, fontWeight: 600, color: t.tx,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>{n}</span>
+                    {/* どれが自分か分かるようにする */}
+                    {n === myName && (
+                      <span style={{
+                        flexShrink: 0, fontSize: 10, fontWeight: 800, color: t.gd,
+                        background: t.gdS, border: `1px solid ${t.gd}66`,
+                        borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap",
+                      }}>あなた</span>
+                    )}
+                  </span>
                   <button onClick={() => { setEditNameIdx(i); setEditNameVal(n); setEditErr(""); }} style={{
                     padding: "7px 12px", borderRadius: 8, border: `1px solid ${t.bd}`,
                     background: "transparent", color: t.dm, fontSize: 12, cursor: "pointer",
@@ -8048,6 +8064,63 @@ input, select { padding: 10px 14px; }
         {homeCat === "members" && (
           <>
             {/* 名前・グループ・友達をここにまとめた（設定からは外してある） */}
+            {/* いちばん上に自分。名簿のどれが自分かが分かるようにする */}
+            <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{
+                  fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.gdS,
+                  border: `1px solid ${t.gd}55`, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>🙋</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: t.dm }}>あなたの名前</div>
+                  <div style={{
+                    fontSize: 16, fontWeight: 800, color: myName ? t.tx : t.dm, lineHeight: 1.5,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{myName || "まだ決めていません"}</div>
+                </div>
+                {!myEditing && (
+                  <button onClick={() => { setMyEditing(true); setMyNameInput(myName); setMyErr(""); }} style={{
+                    flexShrink: 0, minHeight: 36, padding: "8px 12px", borderRadius: 9, cursor: "pointer",
+                    border: `1px solid ${t.bd}`, background: t.sf, color: t.dm,
+                    fontSize: 12, fontWeight: 700, whiteSpace: "nowrap",
+                  }}>{myName ? "変える" : "決める"}</button>
+                )}
+              </div>
+              {myEditing && (
+                <div style={{ marginTop: 12 }}>
+                  <input
+                    value={myNameInput} autoFocus maxLength={10}
+                    onChange={(e) => { setMyNameInput(e.target.value); setMyErr(""); }}
+                    placeholder="例）つとむ"
+                    style={{
+                      width: "100%", padding: "12px", borderRadius: 10, marginBottom: myErr ? 7 : 10,
+                      border: `1px solid ${myErr ? t.rd : t.bd}`, background: t.sf, color: t.tx,
+                      fontSize: 16, boxSizing: "border-box",
+                    }} />
+                  {myErr && <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, lineHeight: 1.8, marginBottom: 10 }}>{myErr}</div>}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => {
+                      const nm = myNameInput.trim();
+                      if (!nm) { setMyErr("名前を入れてください"); return; }
+                      // 名簿にいる別の人と同じ名前にはできない
+                      if (presetNames.some(x => x === nm && x !== myName)) { setMyErr(`「${nm}」はすでに登録されています`); return; }
+                      applyMyName(nm); setMyEditing(false);
+                    }} style={{ ...actionBtn("p"), marginBottom: 0, flex: 1, fontSize: 14, padding: "12px 6px" }}>保存</button>
+                    <button onClick={() => { setMyEditing(false); setMyErr(""); }} style={{
+                      flex: "0 0 92px", borderRadius: 12, cursor: "pointer", minHeight: 44,
+                      border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 13, fontWeight: 700,
+                    }}>やめる</button>
+                  </div>
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
+                {myName
+                  ? "名簿では「あなた」の印が付きます。友達に表示される名前もこれになります。"
+                  : "決めておくと、名簿に「あなた」の印が付き、友達に登録するときもそのまま使えます。"}
+              </div>
+            </div>
+
             {menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
               setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
             })}
@@ -13491,6 +13564,31 @@ input, select { padding: 10px 14px; }
   // FIREBASE_CONFIG が null の間は入口ごと非表示になる（Net.enabled()）
   const [myName, setMyName] = useState(() => { try { return localStorage.getItem("mj_my_name") || ""; } catch { return ""; } });
   const [myCode, setMyCode] = useState(() => { try { return localStorage.getItem("mj_my_code") || ""; } catch { return ""; } });
+  const [myEditing, setMyEditing] = useState(false);   // メンバー画面で自分の名前を書き換え中
+  const [myNameInput, setMyNameInput] = useState("");
+  const [myErr, setMyErr] = useState("");
+  // 自分の名前を決め直す。名簿・友達に表示される名前・サーバの3つをそろえる
+  const applyMyName = (nm) => {
+    const before = myName;
+    setMyName(nm);
+    try { localStorage.setItem("mj_my_name", nm); } catch {}
+    // 名簿にも自分を置いておく（同じ名前が2つ並ばないようにする）
+    savePresetNames(
+      presetNames.includes(before)
+        ? presetNames.map(x => (x === before ? nm : x)).filter((x, i, a) => a.indexOf(x) === i)
+        : (presetNames.includes(nm) ? presetNames : [nm, ...presetNames])
+    );
+    // 友達に登録済みなら、向こうに見えている名前も直しておく
+    if (Net.enabled() && myCode) {
+      (async () => {
+        try {
+          const { uid } = await Net.ensureReady();
+          await Net.update("users/" + uid, { name: nm });
+        } catch { setFrError("友達に表示される名前だけ、まだ変えられていません。電波のよいところで友達画面を開いてください"); }
+      })();
+    }
+  };
+
   // はじめの名前を決める（空なら「あとで」＝聞くのをやめるだけ）
   const finishOnboard = (nm) => {
     setObDone(true);
