@@ -5883,20 +5883,28 @@ input, select { padding: 10px 14px; }
   };
 
   // アプリのことを友達に教える。共有シート → だめならコピー → だめならURLを出す
-  const shareApp = async () => {
-    const url = SHARE_URL();
-    setShareFallback(null);
+  // 共有シート → だめならコピー → それも駄目ならURLを画面に出す、の3段構え。
+  // パソコンのブラウザなどでは共有シートが出ないので、下2つを省かない
+  const shareLink = async (title, text, url) => {
+    setShareFallback(null); setShareMsg(null);
     if (navigator.share) {
-      try { await navigator.share({ title: SHARE_TITLE, text: SHARE_TEXT, url }); return; }
+      try { await navigator.share({ title, text, url }); return; }
       // 送るのをやめただけのときは、なにも出さずに終わる
       catch (e) { if (e && e.name === "AbortError") return; }
     }
     try {
-      await navigator.clipboard.writeText(SHARE_TEXT + "\n" + url);
+      await navigator.clipboard.writeText(text + "\n" + url);
       setShareMsg("リンクをコピーしました。LINEなどに貼って送ってください");
       setTimeout(() => setShareMsg(null), 4000);
     } catch { setShareFallback(url); }
   };
+  const shareApp = () => shareLink(SHARE_TITLE, SHARE_TEXT, SHARE_URL());
+  // 友達リンク。リンクを踏めない相手のために、文面にもコードを入れておく
+  const shareMyCode = () => shareLink(
+    "卓上ポンづけ｜友達コード",
+    `卓上ポンづけで友達になりましょう。このリンクを開くと、友達コード（${myCode}）が入った状態で開きます。`,
+    FRIEND_LINK(myCode),
+  );
 
   const [tmMenu, setTmMenu] = useState(false);               // 卓上の📋メニュー（"flip" で180度回転）
   const [seatRot, setSeatRot] = useState(0); // 卓の回転（0-3）自分を手前に持ってくる
@@ -13730,6 +13738,8 @@ input, select { padding: 10px 14px; }
     // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (view !== "friends") { setFrError(null); setFrNotice(null); setFrEditingName(false); }
+    // 共有のあとの一言は、画面を移ったら持ち越さない（前の画面の分が残って見える）
+    setShareMsg(null); setShareFallback(null);
   }, [view]);
 
   // 友達リンク（?fr=コード）で開かれたら、コード入力済みの友達画面から始める
@@ -13812,8 +13822,31 @@ input, select { padding: 10px 14px; }
                   dangerouslySetInnerHTML={{ __html: myQR }} />
               </div>
             )}
-            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8 }}>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
               このコードを友達のアプリで入力（またはQRを読み取り）してもらうと、お互いの友達リストに入ります。
+            </div>
+            {/* 対面でないときは、リンクにして送る。QRとコードは対面用にそのまま残す */}
+            <button disabled={!myCode} onClick={shareMyCode} style={{
+              width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+              border: `1px solid ${t.ac}`, background: t.acS, color: t.ac,
+              fontSize: 14, fontWeight: 800, opacity: myCode ? 1 : 0.45,
+            }}>📤 友達リンクを送る</button>
+            {shareMsg && (
+              <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {shareMsg}</div>
+            )}
+            {shareFallback && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
+                  {"この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"}
+                </div>
+                <div style={{
+                  fontSize: 12, color: t.ac, background: t.sf, borderRadius: 8, padding: "10px 12px",
+                  wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
+                }}>{shareFallback}</div>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
+              {"このリンクを開いた人は誰でも友達になれます。知らない人に見えるところには貼らないでください。"}
             </div>
           </div>
 
