@@ -30,7 +30,15 @@ input,select{font-family:inherit}
 <script>
 const { useState, useCallback, useMemo } = React;
 
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCaYIM8OoXb0D8un-JOJhUOsBRlE8YsALE",
+  authDomain: "ponzuke-7a90d.firebaseapp.com",
+  databaseURL: "https://ponzuke-7a90d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ponzuke-7a90d",
+  storageBucket: "ponzuke-7a90d.firebasestorage.app",
+  messagingSenderId: "657487813817",
+  appId: "1:657487813817:web:10f909f679710db8f44f68"
+};
 const Net = (() => {
   let readyPromise = null;
   const loadScript = srcUrl => new Promise((ok, ng) => {

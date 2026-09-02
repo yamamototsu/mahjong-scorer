@@ -6,12 +6,18 @@ import React, { useState, useCallback, useMemo } from "react";
 // Firebase コンソールで作ったプロジェクトの設定をここに貼ると「友達」機能が有効になる。
 // null の間は友達機能がボタンごと非表示になり、ほかの機能には一切影響しない。
 // プロジェクトの作り方とセキュリティルールは dev/ONLINE_SETUP.md を参照。
-const FIREBASE_CONFIG = null;
-// 例）const FIREBASE_CONFIG = {
-//   apiKey: "AIza...", authDomain: "xxxx.firebaseapp.com",
-//   databaseURL: "https://xxxx-default-rtdb.asia-southeast1.firebasedatabase.app",
-//   projectId: "xxxx", appId: "1:1234:web:abcd",
-// };
+// この値は公開される前提のもの（どの端末にも配られる）。データの守りは
+// Realtime Database のセキュリティルールが担う。ルールは dev/ONLINE_SETUP.md 参照。
+// 止めたいときは null に戻せば、友達機能だけが画面から消える。
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCaYIM8OoXb0D8un-JOJhUOsBRlE8YsALE",
+  authDomain: "ponzuke-7a90d.firebaseapp.com",
+  databaseURL: "https://ponzuke-7a90d-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ponzuke-7a90d",
+  storageBucket: "ponzuke-7a90d.firebasestorage.app",
+  messagingSenderId: "657487813817",
+  appId: "1:657487813817:web:10f909f679710db8f44f68",
+};
 
 // オンライン入出力はすべてこの Net 経由で行う（テストでは window.__MJ_TEST_NET に差し替える）。
 // Firebase SDK は友達機能を最初に使う瞬間に読み込む（起動時のアプリは重くしない）
