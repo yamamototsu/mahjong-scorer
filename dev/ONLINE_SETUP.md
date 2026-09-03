@@ -92,6 +92,48 @@ const FIREBASE_CONFIG = {
 }
 ```
 
+**クラウド保存（復元キー）を使うときは、上のJSONの `"rules"` の中に次の2つを足す。**
+足さないと、アプリが「サーバのルールが古いようです」と出して先へ進めない。
+
+```json
+"keys": {
+  "$k": {
+    ".read":  "auth != null",
+    ".write": "auth != null && !data.exists()",
+    ".validate": "newData.hasChildren(['box','createdAt'])",
+    "box":       { ".validate": "newData.isString() && newData.val().length === 24" },
+    "createdAt": { ".validate": "newData.isNumber()" },
+    "$other":    { ".validate": false }
+  }
+},
+"box": {
+  "$box": {
+    "owners": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && newData.val() === true"
+      }
+    },
+    "games": {
+      ".read":  "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()",
+      "$gid": {
+        ".write": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()"
+      }
+    },
+    "meta": {
+      ".read":  "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()",
+      ".write": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()"
+    }
+  }
+}
+```
+
+クラウド保存のルールの意味:
+- `keys` は親を読めないので**一覧が取れない**。復元キーを知っている人だけが1件を引ける
+- `!data.exists()` により、**すでにあるキーの行き先は書き換えられない**
+- 箱の中身は、**持ち主として登録された端末しか読み書きできない**
+- キーそのものはサーバに置かない。置くのは SHA-256 の16進だけ
+
 ルールの意味:
 - 自分のプロフィール・友達リスト・受信箱は本人しか書けない／受信箱と友達リストは本人しか読めない
 - 友達コード（codes）は「空きコードを自分のuidで1回だけ確保」しかできない

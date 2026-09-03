@@ -60,6 +60,42 @@ const genFriendCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floo
 const FRIEND_LINK = (code) => location.origin + location.pathname + "?fr=" + code;
 
 // ══════════════════════════════════
+// ── クラウド保存の復元キー ──
+// ══════════════════════════════════
+// 見まちがえにくい29字種から24文字。友達コードの6文字では総当たりされるので、
+// 秘密として使うものは桁を増やす（29^24 ≒ 1.1×10^35）
+const randChars = (n, secret) => {
+  try {
+    const buf = new Uint32Array(n);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, v => CODE_CHARS[v % CODE_CHARS.length]).join("");
+  } catch (e) {
+    // 秘密に使う値は、確かな乱数が無いなら作らない（Math.random は予測できる）
+    if (secret) throw e;
+    return Array.from({ length: n }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
+  }
+};
+const RESTORE_KEY_LEN = 24;
+const genRestoreKey = () => randChars(RESTORE_KEY_LEN, true);
+// 表示は4文字ずつ区切る。照合するときは区切りを取り除く
+const KEY_VIEW = (k) => (k || "").replace(/(.{4})(?=.)/g, "$1-");
+const KEY_NORM = (v) => (v || "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+// サーバにはキーそのものではなく、この値を置く
+const sha256Hex = async (str) => {
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(h), b => b.toString(16).padStart(2, "0")).join("");
+};
+// 古いブラウザや安全でない場所ではキーを作れない。その旨を出して使わせない
+const cryptoOK = () => { try { return !!(window.crypto && crypto.getRandomValues && crypto.subtle); } catch { return false; } };
+// 対局のID。2台で同じミリ秒に終局しても重ならないよう、うしろに短いランダムを足す
+const newGameId = () => Date.now() + "-" + randChars(4, false);
+// 並べ替えに使う時刻。IDは "1756800000000-K7QM" の形なので、前の数字だけを見る
+const gameOrder = (g) => {
+  const n = parseInt(String(g && g.id != null ? g.id : ""), 10);
+  return Number.isFinite(n) ? n : (g && g.endedAt) || 0;
+};
+
+// ══════════════════════════════════
 // ── 配布のしかた ──
 // ══════════════════════════════════
 // "web"    … URLを開いて使ってもらう（いま）。「ホーム画面に追加」を案内する
@@ -382,7 +418,7 @@ export default function MahjongScorer() {
     const fresh = (incoming || []).filter(g => g && g.id && !existingIds.has(g.id));
     if (fresh.length > 0) {
       const merged = [...gameHistory, ...fresh];
-      merged.sort((a, b) => (a.id || 0) - (b.id || 0));
+      merged.sort((a, b) => gameOrder(a) - gameOrder(b));
       setGameHistory(merged);
     }
     return fresh.length;
@@ -5885,18 +5921,19 @@ input, select { padding: 10px 14px; }
   // アプリのことを友達に教える。共有シート → だめならコピー → だめならURLを出す
   // 共有シート → だめならコピー → それも駄目ならURLを画面に出す、の3段構え。
   // パソコンのブラウザなどでは共有シートが出ないので、下2つを省かない
-  const shareLink = async (title, text, url) => {
+  const shareLink = async (title, text, url, opt = {}) => {
     setShareFallback(null); setShareMsg(null);
     if (navigator.share) {
-      try { await navigator.share({ title, text, url }); return; }
+      try { await navigator.share({ title, text, url }); return "shared"; }
       // 送るのをやめただけのときは、なにも出さずに終わる
-      catch (e) { if (e && e.name === "AbortError") return; }
+      catch (e) { if (e && e.name === "AbortError") return "aborted"; }
     }
     try {
       await navigator.clipboard.writeText(text + "\n" + url);
-      setShareMsg("リンクをコピーしました。LINEなどに貼って送ってください");
+      setShareMsg(opt.copied || "リンクをコピーしました。LINEなどに貼って送ってください");
       setTimeout(() => setShareMsg(null), 4000);
-    } catch { setShareFallback(url); }
+      return "copied";
+    } catch { setShareFallback(opt.fallback || url); return "failed"; }
   };
   const shareApp = () => shareLink(SHARE_TITLE, SHARE_TEXT, SHARE_URL());
   // 友達リンク。リンクを踏めない相手のために、文面にもコードを入れておく
@@ -13152,8 +13189,8 @@ input, select { padding: 10px 14px; }
     // 履歴（リーグ対局なら成績表にも）への記録。「終了」と「再試合」で共通
     const recordGame = () => {
       if (rounds.length > 0) {
-        setGameHistory(prev => [...prev, {
-          id: Date.now(),
+        const rec = {
+          id: newGameId(),
           date: gameConfig?.date || "",
           matchType: gameConfig?.matchType || "",
           // 三麻では players に使っていない4人目の名前が残っているため、対局人数で切る
@@ -13166,7 +13203,16 @@ input, select { padding: 10px 14px; }
           leagueId: activeLeagueId || null,
           startedAt: gameConfig?.startedAt || null,
           endedAt: Date.now(),
-        }]);
+        };
+        setGameHistory(prev => [...prev, rec]);
+        // クラウド保存を使っているなら送る。先に未送信として控えるので、
+        // 圏外でも消えず、次に同期したときにまとめて上がる
+        if (cloudBox) {
+          saveCloudQueue(prev => (prev.includes(rec.id) ? prev : [...prev, rec.id]));
+          cloudPush([rec]).then(failed => {
+            if (failed.length === 0) saveCloudQueue(prev => prev.filter(x => x !== rec.id));
+          }).catch(() => {});
+        }
       }
       const lg = leagues.find(l => l.id === activeLeagueId);
       if (lg && rounds.length > 0) {
@@ -13731,11 +13777,179 @@ input, select { padding: 10px 14px; }
     setFrNotice(added > 0 ? added + "件を履歴に取り込みました" : "すでに取り込み済みの対局でした");
   };
 
+  // ══════════════════════════════════
+  // ── クラウド保存（復元キーで機種変更に対応）──
+  // ══════════════════════════════════
+  // 端末の保存が主で、クラウドは同期先。圏外でも今までどおり全部動く。
+  // 持ち主を uid ではなくキー側に置くので、端末が変わっても同じ箱に戻れる
+  const LS = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
+  const [cloudKey, setCloudKey] = useState(() => LS("mj_cloud_key"));
+  const [cloudBox, setCloudBox] = useState(() => LS("mj_cloud_box"));
+  const [cloudQueue, setCloudQueue] = useState(() => {
+    try { const v = JSON.parse(LS("mj_cloud_queue") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+  });
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState(null);        // { ok, text }
+  const [cloudShowKey, setCloudShowKey] = useState(false);
+  const [cloudRestoring, setCloudRestoring] = useState(false);
+  const [cloudKeyInput, setCloudKeyInput] = useState("");
+  const cloudSyncing = React.useRef(false);              // 二重に走らせない
+
+  const saveCloudQueue = (next) => {
+    setCloudQueue(prev => {
+      const ids = typeof next === "function" ? next(prev) : next;
+      try { localStorage.setItem("mj_cloud_queue", JSON.stringify(ids)); } catch {}
+      return ids;
+    });
+  };
+  const saveCloudId = (key, box) => {
+    setCloudKey(key); setCloudBox(box);
+    try {
+      localStorage.setItem("mj_cloud_key", key);
+      localStorage.setItem("mj_cloud_box", box);
+    } catch {}
+  };
+  // ルールを貼り替えていないと必ずここに来るので、原因が分かる言葉にする
+  const cloudErrText = (e) => {
+    const m = String((e && e.message) || e || "");
+    if (/PERMISSION_DENIED|permission_denied/i.test(m)) {
+      return "サーバのルールが古いようです。Firebaseの「ルール」を貼り替えてください（dev/ONLINE_SETUP.md）";
+    }
+    return "通信できませんでした。電波を確認してもう一度お試しください。";
+  };
+
+  // 対局をクラウドへ書く。書けなかったものは未送信として控えておく
+  const cloudPush = async (games) => {
+    if (!cloudBox || games.length === 0) return [];
+    const failed = [];
+    for (const g of games) {
+      try {
+        // undefined は書けないので、いったんJSONに通して落とす
+        await Net.set(`box/${cloudBox}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
+      } catch { failed.push(g.id); }
+    }
+    if (failed.length < games.length) {
+      try { await Net.update(`box/${cloudBox}/meta`, { updatedAt: Date.now() }); } catch {}
+    }
+    return failed;
+  };
+
+  // 送る（未送信ぶん）と受け取る（ほかの端末が足したぶん）を1回で行う
+  const cloudSync = async (opts = {}) => {
+    if (!cloudBox || cloudSyncing.current) return;
+    cloudSyncing.current = true;
+    if (!opts.quiet) setCloudBusy(true);
+    try {
+      await Net.ensureReady();
+      // 送る
+      if (cloudQueue.length > 0) {
+        const pend = gameHistory.filter(g => cloudQueue.includes(g.id));
+        const failed = await cloudPush(pend);
+        // 履歴から消えているIDは、いつまでも残さない
+        saveCloudQueue(failed);
+      }
+      // 受け取る。更新が無ければ本体は取りに行かない
+      const meta = await Net.get(`box/${cloudBox}/meta`);
+      const seen = Number(LS("mj_cloud_pulled") || 0);
+      if (!meta || !meta.updatedAt || meta.updatedAt > seen || opts.force) {
+        const games = (await Net.get(`box/${cloudBox}/games`)) || {};
+        const added = mergeIntoHistory(Object.values(games));
+        try { localStorage.setItem("mj_cloud_pulled", String((meta && meta.updatedAt) || Date.now())); } catch {}
+        if (!opts.quiet) {
+          setCloudMsg({ ok: true, text: added > 0 ? `${added}件を受け取りました` : "同期しました" });
+        }
+      } else if (!opts.quiet) {
+        setCloudMsg({ ok: true, text: "同期しました" });
+      }
+    } catch (e) {
+      if (!opts.quiet) setCloudMsg({ ok: false, text: cloudErrText(e) });
+    }
+    if (!opts.quiet) setCloudBusy(false);
+    cloudSyncing.current = false;
+  };
+
+  // はじめて使うとき。キーと箱を作って、いまの履歴を全部あげる
+  const cloudStart = async () => {
+    if (!cryptoOK()) { setCloudMsg({ ok: false, text: "このブラウザではクラウド保存を使えません" }); return; }
+    setCloudBusy(true); setCloudMsg(null);
+    try {
+      const key = genRestoreKey();
+      const box = randChars(RESTORE_KEY_LEN, true);
+      const hash = await sha256Hex(key);
+      const { uid } = await Net.ensureReady();
+      // 先に持ち主として登録しないと、箱の中身を書けない
+      await Net.set(`box/${box}/owners/${uid}`, true);
+      await Net.set(`keys/${hash}`, { box, createdAt: Date.now() });
+      saveCloudId(key, box);
+      // この時点では cloudBox の state がまだ古いので、箱を直に指定して送る
+      const failed = [];
+      for (const g of gameHistory) {
+        try { await Net.set(`box/${box}/games/${g.id}`, JSON.parse(JSON.stringify(g))); }
+        catch { failed.push(g.id); }
+      }
+      await Net.set(`box/${box}/meta`, { updatedAt: Date.now() });
+      saveCloudQueue(failed);
+      try { localStorage.setItem("mj_cloud_pulled", String(Date.now())); } catch {}
+      setCloudShowKey(true);
+      setCloudMsg({ ok: true, text: `${gameHistory.length - failed.length}件を預けました。復元キーを控えてください` });
+    } catch (e) { setCloudMsg({ ok: false, text: cloudErrText(e) }); }
+    setCloudBusy(false);
+  };
+
+  // 別の端末から引き継ぐ。手元の記録は消さず、両方を合わせる
+  const cloudRestore = async () => {
+    if (!cryptoOK()) { setCloudMsg({ ok: false, text: "このブラウザではクラウド保存を使えません" }); return; }
+    const key = KEY_NORM(cloudKeyInput);
+    if (key.length !== RESTORE_KEY_LEN) {
+      setCloudMsg({ ok: false, text: `復元キーは${RESTORE_KEY_LEN}文字です（いまは${key.length}文字）` });
+      return;
+    }
+    setCloudBusy(true); setCloudMsg(null);
+    try {
+      const hash = await sha256Hex(key);
+      const rec = await Net.get(`keys/${hash}`);
+      if (!rec || !rec.box) {
+        setCloudMsg({ ok: false, text: "このキーの記録が見つかりませんでした。打ちまちがいがないか確かめてください" });
+        setCloudBusy(false); return;
+      }
+      const { uid } = await Net.ensureReady();
+      await Net.set(`box/${rec.box}/owners/${uid}`, true);
+      const games = (await Net.get(`box/${rec.box}/games`)) || {};
+      const added = mergeIntoHistory(Object.values(games));
+      saveCloudId(key, rec.box);
+      // 手元にしか無かった対局も、この箱へ入れておく
+      const cloudIds = Object.keys(games);
+      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
+      const failed = [];
+      for (const g of mine) {
+        try { await Net.set(`box/${rec.box}/games/${g.id}`, JSON.parse(JSON.stringify(g))); }
+        catch { failed.push(g.id); }
+      }
+      if (mine.length > 0) { try { await Net.update(`box/${rec.box}/meta`, { updatedAt: Date.now() }); } catch {} }
+      saveCloudQueue(failed);
+      try { localStorage.setItem("mj_cloud_pulled", String(Date.now())); } catch {}
+      setCloudRestoring(false); setCloudKeyInput("");
+      setCloudMsg({ ok: true, text: added > 0 ? `${added}件を引き継ぎました` : "引き継ぎました（新しく増えた対局はありません）" });
+    } catch (e) { setCloudMsg({ ok: false, text: cloudErrText(e) }); }
+    setCloudBusy(false);
+  };
+
+  // 復元キーを自分あてに送って控える
+  const shareRestoreKey = () => shareLink(
+    "卓上ポンづけ｜復元キー",
+    `卓上ポンづけの復元キーです。機種を変えたときにこれを入れると、対局の記録を引き継げます。人に見せないでください。\n${KEY_VIEW(cloudKey)}`,
+    SHARE_URL(),
+    // 送れなかったときは、URLではなくキーそのものを出す（控えるのが目的なので）
+    { fallback: KEY_VIEW(cloudKey), copied: "復元キーをコピーしました。無くさないところに貼って残してください" },
+  );
+
   // 受信箱は履歴画面に置いてあるので、そちらを開いたときにも読み直す。
   // 友達画面は友達リストのために読む。どちらでもないところへ移ったら通知類を消す
   const FR_VIEWS = ["friends", "history"];
   React.useEffect(() => {
     if (FR_VIEWS.includes(view) && myCode) refreshFriends();
+    // クラウド保存を使っているなら、履歴を開いたときに黙って同期する
+    if (view === "history" && cloudBox) cloudSync({ quiet: true });
     // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); }
@@ -14204,6 +14418,132 @@ input, select { padding: 10px 14px; }
           {/* バックアップは使う頻度が低いので、一覧の下に置く */}
           {!histSelMode && (
             <div style={{ marginTop: 14 }}>
+          {/* クラウド保存。端末の保存が主で、こちらは同期先 */}
+          {Net.enabled() && (
+            <div style={{ ...card, padding: 14, marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 700, color: t.dm, flex: 1, minWidth: 0,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                }}>☁️ クラウド保存</span>
+                {cloudBox && (
+                  <>
+                    <span style={{
+                      flexShrink: 0, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                      borderRadius: 999, padding: "3px 10px",
+                      color: cloudQueue.length > 0 ? t.gd : t.gn,
+                      background: cloudQueue.length > 0 ? t.gdS : t.gnS,
+                    }}>{cloudBusy ? "同期中…" : cloudQueue.length > 0 ? `未送信 ${cloudQueue.length}件` : "同期済み"}</span>
+                    <button aria-label="いま同期する" disabled={cloudBusy} onClick={() => cloudSync()} style={{
+                      flexShrink: 0, minHeight: 34, padding: "8px 11px", borderRadius: 8, cursor: "pointer",
+                      border: `1px solid ${t.bd}`, background: "transparent", color: t.ac,
+                      fontSize: 13, fontWeight: 700, opacity: cloudBusy ? 0.5 : 1,
+                    }}>🔄</button>
+                  </>
+                )}
+              </div>
+
+              {!cloudBox ? (
+                <>
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 10, lineHeight: 1.7 }}>
+                    {["対局の記録をクラウドにも預けます。", "復元キーを控えておけば、", "機種を変えても引き継げます。"].map((x, k) => (
+                      <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                    ))}
+                  </div>
+                  {!cloudRestoring ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button disabled={cloudBusy} onClick={cloudStart} style={{
+                        width: "100%", minHeight: 42, padding: "11px 8px", borderRadius: 10, cursor: "pointer",
+                        border: `1px solid ${t.ac}`, background: t.acS, color: t.ac,
+                        fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", opacity: cloudBusy ? 0.5 : 1,
+                      }}>{cloudBusy ? "準備中…" : "クラウド保存をはじめる"}</button>
+                      <button disabled={cloudBusy} onClick={() => { setCloudRestoring(true); setCloudMsg(null); }} style={{
+                        width: "100%", minHeight: 42, padding: "11px 8px", borderRadius: 10, cursor: "pointer",
+                        border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                        fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                      }}>別の端末から引き継ぐ</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.8 }}>
+                        {["前の端末で控えた", "復元キーを入れてください"].map((x, k) => (
+                          <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                        ))}
+                      </div>
+                      <input value={cloudKeyInput} autoFocus
+                        onChange={(e) => { setCloudKeyInput(e.target.value); setCloudMsg(null); }}
+                        placeholder="7QK4-M9XB-3HTP-RW6D-J8FN-5CVY"
+                        autoCapitalize="characters" autoCorrect="off" spellCheck="false"
+                        style={{
+                          width: "100%", padding: "12px", borderRadius: 10, marginBottom: 8, boxSizing: "border-box",
+                          border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                          fontSize: 15, fontFamily: "ui-monospace, monospace", letterSpacing: "0.04em",
+                        }} />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button disabled={cloudBusy} onClick={cloudRestore} style={{
+                          flex: 1, minWidth: 0, minHeight: 42, padding: "11px 6px", borderRadius: 10, cursor: "pointer",
+                          border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700,
+                          opacity: cloudBusy ? 0.5 : 1, whiteSpace: "nowrap",
+                        }}>{cloudBusy ? "確認中…" : "引き継ぐ"}</button>
+                        <button disabled={cloudBusy} onClick={() => { setCloudRestoring(false); setCloudKeyInput(""); setCloudMsg(null); }} style={{
+                          flex: "0 0 84px", minHeight: 42, borderRadius: 10, cursor: "pointer",
+                          border: `1px solid ${t.bd}`, background: "transparent", color: t.dm, fontSize: 13, fontWeight: 700,
+                        }}>やめる</button>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 6, lineHeight: 1.7 }}>復元キー</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    <div style={{
+                      flex: 1, minWidth: 0,
+                      fontFamily: "ui-monospace, monospace", fontSize: "clamp(11px, 3.2vw, 14px)", fontWeight: 700,
+                      letterSpacing: "0.04em", textAlign: "center", color: t.tx,
+                      background: t.sf, border: `1px solid ${t.bd}`, borderRadius: 8,
+                      padding: "11px 8px", overflowX: "auto", whiteSpace: "nowrap",
+                    }}>{cloudShowKey ? KEY_VIEW(cloudKey) : "•••• •••• •••• •••• •••• ••••"}</div>
+                    <button onClick={() => setCloudShowKey(v => !v)} style={{
+                      flex: "0 0 62px", minHeight: 40, borderRadius: 8, cursor: "pointer",
+                      border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                      fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                    }}>{cloudShowKey ? "隠す" : "見る"}</button>
+                  </div>
+                  <button onClick={shareRestoreKey} style={{
+                    width: "100%", minHeight: 42, padding: "11px 8px", borderRadius: 10, cursor: "pointer",
+                    border: `1px solid ${t.ac}`, background: t.acS, color: t.ac,
+                    fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", marginBottom: 8,
+                  }}>📤 キーを控える</button>
+                  <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.7, textWrap: "balance" }}>
+                    {"このキーが引き継ぎの唯一の手段です。人に見せず、無くさないところに控えてください。"}
+                  </div>
+                </>
+              )}
+
+              {shareMsg && (
+                <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>✓ {shareMsg}</div>
+              )}
+              {shareFallback && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
+                    {"この端末では自動で送れませんでした。下を長押ししてコピーし、無くさないところに控えてください。"}
+                  </div>
+                  <div style={{
+                    fontFamily: "ui-monospace, monospace", fontSize: 13, color: t.tx, background: t.sf,
+                    borderRadius: 8, padding: "10px 12px", wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
+                  }}>{shareFallback}</div>
+                </div>
+              )}
+              {cloudMsg && (
+                <div style={{
+                  marginTop: 10, padding: "9px 11px", borderRadius: 8, fontSize: 12, lineHeight: 1.8,
+                  background: cloudMsg.ok ? t.gnS : t.rdS, color: cloudMsg.ok ? t.gn : t.rd, textWrap: "balance",
+                }}>{cloudMsg.ok ? "✓ " : "✕ "}{cloudMsg.text}</div>
+              )}
+            </div>
+          )}
+
           {/* バックアップ操作 */}
           <div style={{ ...card, padding: 14, marginBottom: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 4 }}>データのバックアップ</div>
