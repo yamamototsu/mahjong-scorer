@@ -1,0 +1,92 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['name', 'code'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+        },
+        "code": {
+          ".validate": "newData.isString() && newData.val().length === 6"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "codes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
+      }
+    },
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$fid": {
+          ".write": "auth != null && (auth.uid === $uid || auth.uid === $fid)",
+          ".validate": "newData.hasChildren(['name', 'addedAt'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 20"
+          },
+          "addedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+    "inbox": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$item": {
+          ".write": "auth != null && ((newData.exists() && newData.child('from').val() === auth.uid) || (!newData.exists() && auth.uid === $uid))",
+          ".validate": "newData.hasChildren(['from', 'fromName', 'sentAt', 'game'])"
+        }
+      }
+    },
+    "keys": {
+      "$k": {
+        ".read": "auth != null",
+        ".write": "auth != null && !data.exists()",
+        ".validate": "newData.hasChildren(['box','createdAt'])",
+        "box": {
+          ".validate": "newData.isString() && newData.val().length === 24"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "box": {
+      "$box": {
+        "owners": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && newData.val() === true"
+          }
+        },
+        "games": {
+          ".read": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()",
+          "$gid": {
+            ".write": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()"
+          }
+        },
+        "meta": {
+          ".read": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()",
+          ".write": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()"
+        }
+      }
+    }
+  }
+}
