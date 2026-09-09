@@ -5879,6 +5879,34 @@ input, select { padding: 10px 14px; }
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false); // 卓上モードの流局入力
   const [showRoundEdit, setShowRoundEdit] = useState(false); // 局の修正モーダル（"flip" で180度回転）
+  // ── オフラインで開けるようにする（Service Worker）──
+  // 本体と絵をあらかじめ取っておくので、圏外でもアプリが立ち上がる。
+  // 新しい版が届いたら、押してもらってから切り替える（対局中に入れ替わらないように）
+  const [swWaiting, setSwWaiting] = useState(null);
+  React.useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    // https か localhost のときだけ。file:// では登録できない
+    const ok = location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
+    if (!ok) return;
+    let reloading = false;
+    const onChange = () => { if (!reloading) { reloading = true; location.reload(); } };
+    navigator.serviceWorker.addEventListener("controllerchange", onChange);
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      const watch = (w) => {
+        if (!w) return;
+        // すでに控えている版があるなら、それが「新しい版」
+        if (reg.waiting && navigator.serviceWorker.controller) setSwWaiting(reg.waiting);
+        w.addEventListener("statechange", () => {
+          if (w.state === "installed" && navigator.serviceWorker.controller) setSwWaiting(w);
+        });
+      };
+      if (reg.waiting && navigator.serviceWorker.controller) setSwWaiting(reg.waiting);
+      watch(reg.installing);
+      reg.addEventListener("updatefound", () => watch(reg.installing));
+    }).catch(() => {});
+    return () => navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+  }, []);
+
   // ── はじめて開いたとき、名前を1つだけ聞く ──
   // 名簿（対局のメンバー）と、友達に表示される名前の両方に使う
   const [obNameInput, setObNameInput] = useState("");
@@ -7969,6 +7997,26 @@ input, select { padding: 10px 14px; }
             setDraftRules({ ...defaultRules }); setRulesSaved(false); setView("home"); setHomeCat("settings");
           })}
         </div>
+
+        {/* 新しい版が届いたら知らせる。切り替えは押してもらってから
+            （対局の途中で入れ替わらないようにする） */}
+        {swWaiting && !intro && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginTop: 8,
+            padding: "10px 12px", borderRadius: 12,
+            border: `1px solid ${t.gd}66`, background: t.gdS, ...reveal(5),
+          }}>
+            <span style={{ fontSize: 15, lineHeight: 1, flexShrink: 0 }}>✨</span>
+            <span style={{ flex: 1, minWidth: 0, lineHeight: 1.5 }}>
+              <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: t.gd }}>新しい版が届いています</span>
+              <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 1 }}>押すと切り替わります</span>
+            </span>
+            <button onClick={() => { try { swWaiting.postMessage({ type: "SKIP_WAITING" }); } catch {} }} style={{
+              flexShrink: 0, minHeight: 36, padding: "8px 14px", borderRadius: 9, cursor: "pointer",
+              border: "none", background: t.gd, color: "#1a1a1a", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap",
+            }}>更新する</button>
+          </div>
+        )}
 
         {/* ブラウザのタブで開かれているときだけ、ホーム画面への追加をすすめる。
             アプリとして開かれていれば出ない（ストア配布に変えたときも自動で消える） */}

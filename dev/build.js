@@ -68,6 +68,22 @@ ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("roo
 
 fs.writeFileSync(path.join(repo, 'index.html'), html);
 
+// ── オフライン用（Service Worker）──
+// index.html の中身から版を作り、sw.js の VERSION と EXTRA を書き替える。
+// 版が変わると古い入れ物が捨てられ、新しい本体が取り直される
+const swPath = path.join(repo, 'sw.js');
+if (fs.existsSync(swPath)) {
+  const crypto = require('crypto');
+  const ver = crypto.createHash('sha256').update(html).digest('hex').slice(0, 12);
+  // 本体が外から読み込むもの（React など）も、いっしょに取っておかないと開けない
+  const extra = [...html.matchAll(/<script src="(https:\/\/[^"]+)"/g)].map(m => m[1]);
+  const sw = fs.readFileSync(swPath, 'utf8')
+    .replace(/^const VERSION = ".*";$/m, `const VERSION = "${ver}";`)
+    .replace(/^const EXTRA = .*;\s*\/\/ (.*)$/m,
+             `const EXTRA = ${JSON.stringify(extra)};   // $1`);
+  fs.writeFileSync(swPath, sw);
+}
+
 // ローカル検証用（CDN・Google Fontsに繋がない）
 const local = html
   .replace('https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
