@@ -25590,24 +25590,66 @@ input, select { padding: 10px 14px; }
     }
     return "通信できませんでした。電波を確認してもう一度お試しください。";
   };
-  const cloudPush = async games => {
-    if (!cloudBox || games.length === 0) return [];
-    const failed = [];
+  const cloudPush = async (games, boxId) => {
+    const box = boxId || cloudBox;
+    if (!box || games.length === 0) return [];
+    const failed = [],
+      done = [];
     for (const g of games) {
       try {
-        await Net.set(`box/${cloudBox}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
+        await Net.set(`box/${box}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
+        done.push(String(g.id));
       } catch {
         failed.push(g.id);
       }
     }
-    if (failed.length < games.length) {
+    if (done.length > 0) {
+      const now = Date.now();
       try {
-        await Net.update(`box/${cloudBox}/meta`, {
-          updatedAt: Date.now()
+        const ids = {};
+        done.forEach(id => {
+          ids[id] = 1;
         });
+        await Net.update(`box/${box}/meta/ids`, ids);
+        await Net.update(`box/${box}/meta`, {
+          updatedAt: now
+        });
+        try {
+          localStorage.setItem("mj_cloud_pulled", String(now));
+        } catch {}
       } catch {}
     }
     return failed;
+  };
+  const cloudPull = async (box, meta) => {
+    const have = new Set(gameHistory.map(g => String(g.id)));
+    if (!meta || !meta.ids) {
+      const games = (await Net.get(`box/${box}/games`)) || {};
+      const ids = {};
+      Object.keys(games).forEach(id => {
+        ids[id] = 1;
+      });
+      if (Object.keys(ids).length > 0) {
+        try {
+          await Net.update(`box/${box}/meta/ids`, ids);
+        } catch {}
+      }
+      return mergeIntoHistory(Object.values(games));
+    }
+    const missing = Object.keys(meta.ids).filter(id => !have.has(id));
+    if (missing.length === 0) return 0;
+    if (missing.length > 40) {
+      const games = (await Net.get(`box/${box}/games`)) || {};
+      return mergeIntoHistory(Object.values(games));
+    }
+    const got = [];
+    for (const id of missing) {
+      try {
+        const g = await Net.get(`box/${box}/games/${id}`);
+        if (g) got.push(g);
+      } catch {}
+    }
+    return mergeIntoHistory(got);
   };
   const cloudSync = async (opts = {}) => {
     if (!cloudBox || cloudSyncing.current) return;
@@ -25623,8 +25665,7 @@ input, select { padding: 10px 14px; }
       const meta = await Net.get(`box/${cloudBox}/meta`);
       const seen = Number(LS("mj_cloud_pulled") || 0);
       if (!meta || !meta.updatedAt || meta.updatedAt > seen || opts.force) {
-        const games = (await Net.get(`box/${cloudBox}/games`)) || {};
-        const added = mergeIntoHistory(Object.values(games));
+        const added = await cloudPull(cloudBox, meta);
         try {
           localStorage.setItem("mj_cloud_pulled", String(meta && meta.updatedAt || Date.now()));
         } catch {}
@@ -25672,21 +25713,16 @@ input, select { padding: 10px 14px; }
         createdAt: Date.now()
       });
       saveCloudId(key, box);
-      const failed = [];
-      for (const g of gameHistory) {
+      const failed = await cloudPush(gameHistory, box);
+      if (gameHistory.length === 0) {
+        await Net.set(`box/${box}/meta`, {
+          updatedAt: Date.now()
+        });
         try {
-          await Net.set(`box/${box}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
-        } catch {
-          failed.push(g.id);
-        }
+          localStorage.setItem("mj_cloud_pulled", String(Date.now()));
+        } catch {}
       }
-      await Net.set(`box/${box}/meta`, {
-        updatedAt: Date.now()
-      });
       saveCloudQueue(failed);
-      try {
-        localStorage.setItem("mj_cloud_pulled", String(Date.now()));
-      } catch {}
       setCloudShowKey(true);
       setCloudMsg({
         ok: true,
@@ -25737,22 +25773,17 @@ input, select { padding: 10px 14px; }
       const added = mergeIntoHistory(Object.values(games));
       saveCloudId(key, rec.box);
       const cloudIds = Object.keys(games);
-      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
-      const failed = [];
-      for (const g of mine) {
+      if (cloudIds.length > 0) {
+        const ids = {};
+        cloudIds.forEach(id => {
+          ids[id] = 1;
+        });
         try {
-          await Net.set(`box/${rec.box}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
-        } catch {
-          failed.push(g.id);
-        }
-      }
-      if (mine.length > 0) {
-        try {
-          await Net.update(`box/${rec.box}/meta`, {
-            updatedAt: Date.now()
-          });
+          await Net.update(`box/${rec.box}/meta/ids`, ids);
         } catch {}
       }
+      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
+      const failed = await cloudPush(mine, rec.box);
       saveCloudQueue(failed);
       try {
         localStorage.setItem("mj_cloud_pulled", String(Date.now()));

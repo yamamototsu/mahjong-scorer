@@ -13818,20 +13818,57 @@ input, select { padding: 10px 14px; }
     return "通信できませんでした。電波を確認してもう一度お試しください。";
   };
 
-  // 対局をクラウドへ書く。書けなかったものは未送信として控えておく
-  const cloudPush = async (games) => {
-    if (!cloudBox || games.length === 0) return [];
-    const failed = [];
+  // 対局をクラウドへ書く。書けなかったものは未送信として控えておく。
+  // meta には「どの対局が入っているか」の目次も置く。これがあると、
+  // 同期のたびに全部を読み直さずに、足りないものだけ取りに行ける
+  const cloudPush = async (games, boxId) => {
+    const box = boxId || cloudBox;
+    if (!box || games.length === 0) return [];
+    const failed = [], done = [];
     for (const g of games) {
       try {
         // undefined は書けないので、いったんJSONに通して落とす
-        await Net.set(`box/${cloudBox}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
+        await Net.set(`box/${box}/games/${g.id}`, JSON.parse(JSON.stringify(g)));
+        done.push(String(g.id));
       } catch { failed.push(g.id); }
     }
-    if (failed.length < games.length) {
-      try { await Net.update(`box/${cloudBox}/meta`, { updatedAt: Date.now() }); } catch {}
+    if (done.length > 0) {
+      const now = Date.now();
+      try {
+        const ids = {};
+        done.forEach(id => { ids[id] = 1; });
+        await Net.update(`box/${box}/meta/ids`, ids);
+        await Net.update(`box/${box}/meta`, { updatedAt: now });
+        // 自分で書いたぶんを、次の同期でまた読み直さないようにする
+        try { localStorage.setItem("mj_cloud_pulled", String(now)); } catch {}
+      } catch {}
     }
     return failed;
+  };
+
+  // クラウドから、手元に無い対局だけを取ってくる
+  const cloudPull = async (box, meta) => {
+    const have = new Set(gameHistory.map(g => String(g.id)));
+    // 目次がまだ無い箱（この仕組みより前に作ったもの）は、1回だけ丸ごと読んで目次を作る
+    if (!meta || !meta.ids) {
+      const games = (await Net.get(`box/${box}/games`)) || {};
+      const ids = {};
+      Object.keys(games).forEach(id => { ids[id] = 1; });
+      if (Object.keys(ids).length > 0) { try { await Net.update(`box/${box}/meta/ids`, ids); } catch {} }
+      return mergeIntoHistory(Object.values(games));
+    }
+    const missing = Object.keys(meta.ids).filter(id => !have.has(id));
+    if (missing.length === 0) return 0;
+    // たくさん足りないとき（引き継いだ直後など）は、1件ずつより丸ごとのほうが速い
+    if (missing.length > 40) {
+      const games = (await Net.get(`box/${box}/games`)) || {};
+      return mergeIntoHistory(Object.values(games));
+    }
+    const got = [];
+    for (const id of missing) {
+      try { const g = await Net.get(`box/${box}/games/${id}`); if (g) got.push(g); } catch {}
+    }
+    return mergeIntoHistory(got);
   };
 
   // 送る（未送信ぶん）と受け取る（ほかの端末が足したぶん）を1回で行う
@@ -13848,12 +13885,11 @@ input, select { padding: 10px 14px; }
         // 履歴から消えているIDは、いつまでも残さない
         saveCloudQueue(failed);
       }
-      // 受け取る。更新が無ければ本体は取りに行かない
+      // 受け取る。更新が無ければ何も取りに行かない
       const meta = await Net.get(`box/${cloudBox}/meta`);
       const seen = Number(LS("mj_cloud_pulled") || 0);
       if (!meta || !meta.updatedAt || meta.updatedAt > seen || opts.force) {
-        const games = (await Net.get(`box/${cloudBox}/games`)) || {};
-        const added = mergeIntoHistory(Object.values(games));
+        const added = await cloudPull(cloudBox, meta);
         try { localStorage.setItem("mj_cloud_pulled", String((meta && meta.updatedAt) || Date.now())); } catch {}
         if (!opts.quiet) {
           setCloudMsg({ ok: true, text: added > 0 ? `${added}件を受け取りました` : "同期しました" });
@@ -13882,14 +13918,12 @@ input, select { padding: 10px 14px; }
       await Net.set(`keys/${hash}`, { box, createdAt: Date.now() });
       saveCloudId(key, box);
       // この時点では cloudBox の state がまだ古いので、箱を直に指定して送る
-      const failed = [];
-      for (const g of gameHistory) {
-        try { await Net.set(`box/${box}/games/${g.id}`, JSON.parse(JSON.stringify(g))); }
-        catch { failed.push(g.id); }
+      const failed = await cloudPush(gameHistory, box);
+      if (gameHistory.length === 0) {
+        await Net.set(`box/${box}/meta`, { updatedAt: Date.now() });
+        try { localStorage.setItem("mj_cloud_pulled", String(Date.now())); } catch {}
       }
-      await Net.set(`box/${box}/meta`, { updatedAt: Date.now() });
       saveCloudQueue(failed);
-      try { localStorage.setItem("mj_cloud_pulled", String(Date.now())); } catch {}
       setCloudShowKey(true);
       setCloudMsg({ ok: true, text: `${gameHistory.length - failed.length}件を預けました。復元キーを控えてください` });
     } catch (e) { setCloudMsg({ ok: false, text: cloudErrText(e) }); }
@@ -13917,15 +13951,16 @@ input, select { padding: 10px 14px; }
       const games = (await Net.get(`box/${rec.box}/games`)) || {};
       const added = mergeIntoHistory(Object.values(games));
       saveCloudId(key, rec.box);
-      // 手元にしか無かった対局も、この箱へ入れておく
+      // 目次が無い箱なら、ここで作っておく
       const cloudIds = Object.keys(games);
-      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
-      const failed = [];
-      for (const g of mine) {
-        try { await Net.set(`box/${rec.box}/games/${g.id}`, JSON.parse(JSON.stringify(g))); }
-        catch { failed.push(g.id); }
+      if (cloudIds.length > 0) {
+        const ids = {};
+        cloudIds.forEach(id => { ids[id] = 1; });
+        try { await Net.update(`box/${rec.box}/meta/ids`, ids); } catch {}
       }
-      if (mine.length > 0) { try { await Net.update(`box/${rec.box}/meta`, { updatedAt: Date.now() }); } catch {} }
+      // 手元にしか無かった対局も、この箱へ入れておく
+      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
+      const failed = await cloudPush(mine, rec.box);
       saveCloudQueue(failed);
       try { localStorage.setItem("mj_cloud_pulled", String(Date.now())); } catch {}
       setCloudRestoring(false); setCloudKeyInput("");
