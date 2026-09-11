@@ -5218,8 +5218,13 @@ input, select { padding: 10px 14px; }
       <div style={body}>
         <div style={{ textAlign: "center", padding: "16px 0 12px" }}>
           <div style={{ fontSize: 34, marginBottom: 6 }}>👤</div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>プレイヤー名の登録</h2>
-          <p style={{ fontSize: 12, color: t.dm }}>対局開始時のリストに表示される名前です</p>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>登録した人</h2>
+          <p style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textWrap: "balance" }}>メンバー決定のときに選べる名前です</p>
+          {Net.enabled() && (
+            <p style={{ fontSize: 11, color: t.dm, lineHeight: 1.9, marginTop: 6, textWrap: "balance" }}>
+              <b style={{ color: t.ac }}>友達</b>の印が付いた人は、対局が終わると結果が自動で届きます
+            </p>
+          )}
         </div>
 
         {/* 追加 */}
@@ -5341,6 +5346,14 @@ input, select { padding: 10px 14px; }
                         background: t.gdS, border: `1px solid ${t.gd}66`,
                         borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap",
                       }}>あなた</span>
+                    )}
+                    {/* 個人IDでつながっている人（結果が自動で届く） */}
+                    {n !== myName && fidOfName(n) && (
+                      <span style={{
+                        flexShrink: 0, fontSize: 10, fontWeight: 800, color: t.ac,
+                        background: t.acS, border: `1px solid ${t.ac}66`,
+                        borderRadius: 5, padding: "2px 6px", whiteSpace: "nowrap",
+                      }}>友達</span>
                     )}
                   </span>
                   <button onClick={() => { setEditNameIdx(i); setEditNameVal(n); setEditErr(""); }} style={{
@@ -8228,9 +8241,14 @@ input, select { padding: 10px 14px; }
               </div>
             </div>
 
-            {menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
-              setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
-            })}
+            {/* 登録の入口はここ1つ。名前だけ／QR／リンク の違いは次の画面で説明する */}
+            {menuItem("➕", ["メンバー・", "友達を登録"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)),
+              Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します",
+              () => setView("addwho"), true)}
+
+            {menuItem("📋", "登録した人",
+              `${presetNames.length}人${frCount() > 0 ? `（うち友達 ${frCount()}人）` : ""}`,
+              () => { setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null); })}
 
             {/* グループ */}
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
@@ -8321,7 +8339,7 @@ input, select { padding: 10px 14px; }
                     メンバーを{gEditSize}人選ぶ（{gEditMembers.length}/{gEditSize}）
                   </div>
                   <div style={{ fontSize: 10, color: t.dm, marginBottom: 7, lineHeight: 1.7 }}>
-                    ここに出るのは「プレイヤー名の登録」に入っている名前です。
+                    ここに出るのは「登録した人」に入っている名前です。
                     いない人は先に登録してください
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 12 }}>
@@ -8351,7 +8369,7 @@ input, select { padding: 10px 14px; }
                       </div>
                       <div style={{ fontSize: 11, color: t.tx, lineHeight: 1.8, marginBottom: 9 }}>
                         グループには{gEditSize}人必要ですが、登録されている名前は{presetNames.length}人ぶんです。
-                        先にプレイヤー名を登録してください。
+                        先に名前を登録してください。
                       </div>
                       <button onClick={() => {
                         setGEditOpen(false); setGEditId(null); setGEditName(""); setGEditMembers([]);
@@ -8359,7 +8377,7 @@ input, select { padding: 10px 14px; }
                       }} style={{
                         width: "100%", padding: "10px 8px", borderRadius: 9, cursor: "pointer",
                         border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700,
-                      }}>👤 プレイヤー名の登録へ</button>
+                      }}>👤 名前の登録へ</button>
                     </div>
                   )}
 
@@ -8419,7 +8437,7 @@ input, select { padding: 10px 14px; }
             <div style={{ marginTop: 12 }}>
               {Net.enabled() ? (
                 menuItem("👥", "友達",
-                  myCode ? "QRで追加・結果を自動で共有" : "QRで友達を追加",
+                  myCode ? "あなたの個人ID・友達リスト" : "オンライン共有をはじめる",
                   () => setView("friends"))
               ) : (
                 <div style={{ ...card, padding: 16 }}>
@@ -13739,6 +13757,8 @@ input, select { padding: 10px 14px; }
   const [frBusy, setFrBusy] = useState(false);
   const [frError, setFrError] = useState(null);
   const [frNotice, setFrNotice] = useState(null);
+  const [frHint, setFrHint] = useState(null);            // 次にすることの案内
+  const [frAfterReg, setFrAfterReg] = useState("");      // 登録がすんだら続けてやること
   const [frNameInput, setFrNameInput] = useState("");
   const [frEditingName, setFrEditingName] = useState(false);
   const [frAddInput, setFrAddInput] = useState("");
@@ -13758,6 +13778,8 @@ input, select { padding: 10px 14px; }
   };
   // 名簿の名前から個人IDを引く
   const fidOfName = (nm) => Object.keys(friendLinks).find(fid => friendLinks[fid] === nm) || "";
+  // 名簿のうち、友達（個人IDでつながっている人）の数
+  const frCount = () => presetNames.filter(n => fidOfName(n)).length;
   // 対局が終わったら、その卓にいた友達へ自動で送る（切ることもできる）
   const [frAuto, setFrAuto] = useState(() => { try { return localStorage.getItem("mj_fr_auto") !== "0"; } catch { return true; } });
   // 送れなかったぶん。電波が戻ったときに送り直す  [{ id, fids }]
@@ -13835,10 +13857,19 @@ input, select { padding: 10px 14px; }
       setMyName(nm); setMyCode(code); setFrNameInput("");
       try { localStorage.setItem("mj_my_name", nm); localStorage.setItem("mj_my_code", code); } catch {}
       if (!presetNames.includes(nm)) savePresetNames([nm, ...presetNames]);
+      setFrHint(null);
       setFrNotice("登録しました。あなたの個人IDは " + code + " です");
       // 友達リンクから来た人は、登録したらそのまま友達にする（続けて操作させない）
       const pend = CODE_FROM(frAddInput);
       if (pend && pend !== code) { setFrBusy(false); await frAddFriend(pend, nm); return; }
+      // 「QRで追加」から来た人は、そのままカメラを開く
+      if (frAfterReg === "qr") {
+        setFrAfterReg(""); setFrHint(null);
+        setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true);
+      } else if (frAfterReg === "link") {
+        // 共有は画面を触った流れでないと出ない端末があるので、押す場所だけ案内する
+        setFrAfterReg(""); setFrHint("下の「📤 追加用のリンクを送る」を押して、友達に送ってください");
+      }
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
   };
@@ -14203,7 +14234,7 @@ input, select { padding: 10px 14px; }
     if (view === "history" && cloudBox) cloudSync({ quiet: true });
     // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
-    if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); }
+    if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); setFrHint(null); setFrAfterReg(""); }
     if (view !== "friends") { setFrEditingName(false); setFrEditFid(null); setQrOpen(false); }
     // 共有のあとの一言は、画面を移ったら持ち越さない（前の画面の分が残って見える）
     setShareMsg(null); setShareFallback(null);
@@ -14385,13 +14416,18 @@ input, select { padding: 10px 14px; }
       {frError && (
         <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.rd}`, color: t.rd, fontSize: 13, fontWeight: 700, textAlign: "center", lineHeight: 1.8, textWrap: "balance" }}>{frError}</div>
       )}
+      {frHint && (
+        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.ac}66`, background: t.acS, color: t.ac, fontSize: 13, fontWeight: 700, textAlign: "center", lineHeight: 1.8, textWrap: "balance" }}>{frHint}</div>
+      )}
 
       {!myCode ? (
         /* ── まだ個人IDが無い人。ここだけ見せる ── */
         <div style={{ ...card, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>はじめに、自分の名前を登録します</div>
+          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>
+            {["はじめに、", "自分の名前を登録します"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+          </div>
           <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
-            登録すると、あなただけの<b style={{ color: t.tx }}>個人ID（6文字）</b>ができます。
+            登録すると、あなただけの<b style={{ color: t.tx, display: "inline-block" }}>個人ID（6文字）</b>ができます。
             友達はこのIDか、QRコード・リンクであなたを追加します。
           </div>
           <input value={frNameInput} onChange={(e) => setFrNameInput(e.target.value)} maxLength={10}
@@ -14577,6 +14613,130 @@ input, select { padding: 10px 14px; }
       </div>
     </div>
   );
+
+  // ── メンバー・友達の登録のしかたを選ぶ画面 ──
+  // 「名前だけ」と「友達」で何が違うのかを、ここで一度に見せる
+  const renderAddWho = () => {
+    const backToMembers = () => { setView("home"); setHomeCat("members"); };
+    const needMe = Net.enabled() && !myCode;      // 先に自分の名前の登録がいる
+    const goNames = () => { setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null); };
+    const goRegisterFirst = (what) => {
+      setFrError(null); setFrNotice(null);
+      setFrAfterReg(what === "QRコード" ? "qr" : "link");
+      setFrHint("はじめに、あなたの名前を登録してください。そのあと" + what + "で友達を追加できます");
+      setView("friends");
+    };
+    const goQr = () => {
+      if (needMe) return goRegisterFirst("QRコード");
+      setFrError(null); setFrNotice(null);
+      setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true); setView("friends");
+    };
+    const goLink = () => {
+      if (needMe) return goRegisterFirst("リンク");
+      shareMyCode();
+    };
+
+    // 選び方のカード。見出し・説明・できること/できないこと
+    const wayCard = (icon, title, desc, marks, onClick, tone) => (
+      <button onClick={onClick} style={{
+        width: "100%", textAlign: "left", boxSizing: "border-box", cursor: "pointer",
+        padding: 16, marginBottom: 12, borderRadius: 14, lineHeight: 1.6,
+        border: `1px solid ${tone === "p" ? t.ac + "66" : t.bd}`,
+        background: tone === "p" ? t.acS : t.card, color: t.tx,
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <span style={{
+            fontSize: 20, width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+            background: tone === "p" ? t.ac + "22" : t.sf,
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+          }}>{icon}</span>
+          <span style={{
+            flex: 1, minWidth: 0, fontSize: "clamp(14px, 4.2vw, 16px)", fontWeight: 800,
+            color: tone === "p" ? t.ac : t.tx,
+          }}>{(Array.isArray(title) ? title : [title]).map((x, k) => (
+            <span key={k} style={{ display: "inline-block" }}>{x}</span>
+          ))}</span>
+        </span>
+        <span style={{ display: "block", fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 8, textWrap: "balance" }}>{desc}</span>
+        {marks.map(([ok, line], k) => (
+          <span key={k} style={{ display: "flex", alignItems: "flex-start", gap: 7, marginTop: 4 }}>
+            <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 900, color: ok ? t.gn : t.rd }}>{ok ? "○" : "✕"}</span>
+            <span style={{ minWidth: 0, fontSize: 12, color: ok ? t.tx : t.dm, lineHeight: 1.8 }}>{line}</span>
+          </span>
+        ))}
+      </button>
+    );
+
+    return (
+      <div style={body}>
+        <div style={{ textAlign: "center", padding: "16px 0 12px" }}>
+          <div style={{ fontSize: 34, marginBottom: 6 }}>➕</div>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>メンバー・友達を登録</h2>
+          <p style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textWrap: "balance" }}>登録のしかたを選んでください</p>
+        </div>
+
+        {wayCard("👤", ["名前だけ", "登録する"],
+          "その場で名前を打つだけ。相手がこのアプリを使っていなくても登録できます。",
+          [[true, "対局のメンバーに選べます"],
+           [false, "対局結果は共有されません（この端末の中だけの名前です）"]],
+          goNames)}
+
+        {Net.enabled() ? (
+          <>
+            {wayCard("📷", ["QRを読み取って", "友達になる"],
+              "目の前にいる人と。相手のアプリに出ているQRコードを読み取ります。",
+              [[true, "対局のメンバーに選べます"],
+               [true, "対局が終わると、結果がその人に自動で届きます"]],
+              goQr, "p")}
+
+            {wayCard("📤", ["リンクを送って", "友達になる"],
+              "離れている人と。LINEなどでリンクを送り、相手に開いてもらいます。",
+              [[true, "対局のメンバーに選べます"],
+               [true, "相手が開くと、お互いの友達リストに入ります"]],
+              goLink, "p")}
+
+            {shareMsg && (
+              <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: -4, marginBottom: 12, textWrap: "balance" }}>✓ {shareMsg}</div>
+            )}
+            {shareFallback && (
+              <div style={{ ...card, padding: 14, marginTop: -4, marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
+                  {"この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"}
+                </div>
+                <div style={{
+                  fontSize: 12, color: t.ac, background: t.sf, borderRadius: 8, padding: "10px 12px",
+                  wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
+                }}>{shareFallback}</div>
+              </div>
+            )}
+
+            {/* ふたつの違いを、もう一度まとめて置いておく */}
+            <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10 }}>「名前だけ」と「友達」のちがい</div>
+              <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 10, textWrap: "balance" }}>
+                <b style={{ color: t.tx }}>名前だけ</b>は、この端末の中だけの名前です。
+                対局には使えますが、結果はこの端末にしか残りません。
+              </div>
+              <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, textWrap: "balance" }}>
+                <b style={{ color: t.ac }}>友達</b>は、相手の個人IDとつながった名前です。
+                その人をメンバーに入れて対局すると、終わったときに結果が自動で相手にも届きます。
+                名前だけで登録した人も、あとからQRやリンクで友達にできます。
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>友達として登録するには</div>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, textWrap: "balance" }}>
+              QRやリンクで友達になると、対局結果を送り合えます。このアプリではまだ準備中のため、いまは名前だけの登録が使えます。
+            </div>
+          </div>
+        )}
+
+        <button style={actionBtn()} onClick={backToMembers}>← メンバーに戻る</button>
+      </div>
+    );
+  };
 
   // 送信モーダル（選んだ対局をどの友達に送るか）
   const renderSendModal = () => {
@@ -15285,6 +15445,7 @@ input, select { padding: 10px 14px; }
         {view === "table" && renderTable()}
         {view === "startguide" && renderStartGuide()}
         {view === "names" && renderNames()}
+        {view === "addwho" && renderAddWho()}
         {view === "friends" && renderFriends()}
         {qrOpen && renderQrScan()}
         {sendPick && renderSendModal()}

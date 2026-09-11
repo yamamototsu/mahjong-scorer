@@ -6,7 +6,7 @@
 //
 // ★ このファイルは手で置いているが、下の2行は build.js が書き替える。
 //   VERSION が変わると新しい入れ物に入れ直し、古いものは捨てる。
-const VERSION = "7c8678bd1c02";
+const VERSION = "a43cf32d1ec4";
 const EXTRA = ["https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js","https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"];   // React など、外から読み込むもの（build.js が入れる）
 
 const CACHE = "ponzuke-" + VERSION;

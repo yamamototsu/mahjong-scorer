@@ -9889,12 +9889,26 @@ input, select { padding: 10px 14px; }
         fontWeight: 800,
         margin: "0 0 4px"
       }
-    }, "プレイヤー名の登録"), React.createElement("p", {
+    }, "登録した人"), React.createElement("p", {
       style: {
         fontSize: 12,
-        color: t.dm
+        color: t.dm,
+        lineHeight: 1.8,
+        textWrap: "balance"
       }
-    }, "対局開始時のリストに表示される名前です")), React.createElement("div", {
+    }, "メンバー決定のときに選べる名前です"), Net.enabled() && React.createElement("p", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginTop: 6,
+        textWrap: "balance"
+      }
+    }, React.createElement("b", {
+      style: {
+        color: t.ac
+      }
+    }, "友達"), "の印が付いた人は、対局が終わると結果が自動で届きます")), React.createElement("div", {
       style: {
         ...card,
         padding: 14
@@ -10149,7 +10163,19 @@ input, select { padding: 10px 14px; }
           padding: "2px 6px",
           whiteSpace: "nowrap"
         }
-      }, "あなた")), React.createElement("button", {
+      }, "あなた"), n !== myName && fidOfName(n) && React.createElement("span", {
+        style: {
+          flexShrink: 0,
+          fontSize: 10,
+          fontWeight: 800,
+          color: t.ac,
+          background: t.acS,
+          border: `1px solid ${t.ac}66`,
+          borderRadius: 5,
+          padding: "2px 6px",
+          whiteSpace: "nowrap"
+        }
+      }, "友達")), React.createElement("button", {
         onClick: () => {
           setEditNameIdx(i);
           setEditNameVal(n);
@@ -15232,7 +15258,12 @@ input, select { padding: 10px 14px; }
         marginTop: 10,
         textWrap: "balance"
       }
-    }, myName ? "名簿では「あなた」の印が付きます。友達に表示される名前もこれになります。" : "決めておくと、名簿に「あなた」の印が付き、友達に登録するときもそのまま使えます。")), menuItem("👤", "プレイヤー名の登録", `${presetNames.length}人を登録中`, () => {
+    }, myName ? "名簿では「あなた」の印が付きます。友達に表示される名前もこれになります。" : "決めておくと、名簿に「あなた」の印が付き、友達に登録するときもそのまま使えます。")), menuItem("➕", ["メンバー・", "友達を登録"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)), Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します", () => setView("addwho"), true), menuItem("📋", "登録した人", `${presetNames.length}人${frCount() > 0 ? `（うち友達 ${frCount()}人）` : ""}`, () => {
       setNamesBackTo("members");
       setView("names");
       setNewNameInput("");
@@ -15443,7 +15474,7 @@ input, select { padding: 10px 14px; }
         marginBottom: 7,
         lineHeight: 1.7
       }
-    }, "ここに出るのは「プレイヤー名の登録」に入っている名前です。 いない人は先に登録してください"), React.createElement("div", {
+    }, "ここに出るのは「登録した人」に入っている名前です。 いない人は先に登録してください"), React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -15493,7 +15524,7 @@ input, select { padding: 10px 14px; }
         lineHeight: 1.8,
         marginBottom: 9
       }
-    }, "グループには", gEditSize, "人必要ですが、登録されている名前は", presetNames.length, "人ぶんです。 先にプレイヤー名を登録してください。"), React.createElement("button", {
+    }, "グループには", gEditSize, "人必要ですが、登録されている名前は", presetNames.length, "人ぶんです。 先に名前を登録してください。"), React.createElement("button", {
       onClick: () => {
         setGEditOpen(false);
         setGEditId(null);
@@ -15515,7 +15546,7 @@ input, select { padding: 10px 14px; }
         fontSize: 12,
         fontWeight: 700
       }
-    }, "👤 プレイヤー名の登録へ")), React.createElement("div", {
+    }, "👤 名前の登録へ")), React.createElement("div", {
       style: {
         display: "flex",
         gap: 8
@@ -15630,7 +15661,7 @@ input, select { padding: 10px 14px; }
       style: {
         marginTop: 12
       }
-    }, Net.enabled() ? menuItem("👥", "友達", myCode ? "QRで追加・結果を自動で共有" : "QRで友達を追加", () => setView("friends")) : React.createElement("div", {
+    }, Net.enabled() ? menuItem("👥", "友達", myCode ? "あなたの個人ID・友達リスト" : "オンライン共有をはじめる", () => setView("friends")) : React.createElement("div", {
       style: {
         ...card,
         padding: 16
@@ -25486,6 +25517,8 @@ input, select { padding: 10px 14px; }
   const [frBusy, setFrBusy] = useState(false);
   const [frError, setFrError] = useState(null);
   const [frNotice, setFrNotice] = useState(null);
+  const [frHint, setFrHint] = useState(null);
+  const [frAfterReg, setFrAfterReg] = useState("");
   const [frNameInput, setFrNameInput] = useState("");
   const [frEditingName, setFrEditingName] = useState(false);
   const [frAddInput, setFrAddInput] = useState("");
@@ -25507,6 +25540,7 @@ input, select { padding: 10px 14px; }
     } catch {}
   };
   const fidOfName = nm => Object.keys(friendLinks).find(fid => friendLinks[fid] === nm) || "";
+  const frCount = () => presetNames.filter(n => fidOfName(n)).length;
   const [frAuto, setFrAuto] = useState(() => {
     try {
       return localStorage.getItem("mj_fr_auto") !== "0";
@@ -25617,12 +25651,23 @@ input, select { padding: 10px 14px; }
         localStorage.setItem("mj_my_code", code);
       } catch {}
       if (!presetNames.includes(nm)) savePresetNames([nm, ...presetNames]);
+      setFrHint(null);
       setFrNotice("登録しました。あなたの個人IDは " + code + " です");
       const pend = CODE_FROM(frAddInput);
       if (pend && pend !== code) {
         setFrBusy(false);
         await frAddFriend(pend, nm);
         return;
+      }
+      if (frAfterReg === "qr") {
+        setFrAfterReg("");
+        setFrHint(null);
+        setQrFail(false);
+        setQrMsg("カメラを準備しています…");
+        setQrOpen(true);
+      } else if (frAfterReg === "link") {
+        setFrAfterReg("");
+        setFrHint("下の「📤 追加用のリンクを送る」を押して、友達に送ってください");
       }
     } catch {
       setFrError(NET_FAIL);
@@ -26124,6 +26169,8 @@ input, select { padding: 10px 14px; }
     if (!FR_VIEWS.includes(view)) {
       setFrError(null);
       setFrNotice(null);
+      setFrHint(null);
+      setFrAfterReg("");
     }
     if (view !== "friends") {
       setFrEditingName(false);
@@ -26396,7 +26443,21 @@ input, select { padding: 10px 14px; }
         lineHeight: 1.8,
         textWrap: "balance"
       }
-    }, frError), !myCode ? React.createElement("div", {
+    }, frError), frHint && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 12,
+        marginBottom: 14,
+        border: `1px solid ${t.ac}66`,
+        background: t.acS,
+        color: t.ac,
+        fontSize: 13,
+        fontWeight: 700,
+        textAlign: "center",
+        lineHeight: 1.8,
+        textWrap: "balance"
+      }
+    }, frHint), !myCode ? React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -26408,7 +26469,12 @@ input, select { padding: 10px 14px; }
         fontWeight: 800,
         marginBottom: 6
       }
-    }, "はじめに、自分の名前を登録します"), React.createElement("div", {
+    }, ["はじめに、", "自分の名前を登録します"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("div", {
       style: {
         fontSize: 12,
         color: t.dm,
@@ -26417,7 +26483,8 @@ input, select { padding: 10px 14px; }
       }
     }, "登録すると、あなただけの", React.createElement("b", {
       style: {
-        color: t.tx
+        color: t.tx,
+        display: "inline-block"
       }
     }, "個人ID（6文字）"), "ができます。 友達はこのIDか、QRコード・リンクであなたを追加します。"), React.createElement("input", {
       value: frNameInput,
@@ -26966,6 +27033,237 @@ input, select { padding: 10px 14px; }
       qrFromPhoto(f);
     }
   })))));
+  const renderAddWho = () => {
+    const backToMembers = () => {
+      setView("home");
+      setHomeCat("members");
+    };
+    const needMe = Net.enabled() && !myCode;
+    const goNames = () => {
+      setNamesBackTo("members");
+      setView("names");
+      setNewNameInput("");
+      setEditNameIdx(null);
+    };
+    const goRegisterFirst = what => {
+      setFrError(null);
+      setFrNotice(null);
+      setFrAfterReg(what === "QRコード" ? "qr" : "link");
+      setFrHint("はじめに、あなたの名前を登録してください。そのあと" + what + "で友達を追加できます");
+      setView("friends");
+    };
+    const goQr = () => {
+      if (needMe) return goRegisterFirst("QRコード");
+      setFrError(null);
+      setFrNotice(null);
+      setQrFail(false);
+      setQrMsg("カメラを準備しています…");
+      setQrOpen(true);
+      setView("friends");
+    };
+    const goLink = () => {
+      if (needMe) return goRegisterFirst("リンク");
+      shareMyCode();
+    };
+    const wayCard = (icon, title, desc, marks, onClick, tone) => React.createElement("button", {
+      onClick: onClick,
+      style: {
+        width: "100%",
+        textAlign: "left",
+        boxSizing: "border-box",
+        cursor: "pointer",
+        padding: 16,
+        marginBottom: 12,
+        borderRadius: 14,
+        lineHeight: 1.6,
+        border: `1px solid ${tone === "p" ? t.ac + "66" : t.bd}`,
+        background: tone === "p" ? t.acS : t.card,
+        color: t.tx
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginBottom: 8
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 20,
+        width: 42,
+        height: 42,
+        borderRadius: 12,
+        flexShrink: 0,
+        background: tone === "p" ? t.ac + "22" : t.sf,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: "clamp(14px, 4.2vw, 16px)",
+        fontWeight: 800,
+        color: tone === "p" ? t.ac : t.tx
+      }
+    }, (Array.isArray(title) ? title : [title]).map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)))), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 8,
+        textWrap: "balance"
+      }
+    }, desc), marks.map(([ok, line], k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 7,
+        marginTop: 4
+      }
+    }, React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        fontSize: 12,
+        fontWeight: 900,
+        color: ok ? t.gn : t.rd
+      }
+    }, ok ? "○" : "✕"), React.createElement("span", {
+      style: {
+        minWidth: 0,
+        fontSize: 12,
+        color: ok ? t.tx : t.dm,
+        lineHeight: 1.8
+      }
+    }, line))));
+    return React.createElement("div", {
+      style: body
+    }, React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "16px 0 12px"
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 34,
+        marginBottom: 6
+      }
+    }, "➕"), React.createElement("h2", {
+      style: {
+        fontSize: 18,
+        fontWeight: 800,
+        margin: "0 0 4px"
+      }
+    }, "メンバー・友達を登録"), React.createElement("p", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        textWrap: "balance"
+      }
+    }, "登録のしかたを選んでください")), wayCard("👤", ["名前だけ", "登録する"], "その場で名前を打つだけ。相手がこのアプリを使っていなくても登録できます。", [[true, "対局のメンバーに選べます"], [false, "対局結果は共有されません（この端末の中だけの名前です）"]], goNames), Net.enabled() ? React.createElement(React.Fragment, null, wayCard("📷", ["QRを読み取って", "友達になる"], "目の前にいる人と。相手のアプリに出ているQRコードを読み取ります。", [[true, "対局のメンバーに選べます"], [true, "対局が終わると、結果がその人に自動で届きます"]], goQr, "p"), wayCard("📤", ["リンクを送って", "友達になる"], "離れている人と。LINEなどでリンクを送り、相手に開いてもらいます。", [[true, "対局のメンバーに選べます"], [true, "相手が開くと、お互いの友達リストに入ります"]], goLink, "p"), shareMsg && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.gn,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: -4,
+        marginBottom: 12,
+        textWrap: "balance"
+      }
+    }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 14,
+        marginTop: -4,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 8,
+        textWrap: "balance"
+      }
+    }, "この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        background: t.sf,
+        borderRadius: 8,
+        padding: "10px 12px",
+        wordBreak: "break-all",
+        userSelect: "all",
+        lineHeight: 1.7
+      }
+    }, shareFallback)), React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 800,
+        marginBottom: 10
+      }
+    }, "「名前だけ」と「友達」のちがい"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 10,
+        textWrap: "balance"
+      }
+    }, React.createElement("b", {
+      style: {
+        color: t.tx
+      }
+    }, "名前だけ"), "は、この端末の中だけの名前です。 対局には使えますが、結果はこの端末にしか残りません。"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        textWrap: "balance"
+      }
+    }, React.createElement("b", {
+      style: {
+        color: t.ac
+      }
+    }, "友達"), "は、相手の個人IDとつながった名前です。 その人をメンバーに入れて対局すると、終わったときに結果が自動で相手にも届きます。 名前だけで登録した人も、あとからQRやリンクで友達にできます。"))) : React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 800,
+        marginBottom: 8
+      }
+    }, "友達として登録するには"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        textWrap: "balance"
+      }
+    }, "QRやリンクで友達になると、対局結果を送り合えます。このアプリではまだ準備中のため、いまは名前だけの登録が使えます。")), React.createElement("button", {
+      style: actionBtn(),
+      onClick: backToMembers
+    }, "← メンバーに戻る"));
+  };
   const renderSendModal = () => {
     const games = gameHistory.filter(g => sendPick.ids.includes(g.id));
     const fids = Object.keys(friendsMap);
@@ -28407,7 +28705,7 @@ input, select { padding: 10px 14px; }
       width: 62,
       flexShrink: 0
     }
-  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "friends" && renderFriends(), qrOpen && renderQrScan(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
+  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "addwho" && renderAddWho(), view === "friends" && renderFriends(), qrOpen && renderQrScan(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
 }
 
 ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));
