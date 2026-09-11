@@ -5189,7 +5189,23 @@ input, select { padding: 10px 14px; }
   // ── PLAYER NAME REGISTRY ──
   // ══════════════════════════════════
   const renderNames = () => {
-    const removeName = (idx) => savePresetNames(presetNames.filter((_, i) => i !== idx));
+    const removeName = (idx) => {
+      const nm = presetNames[idx];
+      const fid = fidOfName(nm);
+      // 押しまちがいで消えないよう、必ず一度たずねる。
+      // 友達の行は、友達でなくなることも伝える
+      const ask = fid
+        ? nm + " さんは友達です。\nリストから消すと友達ではなくなり、対局結果も届かなくなります。\n消してよろしいですか？"
+        : nm + " さんをリストから消しますか？";
+      if (!window.confirm(ask)) return;
+      savePresetNames(presetNames.filter((_, i) => i !== idx));
+      if (fid) {
+        const next = { ...friendLinks }; delete next[fid]; saveFriendLinks(next);
+        (async () => {
+          try { const { uid } = await Net.ensureReady(); await Net.remove("friends/" + uid + "/" + fid); } catch {}
+        })();
+      }
+    };
     const commitEdit = () => {
       const v = editNameVal.trim();
       if (!v) { setEditNameIdx(null); setEditErr(""); return; }
@@ -5204,6 +5220,9 @@ input, select { padding: 10px 14px; }
       savePresetNames(arr);
       // 自分の行を書き換えたときは、友達に表示される名前も一緒に変える
       if (before && before === myName) applyMyName(v);
+      // 友達の行なら、個人IDとの結びつきも新しい名前に移す（自動共有が切れないように）
+      const fid = fidOfName(before);
+      if (fid) saveFriendLinks({ ...friendLinks, [fid]: v });
       setEditNameIdx(null); setEditErr("");
     };
     return (
@@ -8244,7 +8263,7 @@ input, select { padding: 10px 14px; }
                   <button onClick={shareMyCode} style={{
                     width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
                     border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 14, fontWeight: 800,
-                  }}>📤 追加用のリンクを送る</button>
+                  }}>{["📤 お友達追加用", "リンクを送る"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}</button>
                   {shareMsg && (
                     <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {shareMsg}</div>
                   )}
@@ -8259,16 +8278,26 @@ input, select { padding: 10px 14px; }
                       }}>{shareFallback}</div>
                     </div>
                   )}
-                  <button onClick={() => setView("friends")} style={{
-                    width: "100%", minHeight: 44, marginTop: 10, padding: "12px 10px", borderRadius: 10, cursor: "pointer",
-                    border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
-                    display: "flex", alignItems: "center", gap: 8, textAlign: "left", boxSizing: "border-box",
-                  }}>
-                    <span style={{ flexShrink: 0, fontSize: 16 }}>👥</span>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700 }}>
-                      友達リスト{frCount() > 0 ? `（${frCount()}人）` : ""}
+                  {/* 対局が終わったときの自動共有。自分の設定なのでここに置く */}
+                  <button onClick={() => { const v = !frAuto; setFrAuto(v); try { localStorage.setItem("mj_fr_auto", v ? "1" : "0"); } catch {} }}
+                    style={{
+                      width: "100%", display: "flex", alignItems: "center", gap: 10, marginTop: 12,
+                      padding: "12px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left", boxSizing: "border-box",
+                      border: frAuto ? `2px solid ${t.ac}` : `1px solid ${t.bd}`, background: frAuto ? t.acS : t.sf, color: t.tx,
+                    }}>
+                    <span style={{
+                      width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                      border: `2px solid ${frAuto ? t.ac : t.bd}`, background: frAuto ? t.ac : "transparent",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1,
+                    }}>{frAuto ? "✓" : ""}</span>
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>
+                        {["対局が終わったら", "自動で送る"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+                      </span>
+                      <span style={{ display: "block", fontSize: 11, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
+                        {["卓にいた友達へ、", "結果を自動で届けます"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+                      </span>
                     </span>
-                    <span style={{ flexShrink: 0, color: t.dm, fontSize: 16 }}>›</span>
                   </button>
                 </div>
               ) : (
@@ -14525,32 +14554,11 @@ input, select { padding: 10px 14px; }
                   );
                 })}
                 <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 12, textWrap: "balance" }}>
-                  友達の名前は、対局のメンバーにも登録されています。
+                  友達の名前は「メンバー・お友達リスト」にも入っていて、そちらでも直せます。
                 </div>
               </>
             )}
 
-            {/* 自動共有の入切 */}
-            <button onClick={() => { const v = !frAuto; setFrAuto(v); try { localStorage.setItem("mj_fr_auto", v ? "1" : "0"); } catch {} }}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: 10, marginTop: 14,
-                padding: "12px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left", boxSizing: "border-box",
-                border: frAuto ? `2px solid ${t.ac}` : `1px solid ${t.bd}`, background: frAuto ? t.acS : t.sf, color: t.tx,
-              }}>
-              <span style={{
-                width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                border: `2px solid ${frAuto ? t.ac : t.bd}`, background: frAuto ? t.ac : "transparent",
-                display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1,
-              }}>{frAuto ? "✓" : ""}</span>
-              <span style={{ minWidth: 0, flex: 1 }}>
-                <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>
-                  {["対局が終わったら", "自動で送る"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
-                </span>
-                <span style={{ display: "block", fontSize: 11, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
-                  {["卓にいた友達へ、", "結果を自動で届けます"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
-                </span>
-              </span>
-            </button>
           </div>
         </>
       )}
@@ -14778,6 +14786,28 @@ input, select { padding: 10px 14px; }
 
             {shareMsg && (
               <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: -4, marginBottom: 12, textWrap: "balance" }}>✓ {shareMsg}</div>
+            )}
+
+            {/* 個人IDを口で聞いたときのために、打ち込む欄も置いておく */}
+            {!needMe && (
+              <div style={{ ...card, padding: 16, marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
+                  相手の個人ID（6文字）を聞いているなら、ここに入れても追加できます。
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.toUpperCase())} maxLength={6}
+                    placeholder="例）ABC345" autoCapitalize="characters" autoCorrect="off"
+                    style={{ ...frInput, flex: 1, minWidth: 0, letterSpacing: "0.12em", fontWeight: 700 }} />
+                  <button disabled={frBusy} onClick={() => frAddFriend()}
+                    style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
+                </div>
+                {frError && (
+                  <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>{frError}</div>
+                )}
+                {frNotice && (
+                  <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {frNotice}</div>
+                )}
+              </div>
             )}
             {shareFallback && (
               <div style={{ ...card, padding: 14, marginTop: -4, marginBottom: 12 }}>
