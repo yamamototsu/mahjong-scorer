@@ -9840,17 +9840,6 @@ input, select { padding: 10px 14px; }
     })
   }];
   const renderNames = () => {
-    const addName = () => {
-      const v = newNameInput.trim();
-      if (!v) return;
-      if (presetNames.includes(v)) {
-        setNameErr(`「${v}」はすでに登録されています`);
-        return;
-      }
-      savePresetNames([...presetNames, v]);
-      setNewNameInput("");
-      setNameErr("");
-    };
     const removeName = idx => savePresetNames(presetNames.filter((_, i) => i !== idx));
     const commitEdit = () => {
       const v = editNameVal.trim();
@@ -9920,67 +9909,6 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: t.dm,
-        marginBottom: 8
-      }
-    }, "新しく登録"), React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8
-      }
-    }, React.createElement("input", {
-      value: newNameInput,
-      onChange: e => {
-        setNewNameInput(e.target.value);
-        if (nameErr) setNameErr("");
-      },
-      onKeyDown: e => {
-        if (e.key === "Enter") addName();
-      },
-      placeholder: "名前を入力",
-      style: {
-        flex: "1 1 auto",
-        minWidth: 0,
-        padding: "12px 14px",
-        fontSize: 15,
-        background: t.sf,
-        border: `1px solid ${t.bd}`,
-        borderRadius: 10,
-        color: t.tx,
-        outline: "none",
-        boxSizing: "border-box"
-      }
-    }), React.createElement("button", {
-      onClick: addName,
-      disabled: !newNameInput.trim(),
-      style: {
-        flexShrink: 0,
-        padding: "12px 18px",
-        borderRadius: 10,
-        cursor: "pointer",
-        border: "none",
-        background: newNameInput.trim() ? t.ac : t.bd,
-        color: "#fff",
-        fontSize: 14,
-        fontWeight: 700,
-        whiteSpace: "nowrap"
-      }
-    }, "追加")), nameErr && React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.rd,
-        marginTop: 8,
-        lineHeight: 1.7
-      }
-    }, nameErr)), React.createElement("div", {
-      style: {
-        ...card,
-        padding: 14
-      }
-    }, React.createElement("div", {
-      style: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
@@ -10014,9 +9942,10 @@ input, select { padding: 10px 14px; }
     }, "まだ登録がありません", React.createElement("div", {
       style: {
         fontSize: 11,
-        marginTop: 4
+        marginTop: 4,
+        lineHeight: 1.8
       }
-    }, "上から登録できます。メンバー決定で名前を打ち込んでも自動で登録されます")) : presetNames.map((n, i) => {
+    }, "下の「＋ メンバー・友達を登録」から登録できます。 メンバー決定で名前を打ち込んでも自動で登録されます")) : presetNames.map((n, i) => {
       const nd = nameDrag;
       const isDragging = nd && nd.from === i;
       let shiftY = 0;
@@ -10209,6 +10138,17 @@ input, select { padding: 10px 14px; }
         }
       }, "削除")));
     })), React.createElement("button", {
+      style: {
+        ...actionBtn("p")
+      },
+      onClick: () => {
+        setAddwhoBackTo("names");
+        setAddNameOpen(false);
+        setAddedMsg("");
+        setNameErr("");
+        setView("addwho");
+      }
+    }, "＋ メンバー・友達を登録"), React.createElement("button", {
       style: actionBtn(),
       onClick: goNamesBack
     }, namesBackTo === "leagueform" ? "← リーグ設定に戻る" : namesBackTo === "game" ? "← メンバー決定に戻る" : namesBackTo === "members" ? "← メンバーに戻る" : "メニューに戻る"));
@@ -11628,6 +11568,16 @@ input, select { padding: 10px 14px; }
     } catch {}
     return next;
   });
+  const addPresetName = raw => {
+    const v = String(raw || "").trim();
+    if (!v) return "名前を入れてください";
+    if (presetNames.includes(v)) return `「${v}」はすでに登録されています`;
+    savePresetNames([...presetNames, v]);
+    return "";
+  };
+  const [addNameOpen, setAddNameOpen] = useState(false);
+  const [addedMsg, setAddedMsg] = useState("");
+  const [addwhoBackTo, setAddwhoBackTo] = useState("members");
   const [newNameInput, setNewNameInput] = useState("");
   const [nameErr, setNameErr] = useState("");
   const [editErr, setEditErr] = useState("");
@@ -15427,7 +15377,13 @@ input, select { padding: 10px 14px; }
       style: {
         display: "inline-block"
       }
-    }, x)), Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します", () => setView("addwho"), true), menuItem("📋", ["メンバー・", "お友達リスト"].map((x, k) => React.createElement("span", {
+    }, x)), Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します", () => {
+      setAddwhoBackTo("members");
+      setAddNameOpen(false);
+      setAddedMsg("");
+      setNameErr("");
+      setView("addwho");
+    }, true), menuItem("📋", ["メンバー・", "お友達リスト"].map((x, k) => React.createElement("span", {
       key: k,
       style: {
         display: "inline-block"
@@ -26262,6 +26218,10 @@ input, select { padding: 10px 14px; }
       setFrEditFid(null);
       setQrOpen(false);
     }
+    if (view !== "addwho") {
+      setAddNameOpen(false);
+      setAddedMsg("");
+    }
     setShareMsg(null);
     setShareFallback(null);
   }, [view]);
@@ -27126,7 +27086,11 @@ input, select { padding: 10px 14px; }
     }, shareFallback)))));
   };
   const renderAddWho = () => {
-    const backToMembers = () => {
+    const goBack = () => {
+      if (addwhoBackTo === "names") {
+        setView("names");
+        return;
+      }
       setView("home");
       setHomeCat("members");
     };
@@ -27136,6 +27100,18 @@ input, select { padding: 10px 14px; }
       setView("names");
       setNewNameInput("");
       setEditNameIdx(null);
+    };
+    const doAddName = () => {
+      const v = newNameInput.trim();
+      const err = addPresetName(v);
+      if (err) {
+        setNameErr(err);
+        setAddedMsg("");
+        return;
+      }
+      setAddedMsg(v);
+      setNewNameInput("");
+      setNameErr("");
     };
     const goRegisterFirst = what => {
       setFrError(null);
@@ -27262,7 +27238,126 @@ input, select { padding: 10px 14px; }
         lineHeight: 1.8,
         textWrap: "balance"
       }
-    }, "登録のしかたを選んでください")), wayCard("👤", ["名前だけ", "登録する"], "その場で名前を打つだけ。相手がこのアプリを使っていなくても登録できます。", [[true, "対局のメンバーに選べます"], [false, "対局結果は共有されません（この端末の中だけの名前です）"]], goNames), Net.enabled() ? React.createElement(React.Fragment, null, wayCard("📷", ["QRを読み取って", "友達になる"], "目の前にいる人と。相手のアプリに出ているQRコードを読み取ります。", [[true, "対局のメンバーに選べます"], [true, "対局が終わると、結果がその人に自動で届きます"]], goQr, "p"), wayCard("📤", ["リンクを送って", "友達になる"], "離れている人と。LINEなどでリンクを送り、相手に開いてもらいます。", [[true, "対局のメンバーに選べます"], [true, "相手が開くと、お互いの友達リストに入ります"]], goLink, "p"), shareMsg && React.createElement("div", {
+    }, "登録のしかたを選んでください")), wayCard("👤", ["名前だけ", "登録する"], "その場で名前を打つだけ。相手がこのアプリを使っていなくても登録できます。", [[true, "対局のメンバーに選べます"], [false, "対局結果は共有されません（この端末の中だけの名前です）"]], () => {
+      setAddNameOpen(v => !v);
+      setNameErr("");
+      setAddedMsg("");
+    }, addNameOpen ? "p" : undefined), addNameOpen && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 12,
+        marginTop: -4
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: t.dm,
+        marginBottom: 8
+      }
+    }, "名前を入れて「追加」"), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, React.createElement("input", {
+      value: newNameInput,
+      autoFocus: true,
+      maxLength: 10,
+      onChange: e => {
+        setNewNameInput(e.target.value);
+        if (nameErr) setNameErr("");
+      },
+      onKeyDown: e => {
+        if (e.key === "Enter") doAddName();
+      },
+      placeholder: "例）はじめ",
+      style: {
+        ...frInput,
+        flex: 1,
+        minWidth: 0
+      }
+    }), React.createElement("button", {
+      onClick: doAddName,
+      disabled: !newNameInput.trim(),
+      style: {
+        flex: "0 0 64px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+        background: newNameInput.trim() ? t.ac : t.bd,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "追加")), nameErr && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.rd,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 8
+      }
+    }, nameErr), addedMsg && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.gn,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 8,
+        textWrap: "balance"
+      }
+    }, "✓ 「", addedMsg, "」を登録しました"), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginTop: 10,
+        textWrap: "balance"
+      }
+    }, "何人でも続けて登録できます。"), React.createElement("button", {
+      onClick: goNames,
+      style: {
+        width: "100%",
+        minHeight: 44,
+        marginTop: 10,
+        padding: "12px 10px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.tx,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        textAlign: "left",
+        boxSizing: "border-box"
+      }
+    }, React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        fontSize: 15
+      }
+    }, "📋"), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, ["メンバー・", "お友達リスト", `（${presetNames.length}人）`].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        color: t.dm,
+        fontSize: 16
+      }
+    }, "›"))), Net.enabled() ? React.createElement(React.Fragment, null, wayCard("📷", ["QRを読み取って", "友達になる"], "目の前にいる人と。相手のアプリに出ているQRコードを読み取ります。", [[true, "対局のメンバーに選べます"], [true, "対局が終わると、結果がその人に自動で届きます"]], goQr, "p"), wayCard("📤", ["リンクを送って", "友達になる"], "離れている人と。LINEなどでリンクを送り、相手に開いてもらいます。", [[true, "対局のメンバーに選べます"], [true, "相手が開くと、お互いの友達リストに入ります"]], goLink, "p"), shareMsg && React.createElement("div", {
       style: {
         fontSize: 12,
         color: t.gn,
@@ -27354,8 +27449,8 @@ input, select { padding: 10px 14px; }
       }
     }, "QRやリンクで友達になると、対局結果を送り合えます。このアプリではまだ準備中のため、いまは名前だけの登録が使えます。")), React.createElement("button", {
       style: actionBtn(),
-      onClick: backToMembers
-    }, "← メンバーに戻る"));
+      onClick: goBack
+    }, addwhoBackTo === "names" ? "← メンバー・お友達リストに戻る" : "← メンバーに戻る"));
   };
   const renderSendModal = () => {
     const games = gameHistory.filter(g => sendPick.ids.includes(g.id));

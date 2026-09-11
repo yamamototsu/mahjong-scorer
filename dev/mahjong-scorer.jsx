@@ -5189,14 +5189,6 @@ input, select { padding: 10px 14px; }
   // ── PLAYER NAME REGISTRY ──
   // ══════════════════════════════════
   const renderNames = () => {
-    const addName = () => {
-      const v = newNameInput.trim();
-      if (!v) return;
-      // 黙って消えると理由が分からないので、その場で伝える
-      if (presetNames.includes(v)) { setNameErr(`「${v}」はすでに登録されています`); return; }
-      savePresetNames([...presetNames, v]);
-      setNewNameInput(""); setNameErr("");
-    };
     const removeName = (idx) => savePresetNames(presetNames.filter((_, i) => i !== idx));
     const commitEdit = () => {
       const v = editNameVal.trim();
@@ -5229,32 +5221,6 @@ input, select { padding: 10px 14px; }
           )}
         </div>
 
-        {/* 追加 */}
-        <div style={{ ...card, padding: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8 }}>新しく登録</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              value={newNameInput}
-              onChange={e => { setNewNameInput(e.target.value); if (nameErr) setNameErr(""); }}
-              onKeyDown={e => { if (e.key === "Enter") addName(); }}
-              placeholder="名前を入力"
-              style={{
-                flex: "1 1 auto", minWidth: 0, padding: "12px 14px", fontSize: 15,
-                background: t.sf, border: `1px solid ${t.bd}`, borderRadius: 10,
-                color: t.tx, outline: "none", boxSizing: "border-box",
-              }}
-            />
-            <button onClick={addName} disabled={!newNameInput.trim()} style={{
-              flexShrink: 0, padding: "12px 18px", borderRadius: 10, cursor: "pointer",
-              border: "none", background: newNameInput.trim() ? t.ac : t.bd,
-              color: "#fff", fontSize: 14, fontWeight: 700, whiteSpace: "nowrap",
-            }}>追加</button>
-          </div>
-          {nameErr && (
-            <div style={{ fontSize: 12, color: t.rd, marginTop: 8, lineHeight: 1.7 }}>{nameErr}</div>
-          )}
-        </div>
-
         {/* 一覧 */}
         <div style={{ ...card, padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -5268,8 +5234,9 @@ input, select { padding: 10px 14px; }
           {presetNames.length === 0 ? (
             <div style={{ textAlign: "center", padding: "18px 8px", fontSize: 13, color: t.dm, lineHeight: 1.8 }}>
               まだ登録がありません
-              <div style={{ fontSize: 11, marginTop: 4 }}>
-                上から登録できます。メンバー決定で名前を打ち込んでも自動で登録されます
+              <div style={{ fontSize: 11, marginTop: 4, lineHeight: 1.8 }}>
+                下の「＋ メンバー・友達を登録」から登録できます。
+                メンバー決定で名前を打ち込んでも自動で登録されます
               </div>
             </div>
           ) : presetNames.map((n, i) => {
@@ -5372,6 +5339,11 @@ input, select { padding: 10px 14px; }
             );
           })}
         </div>
+
+        <button style={{ ...actionBtn("p") }}
+          onClick={() => { setAddwhoBackTo("names"); setAddNameOpen(false); setAddedMsg(""); setNameErr(""); setView("addwho"); }}>
+          ＋ メンバー・友達を登録
+        </button>
 
         <button style={actionBtn()} onClick={goNamesBack}>
           {namesBackTo === "leagueform" ? "← リーグ設定に戻る"
@@ -6099,6 +6071,17 @@ input, select { padding: 10px 14px; }
     try { localStorage.setItem("mj_preset_names", JSON.stringify(next)); } catch {}
     return next;
   });
+  // 名簿に名前を足す。戻り値は伝えるべき注意（空なら足せた）
+  const addPresetName = (raw) => {
+    const v = String(raw || "").trim();
+    if (!v) return "名前を入れてください";
+    if (presetNames.includes(v)) return `「${v}」はすでに登録されています`;
+    savePresetNames([...presetNames, v]);
+    return "";
+  };
+  const [addNameOpen, setAddNameOpen] = useState(false);   // 登録画面で名前を打っている
+  const [addedMsg, setAddedMsg] = useState("");            // 直前に登録した名前
+  const [addwhoBackTo, setAddwhoBackTo] = useState("members");
   const [newNameInput, setNewNameInput] = useState("");
   const [nameErr, setNameErr] = useState("");   // 名簿への追加で同じ名前だったとき
   const [editErr, setEditErr] = useState("");   // 名簿の編集で同じ名前になったとき
@@ -8305,7 +8288,7 @@ input, select { padding: 10px 14px; }
             {/* 登録の入口はここ1つ。名前だけ／QR／リンク の違いは次の画面で説明する */}
             {menuItem("➕", ["メンバー・", "友達を登録"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)),
               Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します",
-              () => setView("addwho"), true)}
+              () => { setAddwhoBackTo("members"); setAddNameOpen(false); setAddedMsg(""); setNameErr(""); setView("addwho"); }, true)}
 
             {menuItem("📋", ["メンバー・", "お友達リスト"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)),
               `${presetNames.length}人${frCount() > 0 ? `（うち友達 ${frCount()}人）` : ""}`,
@@ -14252,6 +14235,7 @@ input, select { padding: 10px 14px; }
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); setFrHint(null); setFrAfterReg(""); }
     if (view !== "friends") { setFrEditFid(null); setQrOpen(false); }
+    if (view !== "addwho") { setAddNameOpen(false); setAddedMsg(""); }
     // 共有のあとの一言は、画面を移ったら持ち越さない（前の画面の分が残って見える）
     setShareMsg(null); setShareFallback(null);
   }, [view]);
@@ -14661,9 +14645,19 @@ input, select { padding: 10px 14px; }
   // ── メンバー・友達の登録のしかたを選ぶ画面 ──
   // 「名前だけ」と「友達」で何が違うのかを、ここで一度に見せる
   const renderAddWho = () => {
-    const backToMembers = () => { setView("home"); setHomeCat("members"); };
+    const goBack = () => {
+      if (addwhoBackTo === "names") { setView("names"); return; }
+      setView("home"); setHomeCat("members");
+    };
     const needMe = Net.enabled() && !myCode;      // 先に自分の名前の登録がいる
     const goNames = () => { setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null); };
+    // 名前だけの登録は、この画面でそのまま打てるようにする（何人でも続けて足せる）
+    const doAddName = () => {
+      const v = newNameInput.trim();
+      const err = addPresetName(v);
+      if (err) { setNameErr(err); setAddedMsg(""); return; }
+      setAddedMsg(v); setNewNameInput(""); setNameErr("");
+    };
     const goRegisterFirst = (what) => {
       setFrError(null); setFrNotice(null);
       setFrAfterReg(what === "QRコード" ? "qr" : "link");
@@ -14723,7 +14717,50 @@ input, select { padding: 10px 14px; }
           "その場で名前を打つだけ。相手がこのアプリを使っていなくても登録できます。",
           [[true, "対局のメンバーに選べます"],
            [false, "対局結果は共有されません（この端末の中だけの名前です）"]],
-          goNames)}
+          () => { setAddNameOpen(v => !v); setNameErr(""); setAddedMsg(""); },
+          addNameOpen ? "p" : undefined)}
+
+        {addNameOpen && (
+          <div style={{ ...card, padding: 16, marginBottom: 12, marginTop: -4 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.dm, marginBottom: 8 }}>名前を入れて「追加」</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={newNameInput} autoFocus maxLength={10}
+                onChange={(e) => { setNewNameInput(e.target.value); if (nameErr) setNameErr(""); }}
+                onKeyDown={(e) => { if (e.key === "Enter") doAddName(); }}
+                placeholder="例）はじめ"
+                style={{ ...frInput, flex: 1, minWidth: 0 }} />
+              <button onClick={doAddName} disabled={!newNameInput.trim()} style={{
+                flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none",
+                background: newNameInput.trim() ? t.ac : t.bd, color: "#fff", fontSize: 13, fontWeight: 700,
+              }}>追加</button>
+            </div>
+            {nameErr && (
+              <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, lineHeight: 1.8, marginTop: 8 }}>{nameErr}</div>
+            )}
+            {addedMsg && (
+              <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>
+                ✓ 「{addedMsg}」を登録しました
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
+              何人でも続けて登録できます。
+            </div>
+            <button onClick={goNames} style={{
+              width: "100%", minHeight: 44, marginTop: 10, padding: "12px 10px", borderRadius: 10, cursor: "pointer",
+              border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+              display: "flex", alignItems: "center", gap: 8, textAlign: "left", boxSizing: "border-box",
+            }}>
+              <span style={{ flexShrink: 0, fontSize: 15 }}>📋</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700 }}>
+                {["メンバー・", "お友達リスト", `（${presetNames.length}人）`].map((x, k) => (
+                  <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                ))}
+              </span>
+              <span style={{ flexShrink: 0, color: t.dm, fontSize: 16 }}>›</span>
+            </button>
+          </div>
+        )}
 
         {Net.enabled() ? (
           <>
@@ -14777,7 +14814,9 @@ input, select { padding: 10px 14px; }
           </div>
         )}
 
-        <button style={actionBtn()} onClick={backToMembers}>← メンバーに戻る</button>
+        <button style={actionBtn()} onClick={goBack}>
+          {addwhoBackTo === "names" ? "← メンバー・お友達リストに戻る" : "← メンバーに戻る"}
+        </button>
       </div>
     );
   };
