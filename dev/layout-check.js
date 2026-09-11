@@ -46,8 +46,11 @@ const audit = () => {
   };
   const rect = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height }; };
 
+  // SVGの中身（QRコードの四角など）は絵であって配置ではないので、まるごと対象外にする。
+  // <svg> 自身も対象から外すと、その中の rect どうしを比べにいかなくなる
+  // （SVG要素の tagName は小文字のままなので、名前の一覧では弾けない）
   const all = [...document.querySelectorAll('body *')].filter(el =>
-    visible(el) && !['SCRIPT', 'STYLE', 'SVG', 'PATH', 'LINE', 'DEFS', 'MARKER', 'G'].includes(el.tagName));
+    visible(el) && !(el instanceof SVGElement) && !['SCRIPT', 'STYLE'].includes(el.tagName));
 
   // 文字を直接持つ要素（子要素にテキストを預けていないもの）
   const leaves = all.filter(el =>

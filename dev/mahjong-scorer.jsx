@@ -5218,7 +5218,9 @@ input, select { padding: 10px 14px; }
       <div style={body}>
         <div style={{ textAlign: "center", padding: "16px 0 12px" }}>
           <div style={{ fontSize: 34, marginBottom: 6 }}>👤</div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>登録した人</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 4px" }}>
+            {["メンバー・", "お友達リスト"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+          </h2>
           <p style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textWrap: "balance" }}>メンバー決定のときに選べる名前です</p>
           {Net.enabled() && (
             <p style={{ fontSize: 11, color: t.dm, lineHeight: 1.9, marginTop: 6, textWrap: "balance" }}>
@@ -8239,6 +8241,65 @@ input, select { padding: 10px 14px; }
                   ? "名簿では「あなた」の印が付きます。友達に表示される名前もこれになります。"
                   : "決めておくと、名簿に「あなた」の印が付き、友達に登録するときもそのまま使えます。"}
               </div>
+
+              {/* 自分のことは1か所にまとめる。個人IDとQRもここに置く */}
+              {Net.enabled() && (myCode ? (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${t.bd}` }}>
+                  <div style={{ fontSize: 11, color: t.dm, marginBottom: 4 }}>あなたの個人ID</div>
+                  <div style={{ fontSize: "clamp(24px, 8vw, 30px)", fontWeight: 900, letterSpacing: "0.16em", textAlign: "center", marginBottom: 10 }}>{myCode}</div>
+                  {myQR && (
+                    <div style={{ textAlign: "center", marginBottom: 10 }}>
+                      <span style={{ display: "inline-block", padding: 10, background: "#fff", borderRadius: 10, lineHeight: 0 }}
+                        dangerouslySetInnerHTML={{ __html: myQR }} />
+                    </div>
+                  )}
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 10, textWrap: "balance" }}>
+                    {myQR
+                      ? "目の前の人には、このQRコードを読み取ってもらいます。離れている人には、下のボタンでリンクを送ります。"
+                      : "QRコードを作れませんでした。目の前の人には、上の6文字を入力してもらってください。離れている人には、下のボタンでリンクを送ります。"}
+                  </div>
+                  <button onClick={shareMyCode} style={{
+                    width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+                    border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 14, fontWeight: 800,
+                  }}>📤 追加用のリンクを送る</button>
+                  {shareMsg && (
+                    <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {shareMsg}</div>
+                  )}
+                  {shareFallback && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
+                        {"この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"}
+                      </div>
+                      <div style={{
+                        fontSize: 12, color: t.ac, background: t.sf, borderRadius: 8, padding: "10px 12px",
+                        wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
+                      }}>{shareFallback}</div>
+                    </div>
+                  )}
+                  <button onClick={() => setView("friends")} style={{
+                    width: "100%", minHeight: 44, marginTop: 10, padding: "12px 10px", borderRadius: 10, cursor: "pointer",
+                    border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                    display: "flex", alignItems: "center", gap: 8, textAlign: "left", boxSizing: "border-box",
+                  }}>
+                    <span style={{ flexShrink: 0, fontSize: 16 }}>👥</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700 }}>
+                      友達リスト{frCount() > 0 ? `（${frCount()}人）` : ""}
+                    </span>
+                    <span style={{ flexShrink: 0, color: t.dm, fontSize: 16 }}>›</span>
+                  </button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${t.bd}` }}>
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 10, textWrap: "balance" }}>
+                    名前を登録すると、あなただけの<b style={{ color: t.tx, display: "inline-block" }}>個人ID</b>とQRコードができます。
+                    友達がそれを読み取ると、対局結果を送り合えるようになります。
+                  </div>
+                  <button onClick={() => setView("friends")} style={{
+                    width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+                    border: `1px solid ${t.ac}`, background: t.acS, color: t.ac, fontSize: 14, fontWeight: 800,
+                  }}>👥 個人IDを作る</button>
+                </div>
+              ))}
             </div>
 
             {/* 登録の入口はここ1つ。名前だけ／QR／リンク の違いは次の画面で説明する */}
@@ -8246,7 +8307,7 @@ input, select { padding: 10px 14px; }
               Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します",
               () => setView("addwho"), true)}
 
-            {menuItem("📋", "登録した人",
+            {menuItem("📋", ["メンバー・", "お友達リスト"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)),
               `${presetNames.length}人${frCount() > 0 ? `（うち友達 ${frCount()}人）` : ""}`,
               () => { setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null); })}
 
@@ -8339,7 +8400,7 @@ input, select { padding: 10px 14px; }
                     メンバーを{gEditSize}人選ぶ（{gEditMembers.length}/{gEditSize}）
                   </div>
                   <div style={{ fontSize: 10, color: t.dm, marginBottom: 7, lineHeight: 1.7 }}>
-                    ここに出るのは「登録した人」に入っている名前です。
+                    ここに出るのは「メンバー・お友達リスト」に入っている名前です。
                     いない人は先に登録してください
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7, marginBottom: 12 }}>
@@ -8433,30 +8494,6 @@ input, select { padding: 10px 14px; }
               )}
             </div>
 
-            {/* 友達（オンライン共有）。使えないときは、その旨だけ出す */}
-            <div style={{ marginTop: 12 }}>
-              {Net.enabled() ? (
-                menuItem("👥", "友達",
-                  myCode ? "あなたの個人ID・友達リスト" : "オンライン共有をはじめる",
-                  () => setView("friends"))
-              ) : (
-                <div style={{ ...card, padding: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <span style={{
-                      fontSize: 20, width: 40, height: 40, borderRadius: 11, background: t.acS,
-                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    }}>👥</span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>友達</div>
-                      <div style={{ fontSize: 11, color: t.dm, textWrap: "balance" }}>オンライン共有・いまは使えません</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textWrap: "balance" }}>
-                    {"対局結果を友達と送り合う機能です。このアプリでは準備中のため、いまは名前とグループだけが使えます。"}
-                  </div>
-                </div>
-              )}
-            </div>
           </>
         )}
 
@@ -13760,7 +13797,6 @@ input, select { padding: 10px 14px; }
   const [frHint, setFrHint] = useState(null);            // 次にすることの案内
   const [frAfterReg, setFrAfterReg] = useState("");      // 登録がすんだら続けてやること
   const [frNameInput, setFrNameInput] = useState("");
-  const [frEditingName, setFrEditingName] = useState(false);
   const [frAddInput, setFrAddInput] = useState("");
   const [sendPick, setSendPick] = useState(null);        // 送信モーダル { ids: [対局id] }
   const [sendSel, setSendSel] = useState([]);            // 送り先に選んだ友達uid
@@ -13792,7 +13828,8 @@ input, select { padding: 10px 14px; }
   };
   const [frEditFid, setFrEditFid] = useState(null);      // 呼び名を変えている友達
   const [frEditInput, setFrEditInput] = useState("");
-  const [qrOpen, setQrOpen] = useState(false);           // カメラでQRを読む画面
+  const [qrOpen, setQrOpen] = useState(false);           // QRの画面
+  const [qrMode, setQrMode] = useState("scan");          // scan=読み取る / show=自分を見せる
   const [qrMsg, setQrMsg] = useState("");
   const [qrFail, setQrFail] = useState(false);           // カメラが使えなかった
 
@@ -13865,33 +13902,12 @@ input, select { padding: 10px 14px; }
       // 「QRで追加」から来た人は、そのままカメラを開く
       if (frAfterReg === "qr") {
         setFrAfterReg(""); setFrHint(null);
-        setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true);
+        setQrMode("scan"); setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true);
       } else if (frAfterReg === "link") {
-        // 共有は画面を触った流れでないと出ない端末があるので、押す場所だけ案内する
-        setFrAfterReg(""); setFrHint("下の「📤 追加用のリンクを送る」を押して、友達に送ってください");
+        // 共有は画面を触った流れでないと出ない端末があるので、送るボタンのある画面を開く
+        setFrAfterReg(""); setFrHint(null);
+        setQrMode("show"); setQrOpen(true);
       }
-    } catch { setFrError(NET_FAIL); }
-    setFrBusy(false);
-  };
-
-  const frRename = async () => {
-    const nm = frNameInput.trim();
-    if (!nm) { setFrError("名前を入れてください"); return; }
-    setFrBusy(true); setFrError(null);
-    try {
-      const { uid } = await Net.ensureReady();
-      await Net.update("users/" + uid, { name: nm });
-      // 友達のリストに載っている自分の名前も直しておく
-      for (const fid of Object.keys(friendsMap)) {
-        try { await Net.update("friends/" + fid + "/" + uid, { name: nm }); } catch {}
-      }
-      const before = myName;
-      setMyName(nm); setFrEditingName(false); setFrNameInput("");
-      try { localStorage.setItem("mj_my_name", nm); } catch {}
-      // 名簿の自分の名前もそろえる（古い名前が残ると二重に並んでしまう）
-      updatePresetNames(prev => (prev.includes(before)
-        ? prev.map(x => (x === before ? nm : x)).filter((x, i, a) => a.indexOf(x) === i)
-        : (prev.includes(nm) ? prev : [nm, ...prev])));
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
   };
@@ -14235,7 +14251,7 @@ input, select { padding: 10px 14px; }
     // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); setFrHint(null); setFrAfterReg(""); }
-    if (view !== "friends") { setFrEditingName(false); setFrEditFid(null); setQrOpen(false); }
+    if (view !== "friends") { setFrEditFid(null); setQrOpen(false); }
     // 共有のあとの一言は、画面を移ったら持ち越さない（前の画面の分が残って見える）
     setShareMsg(null); setShareFallback(null);
   }, [view]);
@@ -14258,9 +14274,11 @@ input, select { padding: 10px 14px; }
     } catch {}
   }, []);
 
-  // 自分のQR（コード表示の補助。オフラインなどで作れなければコード文字だけ出す）
+  // 自分のQR（コード表示の補助。オフラインなどで作れなければコード文字だけ出す）。
+  // メンバー画面・友達画面・読み取り画面の「自分を見せる」で使う
   React.useEffect(() => {
-    if (view !== "friends" || !myCode || myQR) return;
+    const want = myCode && (view === "friends" || qrOpen || (view === "home" && homeCat === "members"));
+    if (!want || myQR) return;
     let dead = false;
     (async () => {
       try {
@@ -14275,7 +14293,7 @@ input, select { padding: 10px 14px; }
       } catch {}
     })();
     return () => { dead = true; };
-  }, [view, myCode, myQR]);
+  }, [view, homeCat, qrOpen, myCode, myQR]);
 
   // ── QRコードの読み取り ──
   // Android などは端末の機能（BarcodeDetector）で読む。iPhone は対応していないので
@@ -14356,7 +14374,7 @@ input, select { padding: 10px 14px; }
   };
 
   React.useEffect(() => {
-    if (!qrOpen) return;
+    if (!qrOpen || qrMode !== "scan") return;
     let dead = false, stream = null, timer = 0;
     const video = document.createElement("video");
     video.setAttribute("playsinline", "true");     // iPhoneで全画面にしない
@@ -14397,7 +14415,7 @@ input, select { padding: 10px 14px; }
       if (stream) stream.getTracks().forEach(tr => tr.stop());
       try { video.pause(); video.srcObject = null; video.remove(); } catch {}
     };
-  }, [qrOpen]);
+  }, [qrOpen, qrMode]);
 
   const frInput = { width: "100%", padding: "13px 12px", borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 16, boxSizing: "border-box" };
 
@@ -14444,13 +14462,31 @@ input, select { padding: 10px 14px; }
         </div>
       ) : (
         <>
+          {/* ── 自分。名前と個人IDだけ。QRや変更はメンバー画面のカードにある ── */}
+          <div style={{ ...card, padding: 14, marginBottom: 14, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{
+              fontSize: 16, width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              background: t.gdS, border: `1px solid ${t.gd}55`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>🙋</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myName}</span>
+              <span style={{ display: "block", fontSize: 11, color: t.dm, marginTop: 2, letterSpacing: "0.08em" }}>個人ID {myCode}</span>
+            </span>
+            <button onClick={() => { setQrMode("show"); setQrOpen(true); }} style={{
+              flexShrink: 0, minHeight: 36, padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+              border: `1px solid ${t.ac}`, background: t.acS, color: t.ac,
+              fontSize: 12, fontWeight: 800, whiteSpace: "nowrap",
+            }}>📱 見せる</button>
+          </div>
+
           {/* ── ① 友達を追加する。いちばん使うので先頭に置く ── */}
           <div style={{ ...card, padding: 16, marginBottom: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>友達を追加する</div>
             <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
               どちらか片方が追加すれば、お互いの友達リストに入ります。
             </div>
-            <button disabled={frBusy} onClick={() => { setFrError(null); setFrNotice(null); setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true); }}
+            <button disabled={frBusy} onClick={() => { setFrError(null); setFrNotice(null); setQrMode("scan"); setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true); }}
               style={{ ...actionBtn("p"), marginBottom: 10, opacity: frBusy ? 0.5 : 1, fontSize: "clamp(13px, 4vw, 15px)" }}>
               {["📷 QRコードを", "読み取る"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
             </button>
@@ -14464,54 +14500,6 @@ input, select { padding: 10px 14px; }
             </div>
             <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
               友達から届いた追加リンクを開いても、この欄に入ります。
-            </div>
-          </div>
-
-          {/* ── ② 自分を追加してもらう ── */}
-          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 800, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myName}</span>
-              <button style={{ padding: "8px 12px", borderRadius: 8, cursor: "pointer", border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 12, fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap" }}
-                onClick={() => { setFrEditingName(v => !v); setFrNameInput(myName); }}>✏️ 名前を変える</button>
-            </div>
-            {frEditingName && (
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <input value={frNameInput} onChange={(e) => setFrNameInput(e.target.value)} maxLength={10} style={{ ...frInput, flex: 1, minWidth: 0 }} />
-                <button disabled={frBusy} onClick={frRename} style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700 }}>保存</button>
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>あなたの個人ID</div>
-            <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "0.18em", textAlign: "center", marginBottom: 10 }}>{myCode}</div>
-            {myQR && (
-              <div style={{ textAlign: "center", marginBottom: 10 }}>
-                <span style={{ display: "inline-block", padding: 10, background: "#fff", borderRadius: 10, lineHeight: 0 }}
-                  dangerouslySetInnerHTML={{ __html: myQR }} />
-              </div>
-            )}
-            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12, textWrap: "balance" }}>
-              目の前の人には、このQRコードを読み取ってもらいます。離れている人には、下のボタンでリンクを送ります。
-            </div>
-            <button disabled={!myCode} onClick={shareMyCode} style={{
-              width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
-              border: `1px solid ${t.ac}`, background: t.acS, color: t.ac,
-              fontSize: 14, fontWeight: 800, opacity: myCode ? 1 : 0.45,
-            }}>📤 追加用のリンクを送る</button>
-            {shareMsg && (
-              <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {shareMsg}</div>
-            )}
-            {shareFallback && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 8, textWrap: "balance" }}>
-                  {"この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"}
-                </div>
-                <div style={{
-                  fontSize: 12, color: t.ac, background: t.sf, borderRadius: 8, padding: "10px 12px",
-                  wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
-                }}>{shareFallback}</div>
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
-              {"このリンクを開いた人は誰でも友達になれます。知らない人に見えるところには貼らないでください。"}
             </div>
           </div>
 
@@ -14586,33 +14574,89 @@ input, select { padding: 10px 14px; }
     );
   };
 
-  // カメラでQRコードを読む
-  const renderQrScan = () => (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 160, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
-      <div style={{ width: "100%", maxWidth: 400 }}>
-        <div style={card}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 800, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📷 QRコードを読み取る</span>
-            <button aria-label="閉じる" style={{ width: 36, height: 36, flexShrink: 0, background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
-              onClick={() => setQrOpen(false)}>✕</button>
+  // QRの画面。相手のQRを読むのと、自分のQRを見せるのを1つにまとめてある
+  const renderQrScan = () => {
+    const tab = (key, label) => (
+      <button onClick={() => { setQrMode(key); if (key === "scan") { setQrFail(false); setQrMsg("カメラを準備しています…"); } }}
+        style={{
+          flex: 1, minWidth: 0, minHeight: 40, padding: "10px 6px", borderRadius: 9, cursor: "pointer",
+          border: qrMode === key ? `2px solid ${t.ac}` : `1px solid ${t.bd}`,
+          background: qrMode === key ? t.acS : t.sf, color: qrMode === key ? t.ac : t.dm,
+          fontSize: "clamp(12px, 3.6vw, 13px)", fontWeight: 800, whiteSpace: "nowrap",
+        }}>{label}</button>
+    );
+    return (
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 160, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ width: "100%", maxWidth: 400 }}>
+          <div style={card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <span style={{ fontSize: 15, fontWeight: 800, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {qrMode === "scan" ? "📷 QRコードを読み取る" : "📱 自分のQRを見せる"}
+              </span>
+              <button aria-label="閉じる" style={{ width: 36, height: 36, flexShrink: 0, background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
+                onClick={() => setQrOpen(false)}>✕</button>
+            </div>
+
+            {/* どちら向きでもここで切り替えられる */}
+            {myCode && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                {tab("scan", "📷 読み取る")}
+                {tab("show", "📱 見せる")}
+              </div>
+            )}
+
+            {qrMode === "scan" ? (
+              <>
+                {/* カメラが使えなかったときは、黒い枠を出しても仕方がないので畳む */}
+                {!qrFail && (
+                  <div id="mj-qr-box" style={{
+                    width: "100%", aspectRatio: "1 / 1", borderRadius: 12, overflow: "hidden",
+                    background: "#000", border: `1px solid ${t.bd}`, marginBottom: 10,
+                  }} />
+                )}
+                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12, textWrap: "balance" }}>{qrMsg}</div>
+                <label style={{ ...actionBtn(), marginBottom: 0, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 44 }}>
+                  写真から読み取る
+                  <input type="file" accept="image/*" style={{ display: "none" }}
+                    onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; qrFromPhoto(f); }} />
+                </label>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 11, color: t.dm, marginBottom: 4 }}>あなたの個人ID</div>
+                <div style={{ fontSize: "clamp(24px, 8vw, 30px)", fontWeight: 900, letterSpacing: "0.16em", textAlign: "center", marginBottom: 10 }}>{myCode}</div>
+                {myQR ? (
+                  <div style={{ textAlign: "center", marginBottom: 10 }}>
+                    <span style={{ display: "inline-block", padding: 12, background: "#fff", borderRadius: 10, lineHeight: 0 }}
+                      dangerouslySetInnerHTML={{ __html: myQR }} />
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 10, textWrap: "balance" }}>
+                    QRコードを作れませんでした。上の6文字を相手に入力してもらってください。
+                  </div>
+                )}
+                {myQR && (
+                  <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 12, textWrap: "balance" }}>
+                    相手に、この画面のQRコードを「📷 読み取る」で読んでもらってください。
+                  </div>
+                )}
+                <button onClick={shareMyCode} style={{ ...actionBtn(), marginBottom: 0, minHeight: 44 }}>📤 リンクで送る</button>
+                {shareMsg && (
+                  <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {shareMsg}</div>
+                )}
+                {shareFallback && (
+                  <div style={{
+                    fontSize: 12, color: t.ac, background: t.sf, borderRadius: 8, padding: "10px 12px",
+                    marginTop: 10, wordBreak: "break-all", userSelect: "all", lineHeight: 1.7,
+                  }}>{shareFallback}</div>
+                )}
+              </>
+            )}
           </div>
-          {/* カメラが使えなかったときは、黒い枠を出しても仕方がないので畳む */}
-          {!qrFail && (
-            <div id="mj-qr-box" style={{
-              width: "100%", aspectRatio: "1 / 1", borderRadius: 12, overflow: "hidden",
-              background: "#000", border: `1px solid ${t.bd}`, marginBottom: 10,
-            }} />
-          )}
-          <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12, textWrap: "balance" }}>{qrMsg}</div>
-          <label style={{ ...actionBtn(), marginBottom: 0, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 44 }}>
-            写真から読み取る
-            <input type="file" accept="image/*" style={{ display: "none" }}
-              onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; qrFromPhoto(f); }} />
-          </label>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ── メンバー・友達の登録のしかたを選ぶ画面 ──
   // 「名前だけ」と「友達」で何が違うのかを、ここで一度に見せる
@@ -14629,7 +14673,7 @@ input, select { padding: 10px 14px; }
     const goQr = () => {
       if (needMe) return goRegisterFirst("QRコード");
       setFrError(null); setFrNotice(null);
-      setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true); setView("friends");
+      setQrMode("scan"); setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true); setView("friends");
     };
     const goLink = () => {
       if (needMe) return goRegisterFirst("リンク");

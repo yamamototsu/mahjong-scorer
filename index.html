@@ -9889,7 +9889,12 @@ input, select { padding: 10px 14px; }
         fontWeight: 800,
         margin: "0 0 4px"
       }
-    }, "登録した人"), React.createElement("p", {
+    }, ["メンバー・", "お友達リスト"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("p", {
       style: {
         fontSize: 12,
         color: t.dm,
@@ -15258,12 +15263,176 @@ input, select { padding: 10px 14px; }
         marginTop: 10,
         textWrap: "balance"
       }
-    }, myName ? "名簿では「あなた」の印が付きます。友達に表示される名前もこれになります。" : "決めておくと、名簿に「あなた」の印が付き、友達に登録するときもそのまま使えます。")), menuItem("➕", ["メンバー・", "友達を登録"].map((x, k) => React.createElement("span", {
+    }, myName ? "名簿では「あなた」の印が付きます。友達に表示される名前もこれになります。" : "決めておくと、名簿に「あなた」の印が付き、友達に登録するときもそのまま使えます。"), Net.enabled() && (myCode ? React.createElement("div", {
+      style: {
+        marginTop: 14,
+        paddingTop: 14,
+        borderTop: `1px solid ${t.bd}`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 4
+      }
+    }, "あなたの個人ID"), React.createElement("div", {
+      style: {
+        fontSize: "clamp(24px, 8vw, 30px)",
+        fontWeight: 900,
+        letterSpacing: "0.16em",
+        textAlign: "center",
+        marginBottom: 10
+      }
+    }, myCode), myQR && React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "inline-block",
+        padding: 10,
+        background: "#fff",
+        borderRadius: 10,
+        lineHeight: 0
+      },
+      dangerouslySetInnerHTML: {
+        __html: myQR
+      }
+    })), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 10,
+        textWrap: "balance"
+      }
+    }, myQR ? "目の前の人には、このQRコードを読み取ってもらいます。離れている人には、下のボタンでリンクを送ります。" : "QRコードを作れませんでした。目の前の人には、上の6文字を入力してもらってください。離れている人には、下のボタンでリンクを送ります。"), React.createElement("button", {
+      onClick: shareMyCode,
+      style: {
+        width: "100%",
+        minHeight: 44,
+        padding: "12px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.ac}`,
+        background: t.acS,
+        color: t.ac,
+        fontSize: 14,
+        fontWeight: 800
+      }
+    }, "📤 追加用のリンクを送る"), shareMsg && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.gn,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 8,
+        textWrap: "balance"
+      }
+    }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
+      style: {
+        marginTop: 10
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 8,
+        textWrap: "balance"
+      }
+    }, "この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        background: t.sf,
+        borderRadius: 8,
+        padding: "10px 12px",
+        wordBreak: "break-all",
+        userSelect: "all",
+        lineHeight: 1.7
+      }
+    }, shareFallback)), React.createElement("button", {
+      onClick: () => setView("friends"),
+      style: {
+        width: "100%",
+        minHeight: 44,
+        marginTop: 10,
+        padding: "12px 10px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.tx,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        textAlign: "left",
+        boxSizing: "border-box"
+      }
+    }, React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        fontSize: 16
+      }
+    }, "👥"), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "友達リスト", frCount() > 0 ? `（${frCount()}人）` : ""), React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        color: t.dm,
+        fontSize: 16
+      }
+    }, "›"))) : React.createElement("div", {
+      style: {
+        marginTop: 14,
+        paddingTop: 14,
+        borderTop: `1px solid ${t.bd}`
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 10,
+        textWrap: "balance"
+      }
+    }, "名前を登録すると、あなただけの", React.createElement("b", {
+      style: {
+        color: t.tx,
+        display: "inline-block"
+      }
+    }, "個人ID"), "とQRコードができます。 友達がそれを読み取ると、対局結果を送り合えるようになります。"), React.createElement("button", {
+      onClick: () => setView("friends"),
+      style: {
+        width: "100%",
+        minHeight: 44,
+        padding: "12px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.ac}`,
+        background: t.acS,
+        color: t.ac,
+        fontSize: 14,
+        fontWeight: 800
+      }
+    }, "👥 個人IDを作る")))), menuItem("➕", ["メンバー・", "友達を登録"].map((x, k) => React.createElement("span", {
       key: k,
       style: {
         display: "inline-block"
       }
-    }, x)), Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します", () => setView("addwho"), true), menuItem("📋", "登録した人", `${presetNames.length}人${frCount() > 0 ? `（うち友達 ${frCount()}人）` : ""}`, () => {
+    }, x)), Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します", () => setView("addwho"), true), menuItem("📋", ["メンバー・", "お友達リスト"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)), `${presetNames.length}人${frCount() > 0 ? `（うち友達 ${frCount()}人）` : ""}`, () => {
       setNamesBackTo("members");
       setView("names");
       setNewNameInput("");
@@ -15474,7 +15643,7 @@ input, select { padding: 10px 14px; }
         marginBottom: 7,
         lineHeight: 1.7
       }
-    }, "ここに出るのは「登録した人」に入っている名前です。 いない人は先に登録してください"), React.createElement("div", {
+    }, "ここに出るのは「メンバー・お友達リスト」に入っている名前です。 いない人は先に登録してください"), React.createElement("div", {
       style: {
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
@@ -15657,58 +15826,7 @@ input, select { padding: 10px 14px; }
         userSelect: "all",
         lineHeight: 1.7
       }
-    }, shareFallback))), React.createElement("div", {
-      style: {
-        marginTop: 12
-      }
-    }, Net.enabled() ? menuItem("👥", "友達", myCode ? "あなたの個人ID・友達リスト" : "オンライン共有をはじめる", () => setView("friends")) : React.createElement("div", {
-      style: {
-        ...card,
-        padding: 16
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 8
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 20,
-        width: 40,
-        height: 40,
-        borderRadius: 11,
-        background: t.acS,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0
-      }
-    }, "👥"), React.createElement("div", {
-      style: {
-        minWidth: 0
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 15,
-        fontWeight: 700,
-        color: t.tx
-      }
-    }, "友達"), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        textWrap: "balance"
-      }
-    }, "オンライン共有・いまは使えません"))), React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.dm,
-        lineHeight: 1.8,
-        textWrap: "balance"
-      }
-    }, "対局結果を友達と送り合う機能です。このアプリでは準備中のため、いまは名前とグループだけが使えます。")))), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値"), setOpen === "rules" && React.createElement(React.Fragment, null, React.createElement("div", {
+    }, shareFallback)))), homeCat === "settings" && React.createElement(React.Fragment, null, secHdr("rules", "📏", "ルール設定", "連荘・複数ロン・食いタンなどの初期値"), setOpen === "rules" && React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -25520,7 +25638,6 @@ input, select { padding: 10px 14px; }
   const [frHint, setFrHint] = useState(null);
   const [frAfterReg, setFrAfterReg] = useState("");
   const [frNameInput, setFrNameInput] = useState("");
-  const [frEditingName, setFrEditingName] = useState(false);
   const [frAddInput, setFrAddInput] = useState("");
   const [sendPick, setSendPick] = useState(null);
   const [sendSel, setSendSel] = useState([]);
@@ -25565,6 +25682,7 @@ input, select { padding: 10px 14px; }
   const [frEditFid, setFrEditFid] = useState(null);
   const [frEditInput, setFrEditInput] = useState("");
   const [qrOpen, setQrOpen] = useState(false);
+  const [qrMode, setQrMode] = useState("scan");
   const [qrMsg, setQrMsg] = useState("");
   const [qrFail, setQrFail] = useState(false);
   const NET_FAIL = "通信できませんでした。電波を確認してもう一度お試しください。";
@@ -25662,48 +25780,16 @@ input, select { padding: 10px 14px; }
       if (frAfterReg === "qr") {
         setFrAfterReg("");
         setFrHint(null);
+        setQrMode("scan");
         setQrFail(false);
         setQrMsg("カメラを準備しています…");
         setQrOpen(true);
       } else if (frAfterReg === "link") {
         setFrAfterReg("");
-        setFrHint("下の「📤 追加用のリンクを送る」を押して、友達に送ってください");
+        setFrHint(null);
+        setQrMode("show");
+        setQrOpen(true);
       }
-    } catch {
-      setFrError(NET_FAIL);
-    }
-    setFrBusy(false);
-  };
-  const frRename = async () => {
-    const nm = frNameInput.trim();
-    if (!nm) {
-      setFrError("名前を入れてください");
-      return;
-    }
-    setFrBusy(true);
-    setFrError(null);
-    try {
-      const {
-        uid
-      } = await Net.ensureReady();
-      await Net.update("users/" + uid, {
-        name: nm
-      });
-      for (const fid of Object.keys(friendsMap)) {
-        try {
-          await Net.update("friends/" + fid + "/" + uid, {
-            name: nm
-          });
-        } catch {}
-      }
-      const before = myName;
-      setMyName(nm);
-      setFrEditingName(false);
-      setFrNameInput("");
-      try {
-        localStorage.setItem("mj_my_name", nm);
-      } catch {}
-      updatePresetNames(prev => prev.includes(before) ? prev.map(x => x === before ? nm : x).filter((x, i, a) => a.indexOf(x) === i) : prev.includes(nm) ? prev : [nm, ...prev]);
     } catch {
       setFrError(NET_FAIL);
     }
@@ -26173,7 +26259,6 @@ input, select { padding: 10px 14px; }
       setFrAfterReg("");
     }
     if (view !== "friends") {
-      setFrEditingName(false);
       setFrEditFid(null);
       setQrOpen(false);
     }
@@ -26200,7 +26285,8 @@ input, select { padding: 10px 14px; }
     } catch {}
   }, []);
   React.useEffect(() => {
-    if (view !== "friends" || !myCode || myQR) return;
+    const want = myCode && (view === "friends" || qrOpen || view === "home" && homeCat === "members");
+    if (!want || myQR) return;
     let dead = false;
     (async () => {
       try {
@@ -26223,7 +26309,7 @@ input, select { padding: 10px 14px; }
     return () => {
       dead = true;
     };
-  }, [view, myCode, myQR]);
+  }, [view, homeCat, qrOpen, myCode, myQR]);
   const loadJsQR = async () => {
     if (window.jsQR) return window.jsQR;
     const urls = ["https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js", "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"];
@@ -26316,7 +26402,7 @@ input, select { padding: 10px 14px; }
     }
   };
   React.useEffect(() => {
-    if (!qrOpen) return;
+    if (!qrOpen || qrMode !== "scan") return;
     let dead = false,
       stream = null,
       timer = 0;
@@ -26384,7 +26470,7 @@ input, select { padding: 10px 14px; }
         video.remove();
       } catch {}
     };
-  }, [qrOpen]);
+  }, [qrOpen, qrMode]);
   const frInput = {
     width: "100%",
     padding: "13px 12px",
@@ -26515,6 +26601,68 @@ input, select { padding: 10px 14px; }
     }, "登録すると、そのまま個人ID「", pend, "」の人と友達になります")) : React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         ...card,
+        padding: 14,
+        marginBottom: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        flexShrink: 0,
+        background: t.gdS,
+        border: `1px solid ${t.gd}55`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, "🙋"), React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 13,
+        fontWeight: 800,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, myName), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: t.dm,
+        marginTop: 2,
+        letterSpacing: "0.08em"
+      }
+    }, "個人ID ", myCode)), React.createElement("button", {
+      onClick: () => {
+        setQrMode("show");
+        setQrOpen(true);
+      },
+      style: {
+        flexShrink: 0,
+        minHeight: 36,
+        padding: "8px 12px",
+        borderRadius: 8,
+        cursor: "pointer",
+        border: `1px solid ${t.ac}`,
+        background: t.acS,
+        color: t.ac,
+        fontSize: 12,
+        fontWeight: 800,
+        whiteSpace: "nowrap"
+      }
+    }, "📱 見せる")), React.createElement("div", {
+      style: {
+        ...card,
         padding: 16,
         marginBottom: 14
       }
@@ -26536,6 +26684,7 @@ input, select { padding: 10px 14px; }
       onClick: () => {
         setFrError(null);
         setFrNotice(null);
+        setQrMode("scan");
         setQrFail(false);
         setQrMsg("カメラを準備しています…");
         setQrOpen(true);
@@ -26599,168 +26748,6 @@ input, select { padding: 10px 14px; }
         textWrap: "balance"
       }
     }, "友達から届いた追加リンクを開いても、この欄に入ります。")), React.createElement("div", {
-      style: {
-        ...card,
-        padding: 16,
-        marginBottom: 14
-      }
-    }, React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        marginBottom: 10
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 14,
-        fontWeight: 800,
-        flex: 1,
-        minWidth: 0,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap"
-      }
-    }, myName), React.createElement("button", {
-      style: {
-        padding: "8px 12px",
-        borderRadius: 8,
-        cursor: "pointer",
-        border: `1px solid ${t.bd}`,
-        background: t.sf,
-        color: t.dm,
-        fontSize: 12,
-        fontWeight: 700,
-        flexShrink: 0,
-        whiteSpace: "nowrap"
-      },
-      onClick: () => {
-        setFrEditingName(v => !v);
-        setFrNameInput(myName);
-      }
-    }, "✏️ 名前を変える")), frEditingName && React.createElement("div", {
-      style: {
-        display: "flex",
-        gap: 8,
-        marginBottom: 12
-      }
-    }, React.createElement("input", {
-      value: frNameInput,
-      onChange: e => setFrNameInput(e.target.value),
-      maxLength: 10,
-      style: {
-        ...frInput,
-        flex: 1,
-        minWidth: 0
-      }
-    }), React.createElement("button", {
-      disabled: frBusy,
-      onClick: frRename,
-      style: {
-        flex: "0 0 64px",
-        borderRadius: 10,
-        cursor: "pointer",
-        border: "none",
-        background: t.ac,
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: 700
-      }
-    }, "保存")), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        marginBottom: 6
-      }
-    }, "あなたの個人ID"), React.createElement("div", {
-      style: {
-        fontSize: 30,
-        fontWeight: 900,
-        letterSpacing: "0.18em",
-        textAlign: "center",
-        marginBottom: 10
-      }
-    }, myCode), myQR && React.createElement("div", {
-      style: {
-        textAlign: "center",
-        marginBottom: 10
-      }
-    }, React.createElement("span", {
-      style: {
-        display: "inline-block",
-        padding: 10,
-        background: "#fff",
-        borderRadius: 10,
-        lineHeight: 0
-      },
-      dangerouslySetInnerHTML: {
-        __html: myQR
-      }
-    })), React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.dm,
-        lineHeight: 1.8,
-        marginBottom: 12,
-        textWrap: "balance"
-      }
-    }, "目の前の人には、このQRコードを読み取ってもらいます。離れている人には、下のボタンでリンクを送ります。"), React.createElement("button", {
-      disabled: !myCode,
-      onClick: shareMyCode,
-      style: {
-        width: "100%",
-        minHeight: 44,
-        padding: "12px 8px",
-        borderRadius: 10,
-        cursor: "pointer",
-        border: `1px solid ${t.ac}`,
-        background: t.acS,
-        color: t.ac,
-        fontSize: 14,
-        fontWeight: 800,
-        opacity: myCode ? 1 : 0.45
-      }
-    }, "📤 追加用のリンクを送る"), shareMsg && React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.gn,
-        fontWeight: 700,
-        lineHeight: 1.8,
-        marginTop: 8,
-        textWrap: "balance"
-      }
-    }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
-      style: {
-        marginTop: 10
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.dm,
-        lineHeight: 1.8,
-        marginBottom: 8,
-        textWrap: "balance"
-      }
-    }, "この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"), React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: t.ac,
-        background: t.sf,
-        borderRadius: 8,
-        padding: "10px 12px",
-        wordBreak: "break-all",
-        userSelect: "all",
-        lineHeight: 1.7
-      }
-    }, shareFallback)), React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: t.dm,
-        lineHeight: 1.8,
-        marginTop: 10,
-        textWrap: "balance"
-      }
-    }, "このリンクを開いた人は誰でも友達になれます。知らない人に見えるところには貼らないでください。")), React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -26938,101 +26925,206 @@ input, select { padding: 10px 14px; }
       }
     }, x))))))));
   };
-  const renderQrScan = () => React.createElement("div", {
-    style: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: "rgba(0,0,0,0.92)",
-      zIndex: 160,
-      display: "flex",
-      alignItems: "flex-start",
-      justifyContent: "center",
-      padding: "20px 16px",
-      paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
-      paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
-      overflowY: "auto",
-      WebkitOverflowScrolling: "touch"
-    }
-  }, React.createElement("div", {
-    style: {
-      width: "100%",
-      maxWidth: 400
-    }
-  }, React.createElement("div", {
-    style: card
-  }, React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 10
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 15,
-      fontWeight: 800,
-      minWidth: 0,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    }
-  }, "📷 QRコードを読み取る"), React.createElement("button", {
-    "aria-label": "閉じる",
-    style: {
-      width: 36,
-      height: 36,
-      flexShrink: 0,
-      background: "none",
-      border: "none",
-      color: t.dm,
-      fontSize: 20,
-      cursor: "pointer"
-    },
-    onClick: () => setQrOpen(false)
-  }, "✕")), !qrFail && React.createElement("div", {
-    id: "mj-qr-box",
-    style: {
-      width: "100%",
-      aspectRatio: "1 / 1",
-      borderRadius: 12,
-      overflow: "hidden",
-      background: "#000",
-      border: `1px solid ${t.bd}`,
-      marginBottom: 10
-    }
-  }), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.dm,
-      lineHeight: 1.8,
-      marginBottom: 12,
-      textWrap: "balance"
-    }
-  }, qrMsg), React.createElement("label", {
-    style: {
-      ...actionBtn(),
-      marginBottom: 0,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: 44
-    }
-  }, "写真から読み取る", React.createElement("input", {
-    type: "file",
-    accept: "image/*",
-    style: {
-      display: "none"
-    },
-    onChange: e => {
-      const f = e.target.files && e.target.files[0];
-      e.target.value = "";
-      qrFromPhoto(f);
-    }
-  })))));
+  const renderQrScan = () => {
+    const tab = (key, label) => React.createElement("button", {
+      onClick: () => {
+        setQrMode(key);
+        if (key === "scan") {
+          setQrFail(false);
+          setQrMsg("カメラを準備しています…");
+        }
+      },
+      style: {
+        flex: 1,
+        minWidth: 0,
+        minHeight: 40,
+        padding: "10px 6px",
+        borderRadius: 9,
+        cursor: "pointer",
+        border: qrMode === key ? `2px solid ${t.ac}` : `1px solid ${t.bd}`,
+        background: qrMode === key ? t.acS : t.sf,
+        color: qrMode === key ? t.ac : t.dm,
+        fontSize: "clamp(12px, 3.6vw, 13px)",
+        fontWeight: 800,
+        whiteSpace: "nowrap"
+      }
+    }, label);
+    return React.createElement("div", {
+      style: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.92)",
+        zIndex: 160,
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "20px 16px",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch"
+      }
+    }, React.createElement("div", {
+      style: {
+        width: "100%",
+        maxWidth: 400
+      }
+    }, React.createElement("div", {
+      style: card
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 800,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, qrMode === "scan" ? "📷 QRコードを読み取る" : "📱 自分のQRを見せる"), React.createElement("button", {
+      "aria-label": "閉じる",
+      style: {
+        width: 36,
+        height: 36,
+        flexShrink: 0,
+        background: "none",
+        border: "none",
+        color: t.dm,
+        fontSize: 20,
+        cursor: "pointer"
+      },
+      onClick: () => setQrOpen(false)
+    }, "✕")), myCode && React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, tab("scan", "📷 読み取る"), tab("show", "📱 見せる")), qrMode === "scan" ? React.createElement(React.Fragment, null, !qrFail && React.createElement("div", {
+      id: "mj-qr-box",
+      style: {
+        width: "100%",
+        aspectRatio: "1 / 1",
+        borderRadius: 12,
+        overflow: "hidden",
+        background: "#000",
+        border: `1px solid ${t.bd}`,
+        marginBottom: 10
+      }
+    }), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 12,
+        textWrap: "balance"
+      }
+    }, qrMsg), React.createElement("label", {
+      style: {
+        ...actionBtn(),
+        marginBottom: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: 44
+      }
+    }, "写真から読み取る", React.createElement("input", {
+      type: "file",
+      accept: "image/*",
+      style: {
+        display: "none"
+      },
+      onChange: e => {
+        const f = e.target.files && e.target.files[0];
+        e.target.value = "";
+        qrFromPhoto(f);
+      }
+    }))) : React.createElement(React.Fragment, null, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 4
+      }
+    }, "あなたの個人ID"), React.createElement("div", {
+      style: {
+        fontSize: "clamp(24px, 8vw, 30px)",
+        fontWeight: 900,
+        letterSpacing: "0.16em",
+        textAlign: "center",
+        marginBottom: 10
+      }
+    }, myCode), myQR ? React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "inline-block",
+        padding: 12,
+        background: "#fff",
+        borderRadius: 10,
+        lineHeight: 0
+      },
+      dangerouslySetInnerHTML: {
+        __html: myQR
+      }
+    })) : React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 10,
+        textWrap: "balance"
+      }
+    }, "QRコードを作れませんでした。上の6文字を相手に入力してもらってください。"), myQR && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 12,
+        textWrap: "balance"
+      }
+    }, "相手に、この画面のQRコードを「📷 読み取る」で読んでもらってください。"), React.createElement("button", {
+      onClick: shareMyCode,
+      style: {
+        ...actionBtn(),
+        marginBottom: 0,
+        minHeight: 44
+      }
+    }, "📤 リンクで送る"), shareMsg && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.gn,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 8,
+        textWrap: "balance"
+      }
+    }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        background: t.sf,
+        borderRadius: 8,
+        padding: "10px 12px",
+        marginTop: 10,
+        wordBreak: "break-all",
+        userSelect: "all",
+        lineHeight: 1.7
+      }
+    }, shareFallback)))));
+  };
   const renderAddWho = () => {
     const backToMembers = () => {
       setView("home");
@@ -27056,6 +27148,7 @@ input, select { padding: 10px 14px; }
       if (needMe) return goRegisterFirst("QRコード");
       setFrError(null);
       setFrNotice(null);
+      setQrMode("scan");
       setQrFail(false);
       setQrMsg("カメラを準備しています…");
       setQrOpen(true);
