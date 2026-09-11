@@ -95,6 +95,13 @@ const genFriendCode = () => Array.from({
   length: 6
 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 const FRIEND_LINK = code => location.origin + location.pathname + "?fr=" + code;
+const CODE_FROM = text => {
+  const v = String(text || "");
+  const m = /[?&]fr=([0-9A-Za-z]{6})/.exec(v) || /^\s*([0-9A-Za-z]{6})\s*$/.exec(v);
+  if (!m) return "";
+  const c = m[1].toUpperCase();
+  return c.split("").every(ch => CODE_CHARS.includes(ch)) ? c : "";
+};
 const randChars = (n, secret) => {
   try {
     const buf = new Uint32Array(n);
@@ -11430,7 +11437,7 @@ input, select { padding: 10px 14px; }
     }
   };
   const shareApp = () => shareLink(SHARE_TITLE, SHARE_TEXT, SHARE_URL());
-  const shareMyCode = () => shareLink("卓上ポンづけ｜友達コード", `卓上ポンづけで友達になりましょう。このリンクを開くと、友達コード（${myCode}）が入った状態で開きます。`, FRIEND_LINK(myCode));
+  const shareMyCode = () => shareLink("卓上ポンづけ｜友達追加", `卓上ポンづけで友達になりましょう。このリンクを開くと、わたしの個人ID（${myCode}）が入った状態で開きます。`, FRIEND_LINK(myCode));
   const [tmMenu, setTmMenu] = useState(false);
   const [seatRot, setSeatRot] = useState(0);
   const [playerDetail, setPlayerDetail] = useState(null);
@@ -11583,6 +11590,13 @@ input, select { padding: 10px 14px; }
       localStorage.setItem("mj_preset_names", JSON.stringify(arr));
     } catch {}
   };
+  const updatePresetNames = fn => setPresetNames(prev => {
+    const next = fn(prev);
+    try {
+      localStorage.setItem("mj_preset_names", JSON.stringify(next));
+    } catch {}
+    return next;
+  });
   const [newNameInput, setNewNameInput] = useState("");
   const [nameErr, setNameErr] = useState("");
   const [editErr, setEditErr] = useState("");
@@ -15616,7 +15630,7 @@ input, select { padding: 10px 14px; }
       style: {
         marginTop: 12
       }
-    }, Net.enabled() ? menuItem("👥", "友達", myCode ? "結果を送り合う" : "オンライン共有", () => setView("friends")) : React.createElement("div", {
+    }, Net.enabled() ? menuItem("👥", "友達", myCode ? "QRで追加・結果を自動で共有" : "QRで友達を追加", () => setView("friends")) : React.createElement("div", {
       style: {
         ...card,
         padding: 16
@@ -24608,6 +24622,7 @@ input, select { padding: 10px 14px; }
           endedAt: Date.now()
         };
         setGameHistory(prev => [...prev, rec]);
+        frAutoSend(rec);
         if (cloudBox) {
           saveCloudQueue(prev => prev.includes(rec.id) ? prev : [...prev, rec.id]);
           cloudPush([rec]).then(failed => {
@@ -25104,6 +25119,26 @@ input, select { padding: 10px 14px; }
           lineHeight: 1.7
         }
       }, "返し点 ", lg.rules.returnPoints.toLocaleString(), " との差を五捨六入し、ウマ", " ", lg.uma.map(u => (u > 0 ? "+" : "") + u).join("/"), " を加算。オカはトップへ。"));
+    })(), (() => {
+      if (!frAuto || !Net.enabled() || !myCode) return null;
+      const to = frAutoSendTargets(players.slice(0, PC)).map(f => friendLinks[f]);
+      if (!to.length) return null;
+      return React.createElement("div", {
+        style: {
+          ...card,
+          padding: 12,
+          border: `1px solid ${t.ac}55`,
+          background: t.acS
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: t.ac,
+          fontWeight: 700,
+          lineHeight: 1.9,
+          textWrap: "balance"
+        }
+      }, "📤 終了すると、この結果が ", to.join("、"), " さんにも自動で届きます"));
     })(), React.createElement("button", {
       style: {
         ...actionBtn("d"),
@@ -25421,6 +25456,13 @@ input, select { padding: 10px 14px; }
           await Net.update("users/" + uid, {
             name: nm
           });
+          for (const fid of Object.keys(friendsMap)) {
+            try {
+              await Net.update("friends/" + fid + "/" + uid, {
+                name: nm
+              });
+            } catch {}
+          }
         } catch {
           setFrError("友達に表示される名前だけ、まだ変えられていません。電波のよいところで友達画面を開いてください");
         }
@@ -25450,9 +25492,78 @@ input, select { padding: 10px 14px; }
   const [sendPick, setSendPick] = useState(null);
   const [sendSel, setSendSel] = useState([]);
   const [myQR, setMyQR] = useState(null);
+  const [friendLinks, setFriendLinks] = useState(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem("mj_friend_link") || "{}");
+      return v && typeof v === "object" ? v : {};
+    } catch {
+      return {};
+    }
+  });
+  const saveFriendLinks = obj => {
+    setFriendLinks(obj);
+    try {
+      localStorage.setItem("mj_friend_link", JSON.stringify(obj));
+    } catch {}
+  };
+  const fidOfName = nm => Object.keys(friendLinks).find(fid => friendLinks[fid] === nm) || "";
+  const [frAuto, setFrAuto] = useState(() => {
+    try {
+      return localStorage.getItem("mj_fr_auto") !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const [frQueue, setFrQueue] = useState(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem("mj_fr_queue") || "[]");
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  });
+  const saveFrQueue = arr => {
+    setFrQueue(arr);
+    try {
+      localStorage.setItem("mj_fr_queue", JSON.stringify(arr));
+    } catch {}
+  };
+  const [frEditFid, setFrEditFid] = useState(null);
+  const [frEditInput, setFrEditInput] = useState("");
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrMsg, setQrMsg] = useState("");
+  const [qrFail, setQrFail] = useState(false);
   const NET_FAIL = "通信できませんでした。電波を確認してもう一度お試しください。";
-  const refreshFriends = async () => {
-    if (!Net.enabled() || !myCode) return;
+  const syncFriendNames = fr => {
+    const next = {
+      ...friendLinks
+    };
+    const add = [];
+    let changed = false;
+    Object.entries(fr).forEach(([fid, f]) => {
+      if (next[fid]) return;
+      let nm = (f && f.name || "友達").trim() || "友達";
+      const taken = x => Object.values(next).includes(x) || add.includes(x);
+      if (taken(nm)) {
+        let i = 2;
+        while (taken(nm + i)) i++;
+        nm = nm + i;
+      }
+      next[fid] = nm;
+      changed = true;
+      if (!presetNames.includes(nm)) add.push(nm);
+    });
+    Object.keys(next).forEach(fid => {
+      if (!fr[fid]) {
+        delete next[fid];
+        changed = true;
+      }
+    });
+    if (changed) saveFriendLinks(next);
+    if (add.length) updatePresetNames(prev => [...prev, ...add.filter(n => !prev.includes(n))]);
+  };
+  const refreshFriends = async force => {
+    if (!Net.enabled() || !myCode && !force) return;
     setFrBusy(true);
     setFrError(null);
     try {
@@ -25461,10 +25572,14 @@ input, select { padding: 10px 14px; }
       } = await Net.ensureReady();
       const [fr, inb] = await Promise.all([Net.get("friends/" + uid), Net.get("inbox/" + uid)]);
       setFriendsMap(fr || {});
-      setInboxItems(Object.entries(inb || {}).map(([k, v]) => ({
+      syncFriendNames(fr || {});
+      const items = Object.entries(inb || {}).map(([k, v]) => ({
         key: k,
         ...v
-      })).sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0)));
+      })).sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
+      setInboxItems(items);
+      const auto = items.filter(i => i.game && i.from && (fr || {})[i.from]);
+      if (auto.length) await frImportInbox(auto, true);
     } catch {
       setFrError(NET_FAIL);
     }
@@ -25501,7 +25616,14 @@ input, select { padding: 10px 14px; }
         localStorage.setItem("mj_my_name", nm);
         localStorage.setItem("mj_my_code", code);
       } catch {}
-      setFrNotice("登録しました。コードを友達に伝えて追加してもらいましょう");
+      if (!presetNames.includes(nm)) savePresetNames([nm, ...presetNames]);
+      setFrNotice("登録しました。あなたの個人IDは " + code + " です");
+      const pend = CODE_FROM(frAddInput);
+      if (pend && pend !== code) {
+        setFrBusy(false);
+        await frAddFriend(pend, nm);
+        return;
+      }
     } catch {
       setFrError(NET_FAIL);
     }
@@ -25522,25 +25644,35 @@ input, select { padding: 10px 14px; }
       await Net.update("users/" + uid, {
         name: nm
       });
+      for (const fid of Object.keys(friendsMap)) {
+        try {
+          await Net.update("friends/" + fid + "/" + uid, {
+            name: nm
+          });
+        } catch {}
+      }
+      const before = myName;
       setMyName(nm);
       setFrEditingName(false);
       setFrNameInput("");
       try {
         localStorage.setItem("mj_my_name", nm);
       } catch {}
+      updatePresetNames(prev => prev.includes(before) ? prev.map(x => x === before ? nm : x).filter((x, i, a) => a.indexOf(x) === i) : prev.includes(nm) ? prev : [nm, ...prev]);
     } catch {
       setFrError(NET_FAIL);
     }
     setFrBusy(false);
   };
-  const frAddFriend = async () => {
-    const code = frAddInput.trim().toUpperCase();
-    if (code.length !== 6) {
-      setFrError("6文字のコードを入れてください");
+  const frAddFriend = async (codeArg, meName) => {
+    const code = CODE_FROM(typeof codeArg === "string" ? codeArg : frAddInput);
+    const me = meName || myName;
+    if (!code) {
+      setFrError("6文字の個人IDを入れてください");
       return;
     }
     if (code === myCode) {
-      setFrError("それはあなた自身のコードです");
+      setFrError("それはあなた自身の個人IDです");
       return;
     }
     setFrBusy(true);
@@ -25552,7 +25684,12 @@ input, select { padding: 10px 14px; }
       const fid = await Net.get("codes/" + code);
       const info = fid ? await Net.get("users/" + fid) : null;
       if (!fid || !info) {
-        setFrError("このコードの人が見つかりませんでした");
+        setFrError("この個人IDの人が見つかりませんでした");
+        setFrBusy(false);
+        return;
+      }
+      if (fid === uid) {
+        setFrError("それはあなた自身の個人IDです");
         setFrBusy(false);
         return;
       }
@@ -25561,16 +25698,40 @@ input, select { padding: 10px 14px; }
         addedAt: Date.now()
       });
       await Net.update("friends/" + fid + "/" + uid, {
-        name: myName,
+        name: me,
         addedAt: Date.now()
       });
       setFrAddInput("");
-      setFrNotice(info.name + " さんと友達になりました");
-      await refreshFriends();
+      setFrNotice(info.name + " さんと友達になりました。メンバーに入れて対局すると、結果が自動で届きます");
+      await refreshFriends(true);
     } catch {
       setFrError(NET_FAIL);
     }
     setFrBusy(false);
+  };
+  const frSetAlias = fid => {
+    const nm = frEditInput.trim();
+    if (!nm) {
+      setFrError("名前を入れてください");
+      return;
+    }
+    if (nm === myName) {
+      setFrError("あなたと同じ名前は使えません");
+      return;
+    }
+    if (Object.entries(friendLinks).some(([k, v]) => k !== fid && v === nm)) {
+      setFrError("その名前は別の友達に使っています");
+      return;
+    }
+    const before = friendLinks[fid];
+    saveFriendLinks({
+      ...friendLinks,
+      [fid]: nm
+    });
+    updatePresetNames(prev => prev.includes(before) ? prev.map(x => x === before ? nm : x).filter((x, i, a) => a.indexOf(x) === i) : prev.includes(nm) ? prev : [...prev, nm]);
+    setFrEditFid(null);
+    setFrError(null);
+    setFrNotice("この端末での呼び名を「" + nm + "」にしました");
   };
   const frRemoveFriend = async (fid, name) => {
     if (!window.confirm(name + " さんを友達から削除しますか？")) return;
@@ -25618,7 +25779,7 @@ input, select { padding: 10px 14px; }
     }
     setFrBusy(false);
   };
-  const frImportInbox = async items => {
+  const frImportInbox = async (items, quiet) => {
     const added = mergeIntoHistory(items.map(i => i.game));
     try {
       const {
@@ -25627,7 +25788,65 @@ input, select { padding: 10px 14px; }
       for (const i of items) await Net.remove("inbox/" + uid + "/" + i.key);
     } catch {}
     setInboxItems(prev => (prev || []).filter(p => !items.some(i => i.key === p.key)));
+    if (quiet) {
+      if (added > 0) {
+        const from = Array.from(new Set(items.map(i => friendLinks[i.from] || i.fromName).filter(Boolean)));
+        setFrNotice(from.join("、") + " さんから " + added + "件の対局結果が届きました");
+      }
+      return;
+    }
     setFrNotice(added > 0 ? added + "件を履歴に取り込みました" : "すでに取り込み済みの対局でした");
+  };
+  const frAutoSendTargets = names => Array.from(new Set((names || []).map(fidOfName).filter(Boolean)));
+  const frAutoSend = async rec => {
+    if (!frAuto || !Net.enabled() || !myCode) return;
+    const fids = frAutoSendTargets(rec.players);
+    if (!fids.length) return;
+    try {
+      const {
+        uid
+      } = await Net.ensureReady();
+      for (const fid of fids) {
+        await Net.push("inbox/" + fid, {
+          from: uid,
+          fromName: myName,
+          sentAt: Date.now(),
+          game: rec
+        });
+      }
+      setFrNotice(fids.map(f => friendLinks[f]).join("、") + " さんに結果を送りました");
+    } catch {
+      saveFrQueue(frQueue.some(q => q.id === rec.id) ? frQueue : [...frQueue, {
+        id: rec.id,
+        fids
+      }]);
+    }
+  };
+  const frFlushQueue = async () => {
+    if (!frQueue.length || !frAuto || !Net.enabled() || !myCode) return;
+    try {
+      const {
+        uid
+      } = await Net.ensureReady();
+      const rest = [];
+      for (const q of frQueue) {
+        const g = gameHistory.find(x => x.id === q.id);
+        if (!g) continue;
+        try {
+          for (const fid of q.fids) {
+            await Net.push("inbox/" + fid, {
+              from: uid,
+              fromName: myName,
+              sentAt: Date.now(),
+              game: g
+            });
+          }
+        } catch {
+          rest.push(q);
+        }
+      }
+      if (rest.length !== frQueue.length) saveFrQueue(rest);
+    } catch {}
   };
   const LS = k => {
     try {
@@ -25894,7 +26113,10 @@ input, select { padding: 10px 14px; }
   });
   const FR_VIEWS = ["friends", "history"];
   React.useEffect(() => {
-    if (FR_VIEWS.includes(view) && myCode) refreshFriends();
+    if (FR_VIEWS.includes(view) && myCode) {
+      refreshFriends();
+      frFlushQueue();
+    }
     if (view === "history" && cloudBox) cloudSync({
       quiet: true
     });
@@ -25903,10 +26125,21 @@ input, select { padding: 10px 14px; }
       setFrError(null);
       setFrNotice(null);
     }
-    if (view !== "friends") setFrEditingName(false);
+    if (view !== "friends") {
+      setFrEditingName(false);
+      setFrEditFid(null);
+      setQrOpen(false);
+    }
     setShareMsg(null);
     setShareFallback(null);
   }, [view]);
+  const codeSeen = React.useRef(myCode);
+  React.useEffect(() => {
+    if (myCode && codeSeen.current !== myCode) {
+      codeSeen.current = myCode;
+      refreshFriends();
+    }
+  }, [myCode]);
   React.useEffect(() => {
     try {
       const m = /[?&]fr=([A-Za-z0-9]{6})/.exec(location.search);
@@ -25944,6 +26177,167 @@ input, select { padding: 10px 14px; }
       dead = true;
     };
   }, [view, myCode, myQR]);
+  const loadJsQR = async () => {
+    if (window.jsQR) return window.jsQR;
+    const urls = ["https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js", "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"];
+    for (const u of urls) {
+      try {
+        await new Promise((ok, ng) => {
+          const sc = document.createElement("script");
+          sc.src = u;
+          sc.onload = ok;
+          sc.onerror = ng;
+          document.head.appendChild(sc);
+        });
+        if (window.jsQR) return window.jsQR;
+      } catch {}
+    }
+    return null;
+  };
+  const makeQrReader = async () => {
+    try {
+      if (window.BarcodeDetector) {
+        const fmts = window.BarcodeDetector.getSupportedFormats ? await window.BarcodeDetector.getSupportedFormats() : null;
+        if (!fmts || fmts.includes("qr_code")) {
+          const d = new window.BarcodeDetector({
+            formats: ["qr_code"]
+          });
+          return async src => {
+            try {
+              const r = await d.detect(src);
+              return r && r[0] && r[0].rawValue || "";
+            } catch {
+              return "";
+            }
+          };
+        }
+      }
+    } catch {}
+    const jsQR = await loadJsQR();
+    if (!jsQR) return null;
+    return async (src, canvas) => {
+      const w = src.videoWidth || src.naturalWidth || 0;
+      const h = src.videoHeight || src.naturalHeight || 0;
+      if (!w || !h) return "";
+      const sc = Math.min(1, 480 / Math.max(w, h));
+      canvas.width = Math.round(w * sc);
+      canvas.height = Math.round(h * sc);
+      try {
+        const ctx = canvas.getContext("2d", {
+          willReadFrequently: true
+        });
+        ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const r = jsQR(img.data, img.width, img.height);
+        return r && r.data || "";
+      } catch {
+        return "";
+      }
+    };
+  };
+  const qrGotText = text => {
+    const c = CODE_FROM(text);
+    if (!c) return false;
+    setQrOpen(false);
+    setFrAddInput(c);
+    frAddFriend(c);
+    return true;
+  };
+  const qrFromPhoto = async file => {
+    if (!file) return;
+    setQrMsg("写真を読み取っています…");
+    try {
+      const read = await makeQrReader();
+      if (!read) {
+        setQrMsg("この端末ではQRコードを読み取れませんでした。個人IDを手で入れてください");
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      await new Promise((ok, ng) => {
+        img.onload = ok;
+        img.onerror = ng;
+        img.src = url;
+      });
+      const text = await read(img, document.createElement("canvas"));
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+      if (!qrGotText(text)) setQrMsg("QRコードが見つかりませんでした。もう一度お試しください");
+    } catch {
+      setQrMsg("写真を読み取れませんでした");
+    }
+  };
+  React.useEffect(() => {
+    if (!qrOpen) return;
+    let dead = false,
+      stream = null,
+      timer = 0;
+    const video = document.createElement("video");
+    video.setAttribute("playsinline", "true");
+    video.setAttribute("muted", "true");
+    video.muted = true;
+    video.style.width = "100%";
+    video.style.height = "100%";
+    video.style.objectFit = "cover";
+    const canvas = document.createElement("canvas");
+    (async () => {
+      const read = await makeQrReader();
+      if (dead) return;
+      if (!read) {
+        setQrFail(true);
+        setQrMsg("この端末ではカメラで読み取れません。下の「写真から読み取る」か、個人IDの入力をお使いください");
+        return;
+      }
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no camera");
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: {
+              ideal: "environment"
+            }
+          },
+          audio: false
+        });
+      } catch {
+        if (!dead) {
+          setQrFail(true);
+          setQrMsg("カメラを使えませんでした。カメラを許可するか、下の「写真から読み取る」をお使いください");
+        }
+        return;
+      }
+      if (dead) {
+        stream.getTracks().forEach(tr => tr.stop());
+        return;
+      }
+      const box = document.getElementById("mj-qr-box");
+      if (box) box.appendChild(video);
+      video.srcObject = stream;
+      try {
+        const pr = video.play();
+        if (pr && pr.catch) pr.catch(() => {});
+      } catch {}
+      if (!dead) setQrMsg("相手のQRコードを枠に入れてください");
+      const tick = async () => {
+        if (dead) return;
+        const text = await read(video, canvas);
+        if (dead) return;
+        if (text && qrGotText(text)) return;
+        timer = setTimeout(tick, 250);
+      };
+      tick();
+    })();
+    return () => {
+      dead = true;
+      clearTimeout(timer);
+      if (stream) stream.getTracks().forEach(tr => tr.stop());
+      try {
+        video.pause();
+        video.srcObject = null;
+        video.remove();
+      } catch {}
+    };
+  }, [qrOpen]);
   const frInput = {
     width: "100%",
     padding: "13px 12px",
@@ -25954,327 +26348,624 @@ input, select { padding: 10px 14px; }
     fontSize: 16,
     boxSizing: "border-box"
   };
-  const renderFriends = () => React.createElement("div", {
-    style: body
-  }, React.createElement("div", {
+  const frIconBtn = {
+    flexShrink: 0,
+    width: 40,
+    height: 36,
+    borderRadius: 8,
+    cursor: "pointer",
+    border: `1px solid ${t.bd}`,
+    background: t.sf,
+    color: t.dm,
+    fontSize: 14
+  };
+  const renderFriends = () => {
+    const fids = Object.keys(friendsMap);
+    const pend = CODE_FROM(frAddInput);
+    return React.createElement("div", {
+      style: body
+    }, React.createElement("div", {
+      style: {
+        fontSize: 16,
+        fontWeight: 700,
+        marginBottom: 12
+      }
+    }, "👥 友達とオンライン共有"), frNotice && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 12,
+        marginBottom: 14,
+        border: `1px solid ${t.gn}`,
+        color: t.gn,
+        fontSize: 13,
+        fontWeight: 700,
+        textAlign: "center",
+        lineHeight: 1.8,
+        textWrap: "balance"
+      }
+    }, "✓ ", frNotice), frError && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 12,
+        marginBottom: 14,
+        border: `1px solid ${t.rd}`,
+        color: t.rd,
+        fontSize: 13,
+        fontWeight: 700,
+        textAlign: "center",
+        lineHeight: 1.8,
+        textWrap: "balance"
+      }
+    }, frError), !myCode ? React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginBottom: 6
+      }
+    }, "はじめに、自分の名前を登録します"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 12
+      }
+    }, "登録すると、あなただけの", React.createElement("b", {
+      style: {
+        color: t.tx
+      }
+    }, "個人ID（6文字）"), "ができます。 友達はこのIDか、QRコード・リンクであなたを追加します。"), React.createElement("input", {
+      value: frNameInput,
+      onChange: e => setFrNameInput(e.target.value),
+      maxLength: 10,
+      placeholder: "例）たかし",
+      style: {
+        ...frInput,
+        marginBottom: 10
+      }
+    }), React.createElement("button", {
+      disabled: frBusy,
+      onClick: frRegister,
+      style: {
+        ...actionBtn("p"),
+        marginBottom: 0,
+        opacity: frBusy ? 0.5 : 1
+      }
+    }, frBusy ? "登録しています…" : "この名前で登録する"), pend && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 10,
+        textWrap: "balance"
+      }
+    }, "登録すると、そのまま個人ID「", pend, "」の人と友達になります")) : React.createElement(React.Fragment, null, React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginBottom: 6
+      }
+    }, "友達を追加する"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 12
+      }
+    }, "どちらか片方が追加すれば、お互いの友達リストに入ります。"), React.createElement("button", {
+      disabled: frBusy,
+      onClick: () => {
+        setFrError(null);
+        setFrNotice(null);
+        setQrFail(false);
+        setQrMsg("カメラを準備しています…");
+        setQrOpen(true);
+      },
+      style: {
+        ...actionBtn("p"),
+        marginBottom: 10,
+        opacity: frBusy ? 0.5 : 1,
+        fontSize: "clamp(13px, 4vw, 15px)"
+      }
+    }, ["📷 QRコードを", "読み取る"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 6
+      }
+    }, "個人IDを入力して追加"), React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, React.createElement("input", {
+      value: frAddInput,
+      onChange: e => setFrAddInput(e.target.value.toUpperCase()),
+      maxLength: 6,
+      placeholder: "例）ABC345",
+      autoCapitalize: "characters",
+      autoCorrect: "off",
+      style: {
+        ...frInput,
+        flex: 1,
+        minWidth: 0,
+        letterSpacing: "0.12em",
+        fontWeight: 700
+      }
+    }), React.createElement("button", {
+      disabled: frBusy,
+      onClick: () => frAddFriend(),
+      style: {
+        flex: "0 0 64px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+        background: t.ac,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 700,
+        opacity: frBusy ? 0.5 : 1
+      }
+    }, "追加")), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginTop: 10,
+        textWrap: "balance"
+      }
+    }, "友達から届いた追加リンクを開いても、この欄に入ります。")), React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        flex: 1,
+        minWidth: 0,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap"
+      }
+    }, myName), React.createElement("button", {
+      style: {
+        padding: "8px 12px",
+        borderRadius: 8,
+        cursor: "pointer",
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.dm,
+        fontSize: 12,
+        fontWeight: 700,
+        flexShrink: 0,
+        whiteSpace: "nowrap"
+      },
+      onClick: () => {
+        setFrEditingName(v => !v);
+        setFrNameInput(myName);
+      }
+    }, "✏️ 名前を変える")), frEditingName && React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 12
+      }
+    }, React.createElement("input", {
+      value: frNameInput,
+      onChange: e => setFrNameInput(e.target.value),
+      maxLength: 10,
+      style: {
+        ...frInput,
+        flex: 1,
+        minWidth: 0
+      }
+    }), React.createElement("button", {
+      disabled: frBusy,
+      onClick: frRename,
+      style: {
+        flex: "0 0 64px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: "none",
+        background: t.ac,
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: 700
+      }
+    }, "保存")), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        marginBottom: 6
+      }
+    }, "あなたの個人ID"), React.createElement("div", {
+      style: {
+        fontSize: 30,
+        fontWeight: 900,
+        letterSpacing: "0.18em",
+        textAlign: "center",
+        marginBottom: 10
+      }
+    }, myCode), myQR && React.createElement("div", {
+      style: {
+        textAlign: "center",
+        marginBottom: 10
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "inline-block",
+        padding: 10,
+        background: "#fff",
+        borderRadius: 10,
+        lineHeight: 0
+      },
+      dangerouslySetInnerHTML: {
+        __html: myQR
+      }
+    })), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 12,
+        textWrap: "balance"
+      }
+    }, "目の前の人には、このQRコードを読み取ってもらいます。離れている人には、下のボタンでリンクを送ります。"), React.createElement("button", {
+      disabled: !myCode,
+      onClick: shareMyCode,
+      style: {
+        width: "100%",
+        minHeight: 44,
+        padding: "12px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.ac}`,
+        background: t.acS,
+        color: t.ac,
+        fontSize: 14,
+        fontWeight: 800,
+        opacity: myCode ? 1 : 0.45
+      }
+    }, "📤 追加用のリンクを送る"), shareMsg && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.gn,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 8,
+        textWrap: "balance"
+      }
+    }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
+      style: {
+        marginTop: 10
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginBottom: 8,
+        textWrap: "balance"
+      }
+    }, "この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.ac,
+        background: t.sf,
+        borderRadius: 8,
+        padding: "10px 12px",
+        wordBreak: "break-all",
+        userSelect: "all",
+        lineHeight: 1.7
+      }
+    }, shareFallback)), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginTop: 10,
+        textWrap: "balance"
+      }
+    }, "このリンクを開いた人は誰でも友達になれます。知らない人に見えるところには貼らないでください。")), React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginBottom: 14
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginBottom: 10
+      }
+    }, "友達リスト", fids.length > 0 ? `（${fids.length}人）` : ""), fids.length === 0 ? React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8
+      }
+    }, "まだ友達がいません。上のQRコードか個人IDで追加してください。") : React.createElement(React.Fragment, null, fids.map((fid, fi) => {
+      const nm = friendLinks[fid] || friendsMap[fid].name;
+      const their = friendsMap[fid].name;
+      return React.createElement("div", {
+        key: fid,
+        style: {
+          marginTop: fi === 0 ? 0 : 12
+        }
+      }, React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8
+        }
+      }, React.createElement("span", {
+        style: {
+          flex: 1,
+          minWidth: 0,
+          fontSize: 13,
+          fontWeight: 700,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap"
+        }
+      }, nm), React.createElement("button", {
+        "aria-label": "呼び名を変える",
+        onClick: () => {
+          setFrError(null);
+          setFrEditFid(frEditFid === fid ? null : fid);
+          setFrEditInput(nm);
+        },
+        style: frIconBtn
+      }, "✏️"), React.createElement("button", {
+        "aria-label": "友達を削除",
+        onClick: () => frRemoveFriend(fid, nm),
+        style: frIconBtn
+      }, "🗑")), their && their !== nm && React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: t.dm,
+          marginTop: 3,
+          lineHeight: 1.6
+        }
+      }, "相手の登録名：", their), frEditFid === fid && React.createElement("div", {
+        style: {
+          marginTop: 8
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: t.dm,
+          lineHeight: 1.7,
+          marginBottom: 6,
+          textWrap: "balance"
+        }
+      }, "この端末での呼び名です。相手には伝わりません。名簿の名前も一緒に変わります。"), React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 8
+        }
+      }, React.createElement("input", {
+        value: frEditInput,
+        onChange: e => setFrEditInput(e.target.value),
+        maxLength: 10,
+        style: {
+          ...frInput,
+          flex: 1,
+          minWidth: 0
+        }
+      }), React.createElement("button", {
+        onClick: () => frSetAlias(fid),
+        style: {
+          flex: "0 0 64px",
+          borderRadius: 10,
+          cursor: "pointer",
+          border: "none",
+          background: t.ac,
+          color: "#fff",
+          fontSize: 13,
+          fontWeight: 700
+        }
+      }, "保存"))));
+    }), React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginTop: 12,
+        textWrap: "balance"
+      }
+    }, "友達の名前は、対局のメンバーにも登録されています。")), React.createElement("button", {
+      onClick: () => {
+        const v = !frAuto;
+        setFrAuto(v);
+        try {
+          localStorage.setItem("mj_fr_auto", v ? "1" : "0");
+        } catch {}
+      },
+      style: {
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginTop: 14,
+        padding: "12px 12px",
+        borderRadius: 10,
+        cursor: "pointer",
+        textAlign: "left",
+        boxSizing: "border-box",
+        border: frAuto ? `2px solid ${t.ac}` : `1px solid ${t.bd}`,
+        background: frAuto ? t.acS : t.sf,
+        color: t.tx
+      }
+    }, React.createElement("span", {
+      style: {
+        width: 20,
+        height: 20,
+        borderRadius: 6,
+        flexShrink: 0,
+        border: `2px solid ${frAuto ? t.ac : t.bd}`,
+        background: frAuto ? t.ac : "transparent",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: 900,
+        lineHeight: 1
+      }
+    }, frAuto ? "✓" : ""), React.createElement("span", {
+      style: {
+        minWidth: 0,
+        flex: 1
+      }
+    }, React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 13,
+        fontWeight: 800
+      }
+    }, ["対局が終わったら", "自動で送る"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))), React.createElement("span", {
+      style: {
+        display: "block",
+        fontSize: 11,
+        color: t.dm,
+        lineHeight: 1.7,
+        marginTop: 2
+      }
+    }, ["卓にいた友達へ、", "結果を自動で届けます"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x))))))));
+  };
+  const renderQrScan = () => React.createElement("div", {
     style: {
-      fontSize: 16,
-      fontWeight: 700,
-      marginBottom: 12
-    }
-  }, "👥 友達とオンライン共有"), frNotice && React.createElement("div", {
-    style: {
-      ...card,
-      padding: 12,
-      marginBottom: 14,
-      border: `1px solid ${t.gn}`,
-      color: t.gn,
-      fontSize: 13,
-      fontWeight: 700,
-      textAlign: "center"
-    }
-  }, "✓ ", frNotice), frError && React.createElement("div", {
-    style: {
-      ...card,
-      padding: 12,
-      marginBottom: 14,
-      border: `1px solid ${t.rd}`,
-      color: t.rd,
-      fontSize: 13,
-      fontWeight: 700,
-      textAlign: "center"
-    }
-  }, frError), !myCode ? React.createElement("div", {
-    style: {
-      ...card,
-      padding: 16,
-      marginBottom: 14
-    }
-  }, React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 800,
-      marginBottom: 6
-    }
-  }, "はじめての設定"), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.dm,
-      lineHeight: 1.8,
-      marginBottom: 12
-    }
-  }, "友達に表示される名前を決めてください。登録すると、あなたの友達コード（6文字）が発行されます。 対局結果を送り合うときだけ、結果（名前と点数）がサーバを経由します。"), React.createElement("input", {
-    value: frNameInput,
-    onChange: e => setFrNameInput(e.target.value),
-    maxLength: 10,
-    placeholder: "例）たかし",
-    style: {
-      ...frInput,
-      marginBottom: 10
-    }
-  }), React.createElement("button", {
-    disabled: frBusy,
-    onClick: frRegister,
-    style: {
-      ...actionBtn("p"),
-      marginBottom: 0,
-      opacity: frBusy ? 0.5 : 1
-    }
-  }, frBusy ? "登録しています…" : "この名前で登録する")) : React.createElement(React.Fragment, null, React.createElement("div", {
-    style: {
-      ...card,
-      padding: 16,
-      marginBottom: 14
-    }
-  }, React.createElement("div", {
-    style: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.92)",
+      zIndex: 160,
       display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 10
+      alignItems: "flex-start",
+      justifyContent: "center",
+      padding: "20px 16px",
+      paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)",
+      paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
+      overflowY: "auto",
+      WebkitOverflowScrolling: "touch"
     }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 14,
-      fontWeight: 800,
-      flex: 1,
-      minWidth: 0,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap"
-    }
-  }, myName), React.createElement("button", {
-    style: {
-      padding: "8px 12px",
-      borderRadius: 8,
-      cursor: "pointer",
-      border: `1px solid ${t.bd}`,
-      background: t.sf,
-      color: t.dm,
-      fontSize: 12,
-      fontWeight: 700,
-      flexShrink: 0,
-      whiteSpace: "nowrap"
-    },
-    onClick: () => {
-      setFrEditingName(v => !v);
-      setFrNameInput(myName);
-    }
-  }, "✏️ 名前を変える")), frEditingName && React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      marginBottom: 12
-    }
-  }, React.createElement("input", {
-    value: frNameInput,
-    onChange: e => setFrNameInput(e.target.value),
-    maxLength: 10,
-    style: {
-      ...frInput,
-      flex: 1,
-      minWidth: 0
-    }
-  }), React.createElement("button", {
-    disabled: frBusy,
-    onClick: frRename,
-    style: {
-      flex: "0 0 64px",
-      borderRadius: 10,
-      cursor: "pointer",
-      border: "none",
-      background: t.ac,
-      color: "#fff",
-      fontSize: 13,
-      fontWeight: 700
-    }
-  }, "保存")), React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: t.dm,
-      marginBottom: 6
-    }
-  }, "あなたの友達コード"), React.createElement("div", {
-    style: {
-      fontSize: 30,
-      fontWeight: 900,
-      letterSpacing: "0.18em",
-      textAlign: "center",
-      marginBottom: 10
-    }
-  }, myCode), myQR && React.createElement("div", {
-    style: {
-      textAlign: "center",
-      marginBottom: 10
-    }
-  }, React.createElement("span", {
-    style: {
-      display: "inline-block",
-      padding: 10,
-      background: "#fff",
-      borderRadius: 10,
-      lineHeight: 0
-    },
-    dangerouslySetInnerHTML: {
-      __html: myQR
-    }
-  })), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.dm,
-      lineHeight: 1.8,
-      marginBottom: 12
-    }
-  }, "このコードを友達のアプリで入力（またはQRを読み取り）してもらうと、お互いの友達リストに入ります。"), React.createElement("button", {
-    disabled: !myCode,
-    onClick: shareMyCode,
+  }, React.createElement("div", {
     style: {
       width: "100%",
-      minHeight: 44,
-      padding: "12px 8px",
-      borderRadius: 10,
-      cursor: "pointer",
-      border: `1px solid ${t.ac}`,
-      background: t.acS,
-      color: t.ac,
-      fontSize: 14,
-      fontWeight: 800,
-      opacity: myCode ? 1 : 0.45
-    }
-  }, "📤 友達リンクを送る"), shareMsg && React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.gn,
-      fontWeight: 700,
-      lineHeight: 1.8,
-      marginTop: 8,
-      textWrap: "balance"
-    }
-  }, "✓ ", shareMsg), shareFallback && React.createElement("div", {
-    style: {
-      marginTop: 10
+      maxWidth: 400
     }
   }, React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.dm,
-      lineHeight: 1.8,
-      marginBottom: 8,
-      textWrap: "balance"
-    }
-  }, "この端末では自動で送れませんでした。下のリンクを長押ししてコピーし、LINEなどに貼って送ってください。"), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.ac,
-      background: t.sf,
-      borderRadius: 8,
-      padding: "10px 12px",
-      wordBreak: "break-all",
-      userSelect: "all",
-      lineHeight: 1.7
-    }
-  }, shareFallback)), React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: t.dm,
-      lineHeight: 1.8,
-      marginTop: 10,
-      textWrap: "balance"
-    }
-  }, "このリンクを開いた人は誰でも友達になれます。知らない人に見えるところには貼らないでください。")), React.createElement("div", {
-    style: {
-      ...card,
-      padding: 16,
-      marginBottom: 14
-    }
+    style: card
   }, React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 800,
-      marginBottom: 10
-    }
-  }, "友達リスト", Object.keys(friendsMap).length > 0 ? `（${Object.keys(friendsMap).length}人）` : ""), Object.keys(friendsMap).length === 0 ? React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: t.dm,
-      marginBottom: 12
-    }
-  }, "まだ友達がいません。下でコードを入力して追加してください。") : React.createElement("div", {
-    style: {
-      marginBottom: 12
-    }
-  }, Object.entries(friendsMap).map(([fid, f], fi) => React.createElement("div", {
-    key: fid,
     style: {
       display: "flex",
+      justifyContent: "space-between",
       alignItems: "center",
       gap: 8,
-      marginTop: fi === 0 ? 0 : 10
+      marginBottom: 10
     }
   }, React.createElement("span", {
     style: {
-      flex: 1,
+      fontSize: 15,
+      fontWeight: 800,
       minWidth: 0,
-      fontSize: 13,
-      fontWeight: 700,
       overflow: "hidden",
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, f.name), React.createElement("button", {
-    "aria-label": "友達を削除",
-    onClick: () => frRemoveFriend(fid, f.name),
+  }, "📷 QRコードを読み取る"), React.createElement("button", {
+    "aria-label": "閉じる",
     style: {
-      flexShrink: 0,
-      width: 40,
+      width: 36,
       height: 36,
-      borderRadius: 8,
-      cursor: "pointer",
-      border: `1px solid ${t.bd}`,
-      background: t.sf,
-      color: t.dm,
-      fontSize: 14
-    }
-  }, "🗑")))), React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: t.dm,
-      marginBottom: 6
-    }
-  }, "友達のコードを入力して追加"), React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, React.createElement("input", {
-    value: frAddInput,
-    onChange: e => setFrAddInput(e.target.value.toUpperCase()),
-    maxLength: 6,
-    placeholder: "例）ABC345",
-    autoCapitalize: "characters",
-    autoCorrect: "off",
-    style: {
-      ...frInput,
-      flex: 1,
-      minWidth: 0,
-      letterSpacing: "0.12em",
-      fontWeight: 700
-    }
-  }), React.createElement("button", {
-    disabled: frBusy,
-    onClick: frAddFriend,
-    style: {
-      flex: "0 0 64px",
-      borderRadius: 10,
-      cursor: "pointer",
+      flexShrink: 0,
+      background: "none",
       border: "none",
-      background: t.ac,
-      color: "#fff",
-      fontSize: 13,
-      fontWeight: 700,
-      opacity: frBusy ? 0.5 : 1
+      color: t.dm,
+      fontSize: 20,
+      cursor: "pointer"
+    },
+    onClick: () => setQrOpen(false)
+  }, "✕")), !qrFail && React.createElement("div", {
+    id: "mj-qr-box",
+    style: {
+      width: "100%",
+      aspectRatio: "1 / 1",
+      borderRadius: 12,
+      overflow: "hidden",
+      background: "#000",
+      border: `1px solid ${t.bd}`,
+      marginBottom: 10
     }
-  }, "追加")))));
+  }), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: t.dm,
+      lineHeight: 1.8,
+      marginBottom: 12,
+      textWrap: "balance"
+    }
+  }, qrMsg), React.createElement("label", {
+    style: {
+      ...actionBtn(),
+      marginBottom: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: 44
+    }
+  }, "写真から読み取る", React.createElement("input", {
+    type: "file",
+    accept: "image/*",
+    style: {
+      display: "none"
+    },
+    onChange: e => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = "";
+      qrFromPhoto(f);
+    }
+  })))));
   const renderSendModal = () => {
     const games = gameHistory.filter(g => sendPick.ids.includes(g.id));
     const fids = Object.keys(friendsMap);
@@ -27716,7 +28407,7 @@ input, select { padding: 10px 14px; }
       width: 62,
       flexShrink: 0
     }
-  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "friends" && renderFriends(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
+  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "friends" && renderFriends(), qrOpen && renderQrScan(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
 }
 
 ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));

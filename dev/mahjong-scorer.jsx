@@ -58,6 +58,14 @@ const CODE_CHARS = "3456789ABCDEFGHJKMNPQRSTUVWXY";
 const genFriendCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 // 友達追加用のリンク（QRに入れる。開くとコード入力済みの友達画面が出る）
 const FRIEND_LINK = (code) => location.origin + location.pathname + "?fr=" + code;
+// QRやリンクから個人IDを取り出す。「…?fr=ABC345」でも「ABC345」でも受ける
+const CODE_FROM = (text) => {
+  const v = String(text || "");
+  const m = /[?&]fr=([0-9A-Za-z]{6})/.exec(v) || /^\s*([0-9A-Za-z]{6})\s*$/.exec(v);
+  if (!m) return "";
+  const c = m[1].toUpperCase();
+  return c.split("").every(ch => CODE_CHARS.includes(ch)) ? c : "";
+};
 
 // ══════════════════════════════════
 // ── クラウド保存の復元キー ──
@@ -5966,8 +5974,8 @@ input, select { padding: 10px 14px; }
   const shareApp = () => shareLink(SHARE_TITLE, SHARE_TEXT, SHARE_URL());
   // 友達リンク。リンクを踏めない相手のために、文面にもコードを入れておく
   const shareMyCode = () => shareLink(
-    "卓上ポンづけ｜友達コード",
-    `卓上ポンづけで友達になりましょう。このリンクを開くと、友達コード（${myCode}）が入った状態で開きます。`,
+    "卓上ポンづけ｜友達追加",
+    `卓上ポンづけで友達になりましょう。このリンクを開くと、わたしの個人ID（${myCode}）が入った状態で開きます。`,
     FRIEND_LINK(myCode),
   );
 
@@ -6070,6 +6078,12 @@ input, select { padding: 10px 14px; }
     setPresetNames(arr);
     try { localStorage.setItem("mj_preset_names", JSON.stringify(arr)); } catch {}
   };
+  // いまの名簿から作り直す。続けて何度も直すところ（友達の取り込みなど）から使う
+  const updatePresetNames = (fn) => setPresetNames(prev => {
+    const next = fn(prev);
+    try { localStorage.setItem("mj_preset_names", JSON.stringify(next)); } catch {}
+    return next;
+  });
   const [newNameInput, setNewNameInput] = useState("");
   const [nameErr, setNameErr] = useState("");   // 名簿への追加で同じ名前だったとき
   const [editErr, setEditErr] = useState("");   // 名簿の編集で同じ名前になったとき
@@ -8405,7 +8419,7 @@ input, select { padding: 10px 14px; }
             <div style={{ marginTop: 12 }}>
               {Net.enabled() ? (
                 menuItem("👥", "友達",
-                  myCode ? "結果を送り合う" : "オンライン共有",
+                  myCode ? "QRで追加・結果を自動で共有" : "QRで友達を追加",
                   () => setView("friends"))
               ) : (
                 <div style={{ ...card, padding: 16 }}>
@@ -13253,6 +13267,8 @@ input, select { padding: 10px 14px; }
           endedAt: Date.now(),
         };
         setGameHistory(prev => [...prev, rec]);
+        // 卓にいた友達（個人ID登録済み）には、結果をそのまま送る
+        frAutoSend(rec);
         // クラウド保存を使っているなら送る。先に未送信として控えるので、
         // 圏外でも消えず、次に同期したときにまとめて上がる
         if (cloudBox) {
@@ -13516,6 +13532,20 @@ input, select { padding: 10px 14px; }
           );
         })()}
 
+        {/* この卓に友達がいるなら、終了すると結果が届くことを先に知らせる */}
+        {(() => {
+          if (!frAuto || !Net.enabled() || !myCode) return null;
+          const to = frAutoSendTargets(players.slice(0, PC)).map(f => friendLinks[f]);
+          if (!to.length) return null;
+          return (
+            <div style={{ ...card, padding: 12, border: `1px solid ${t.ac}55`, background: t.acS }}>
+              <div style={{ fontSize: 12, color: t.ac, fontWeight: 700, lineHeight: 1.9, textWrap: "balance" }}>
+                📤 終了すると、この結果が {to.join("、")} さんにも自動で届きます
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 「終了」「再試合」をまず読ませ、説明はそのうしろに小さく置く */}
         <button style={{ ...actionBtn("d"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }} onClick={() => {
           const lgName = leagues.find(l => l.id === activeLeagueId)?.name;
@@ -13686,6 +13716,9 @@ input, select { padding: 10px 14px; }
         try {
           const { uid } = await Net.ensureReady();
           await Net.update("users/" + uid, { name: nm });
+          for (const fid of Object.keys(friendsMap)) {
+            try { await Net.update("friends/" + fid + "/" + uid, { name: nm }); } catch {}
+          }
         } catch { setFrError("友達に表示される名前だけ、まだ変えられていません。電波のよいところで友達画面を開いてください"); }
       })();
     }
@@ -13713,18 +13746,73 @@ input, select { padding: 10px 14px; }
   const [sendSel, setSendSel] = useState([]);            // 送り先に選んだ友達uid
   const [myQR, setMyQR] = useState(null);                // 自分の友達リンクのQR（SVG文字列）
 
+  // 友達の「この端末での呼び名」。個人ID（uid）に結びつけて持つので、
+  // 名前がかぶっても取り違えない。名簿の名前とそろえてあり、対局のメンバーに
+  // 入れると、終わったときに自動で結果が送られる     { [fid]: 名簿での名前 }
+  const [friendLinks, setFriendLinks] = useState(() => {
+    try { const v = JSON.parse(localStorage.getItem("mj_friend_link") || "{}"); return (v && typeof v === "object") ? v : {}; } catch { return {}; }
+  });
+  const saveFriendLinks = (obj) => {
+    setFriendLinks(obj);
+    try { localStorage.setItem("mj_friend_link", JSON.stringify(obj)); } catch {}
+  };
+  // 名簿の名前から個人IDを引く
+  const fidOfName = (nm) => Object.keys(friendLinks).find(fid => friendLinks[fid] === nm) || "";
+  // 対局が終わったら、その卓にいた友達へ自動で送る（切ることもできる）
+  const [frAuto, setFrAuto] = useState(() => { try { return localStorage.getItem("mj_fr_auto") !== "0"; } catch { return true; } });
+  // 送れなかったぶん。電波が戻ったときに送り直す  [{ id, fids }]
+  const [frQueue, setFrQueue] = useState(() => {
+    try { const v = JSON.parse(localStorage.getItem("mj_fr_queue") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
+  });
+  const saveFrQueue = (arr) => {
+    setFrQueue(arr);
+    try { localStorage.setItem("mj_fr_queue", JSON.stringify(arr)); } catch {}
+  };
+  const [frEditFid, setFrEditFid] = useState(null);      // 呼び名を変えている友達
+  const [frEditInput, setFrEditInput] = useState("");
+  const [qrOpen, setQrOpen] = useState(false);           // カメラでQRを読む画面
+  const [qrMsg, setQrMsg] = useState("");
+  const [qrFail, setQrFail] = useState(false);           // カメラが使えなかった
+
   const NET_FAIL = "通信できませんでした。電波を確認してもう一度お試しください。";
 
-  // 友達リストと受信箱を読み直す
-  const refreshFriends = async () => {
-    if (!Net.enabled() || !myCode) return;
+  // サーバの友達リストと、この端末の呼び名・名簿をそろえる。
+  // 友達は名簿にも入れておく（メンバーに選べば、自動共有の相手になる）
+  const syncFriendNames = (fr) => {
+    const next = { ...friendLinks };
+    const add = [];
+    let changed = false;
+    Object.entries(fr).forEach(([fid, f]) => {
+      if (next[fid]) return;                      // すでに呼び名がある人は触らない
+      let nm = ((f && f.name) || "友達").trim() || "友達";
+      // 呼び名がかぶったら、あとから来た人に番号を足す（個人IDが違えば別人）
+      const taken = (x) => Object.values(next).includes(x) || add.includes(x);
+      if (taken(nm)) { let i = 2; while (taken(nm + i)) i++; nm = nm + i; }
+      next[fid] = nm; changed = true;
+      if (!presetNames.includes(nm)) add.push(nm);
+    });
+    Object.keys(next).forEach(fid => { if (!fr[fid]) { delete next[fid]; changed = true; } });
+    if (changed) saveFriendLinks(next);
+    if (add.length) updatePresetNames(prev => [...prev, ...add.filter(n => !prev.includes(n))]);
+  };
+
+  // 友達リストと受信箱を読み直す。
+  // force=登録した直後（この時点では新しい個人IDがまだ見えていない）
+  const refreshFriends = async (force) => {
+    if (!Net.enabled() || (!myCode && !force)) return;
     setFrBusy(true); setFrError(null);
     try {
       const { uid } = await Net.ensureReady();
       const [fr, inb] = await Promise.all([Net.get("friends/" + uid), Net.get("inbox/" + uid)]);
       setFriendsMap(fr || {});
-      setInboxItems(Object.entries(inb || {}).map(([k, v]) => ({ key: k, ...v }))
-        .sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0)));
+      syncFriendNames(fr || {});
+      const items = Object.entries(inb || {}).map(([k, v]) => ({ key: k, ...v }))
+        .sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
+      setInboxItems(items);
+      // 友達から届いたぶんは、そのまま履歴に入れる（自動共有）。
+      // 友達でない人から届いたものは、受信箱に置いたまま本人に選んでもらう
+      const auto = items.filter(i => i.game && i.from && (fr || {})[i.from]);
+      if (auto.length) await frImportInbox(auto, true);
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
   };
@@ -13746,7 +13834,11 @@ input, select { padding: 10px 14px; }
       await Net.set("users/" + uid, { name: nm, code, createdAt: Date.now() });
       setMyName(nm); setMyCode(code); setFrNameInput("");
       try { localStorage.setItem("mj_my_name", nm); localStorage.setItem("mj_my_code", code); } catch {}
-      setFrNotice("登録しました。コードを友達に伝えて追加してもらいましょう");
+      if (!presetNames.includes(nm)) savePresetNames([nm, ...presetNames]);
+      setFrNotice("登録しました。あなたの個人IDは " + code + " です");
+      // 友達リンクから来た人は、登録したらそのまま友達にする（続けて操作させない）
+      const pend = CODE_FROM(frAddInput);
+      if (pend && pend !== code) { setFrBusy(false); await frAddFriend(pend, nm); return; }
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
   };
@@ -13758,30 +13850,58 @@ input, select { padding: 10px 14px; }
     try {
       const { uid } = await Net.ensureReady();
       await Net.update("users/" + uid, { name: nm });
+      // 友達のリストに載っている自分の名前も直しておく
+      for (const fid of Object.keys(friendsMap)) {
+        try { await Net.update("friends/" + fid + "/" + uid, { name: nm }); } catch {}
+      }
+      const before = myName;
       setMyName(nm); setFrEditingName(false); setFrNameInput("");
       try { localStorage.setItem("mj_my_name", nm); } catch {}
+      // 名簿の自分の名前もそろえる（古い名前が残ると二重に並んでしまう）
+      updatePresetNames(prev => (prev.includes(before)
+        ? prev.map(x => (x === before ? nm : x)).filter((x, i, a) => a.indexOf(x) === i)
+        : (prev.includes(nm) ? prev : [nm, ...prev])));
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
   };
 
-  // コードで友達追加（追加するとお互いのリストに入る）
-  const frAddFriend = async () => {
-    const code = frAddInput.trim().toUpperCase();
-    if (code.length !== 6) { setFrError("6文字のコードを入れてください"); return; }
-    if (code === myCode) { setFrError("それはあなた自身のコードです"); return; }
+  // 個人IDで友達追加。片方が追加すれば、お互いのリストに入る。
+  // （登録した直後にも呼ぶので、そのときは名前を引数で受け取る）
+  const frAddFriend = async (codeArg, meName) => {
+    const code = CODE_FROM(typeof codeArg === "string" ? codeArg : frAddInput);
+    const me = meName || myName;
+    if (!code) { setFrError("6文字の個人IDを入れてください"); return; }
+    if (code === myCode) { setFrError("それはあなた自身の個人IDです"); return; }
     setFrBusy(true); setFrError(null);
     try {
       const { uid } = await Net.ensureReady();
       const fid = await Net.get("codes/" + code);
       const info = fid ? await Net.get("users/" + fid) : null;
-      if (!fid || !info) { setFrError("このコードの人が見つかりませんでした"); setFrBusy(false); return; }
+      if (!fid || !info) { setFrError("この個人IDの人が見つかりませんでした"); setFrBusy(false); return; }
+      if (fid === uid) { setFrError("それはあなた自身の個人IDです"); setFrBusy(false); return; }
       await Net.update("friends/" + uid + "/" + fid, { name: info.name, addedAt: Date.now() });
-      await Net.update("friends/" + fid + "/" + uid, { name: myName, addedAt: Date.now() });
+      await Net.update("friends/" + fid + "/" + uid, { name: me, addedAt: Date.now() });
       setFrAddInput("");
-      setFrNotice(info.name + " さんと友達になりました");
-      await refreshFriends();
+      setFrNotice(info.name + " さんと友達になりました。メンバーに入れて対局すると、結果が自動で届きます");
+      await refreshFriends(true);
     } catch { setFrError(NET_FAIL); }
     setFrBusy(false);
+  };
+
+  // 友達の呼び名を、この端末だけで変える。個人IDに結びつくので相手の登録名は変わらない
+  const frSetAlias = (fid) => {
+    const nm = frEditInput.trim();
+    if (!nm) { setFrError("名前を入れてください"); return; }
+    if (nm === myName) { setFrError("あなたと同じ名前は使えません"); return; }
+    if (Object.entries(friendLinks).some(([k, v]) => k !== fid && v === nm)) { setFrError("その名前は別の友達に使っています"); return; }
+    const before = friendLinks[fid];
+    saveFriendLinks({ ...friendLinks, [fid]: nm });
+    // 名簿の名前もそろえる（メンバーに入れたときに同じ人だと分かるように）
+    updatePresetNames(prev => (prev.includes(before)
+      ? prev.map(x => (x === before ? nm : x)).filter((x, i, a) => a.indexOf(x) === i)
+      : (prev.includes(nm) ? prev : [...prev, nm])));
+    setFrEditFid(null); setFrError(null);
+    setFrNotice("この端末での呼び名を「" + nm + "」にしました");
   };
 
   const frRemoveFriend = async (fid, name) => {
@@ -13814,15 +13934,63 @@ input, select { padding: 10px 14px; }
     setFrBusy(false);
   };
 
-  // 受信箱の対局を履歴に取り込み、取り込んだ分をサーバから消す
-  const frImportInbox = async (items) => {
+  // 受信箱の対局を履歴に取り込み、取り込んだ分をサーバから消す。
+  // quiet=友達から自動で届いたぶん（増えたときだけ知らせる）
+  const frImportInbox = async (items, quiet) => {
     const added = mergeIntoHistory(items.map(i => i.game));
     try {
       const { uid } = await Net.ensureReady();
       for (const i of items) await Net.remove("inbox/" + uid + "/" + i.key);
     } catch {}   // サーバ側の削除に失敗しても、次の取り込みで重複除外されるので実害はない
     setInboxItems(prev => (prev || []).filter(p => !items.some(i => i.key === p.key)));
+    if (quiet) {
+      if (added > 0) {
+        const from = Array.from(new Set(items.map(i => friendLinks[i.from] || i.fromName).filter(Boolean)));
+        setFrNotice(from.join("、") + " さんから " + added + "件の対局結果が届きました");
+      }
+      return;
+    }
     setFrNotice(added > 0 ? added + "件を履歴に取り込みました" : "すでに取り込み済みの対局でした");
+  };
+
+  // 対局が終わったとき、その卓にいた友達へ自動で送る。
+  // 卓のメンバーは名簿の名前で持っているので、名前から個人IDを引いて送り先にする
+  const frAutoSendTargets = (names) =>
+    Array.from(new Set((names || []).map(fidOfName).filter(Boolean)));
+
+  const frAutoSend = async (rec) => {
+    if (!frAuto || !Net.enabled() || !myCode) return;
+    const fids = frAutoSendTargets(rec.players);
+    if (!fids.length) return;
+    try {
+      const { uid } = await Net.ensureReady();
+      for (const fid of fids) {
+        await Net.push("inbox/" + fid, { from: uid, fromName: myName, sentAt: Date.now(), game: rec });
+      }
+      setFrNotice(fids.map(f => friendLinks[f]).join("、") + " さんに結果を送りました");
+    } catch {
+      // 圏外でも消さずに控えておき、次に友達画面や履歴を開いたときに送る
+      saveFrQueue(frQueue.some(q => q.id === rec.id) ? frQueue : [...frQueue, { id: rec.id, fids }]);
+    }
+  };
+
+  // 控えてあったぶんを送り直す
+  const frFlushQueue = async () => {
+    if (!frQueue.length || !frAuto || !Net.enabled() || !myCode) return;
+    try {
+      const { uid } = await Net.ensureReady();
+      const rest = [];
+      for (const q of frQueue) {
+        const g = gameHistory.find(x => x.id === q.id);
+        if (!g) continue;                       // 消された対局は送らない
+        try {
+          for (const fid of q.fids) {
+            await Net.push("inbox/" + fid, { from: uid, fromName: myName, sentAt: Date.now(), game: g });
+          }
+        } catch { rest.push(q); }
+      }
+      if (rest.length !== frQueue.length) saveFrQueue(rest);
+    } catch {}
   };
 
   // ══════════════════════════════════
@@ -14030,16 +14198,23 @@ input, select { padding: 10px 14px; }
   // 友達画面は友達リストのために読む。どちらでもないところへ移ったら通知類を消す
   const FR_VIEWS = ["friends", "history"];
   React.useEffect(() => {
-    if (FR_VIEWS.includes(view) && myCode) refreshFriends();
+    if (FR_VIEWS.includes(view) && myCode) { refreshFriends(); frFlushQueue(); }
     // クラウド保存を使っているなら、履歴を開いたときに黙って同期する
     if (view === "history" && cloudBox) cloudSync({ quiet: true });
     // まだ登録していない人は、はじめに決めた名前を入れておく（押すだけで済む）
     if (view === "friends" && !myCode && myName) setFrNameInput(v => v || myName);
     if (!FR_VIEWS.includes(view)) { setFrError(null); setFrNotice(null); }
-    if (view !== "friends") setFrEditingName(false);
+    if (view !== "friends") { setFrEditingName(false); setFrEditFid(null); setQrOpen(false); }
     // 共有のあとの一言は、画面を移ったら持ち越さない（前の画面の分が残って見える）
     setShareMsg(null); setShareFallback(null);
   }, [view]);
+
+  // 個人IDを発行した直後は、登録処理の中からは新しいコードが見えないので、
+  // ここで読み直して友達リストと呼び名をそろえる（起動しただけのときは読まない）
+  const codeSeen = React.useRef(myCode);
+  React.useEffect(() => {
+    if (myCode && codeSeen.current !== myCode) { codeSeen.current = myCode; refreshFriends(); }
+  }, [myCode]);
 
   // 友達リンク（?fr=コード）で開かれたら、コード入力済みの友達画面から始める
   React.useEffect(() => {
@@ -14071,25 +14246,153 @@ input, select { padding: 10px 14px; }
     return () => { dead = true; };
   }, [view, myCode, myQR]);
 
+  // ── QRコードの読み取り ──
+  // Android などは端末の機能（BarcodeDetector）で読む。iPhone は対応していないので
+  // jsQR を読み込んで読む。どちらも無理なら、写真から読むか個人IDを手で入れてもらう
+  const loadJsQR = async () => {
+    if (window.jsQR) return window.jsQR;
+    const urls = [
+      "https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js",
+      "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js",
+    ];
+    for (const u of urls) {
+      try {
+        await new Promise((ok, ng) => {
+          const sc = document.createElement("script");
+          sc.src = u; sc.onload = ok; sc.onerror = ng; document.head.appendChild(sc);
+        });
+        if (window.jsQR) return window.jsQR;
+      } catch {}
+    }
+    return null;
+  };
+
+  // 映像や写真からQRの中身を取り出す係を1つ作る
+  const makeQrReader = async () => {
+    try {
+      if (window.BarcodeDetector) {
+        const fmts = window.BarcodeDetector.getSupportedFormats ? await window.BarcodeDetector.getSupportedFormats() : null;
+        if (!fmts || fmts.includes("qr_code")) {
+          const d = new window.BarcodeDetector({ formats: ["qr_code"] });
+          return async (src) => {
+            try { const r = await d.detect(src); return (r && r[0] && r[0].rawValue) || ""; } catch { return ""; }
+          };
+        }
+      }
+    } catch {}
+    const jsQR = await loadJsQR();
+    if (!jsQR) return null;
+    return async (src, canvas) => {
+      const w = src.videoWidth || src.naturalWidth || 0;
+      const h = src.videoHeight || src.naturalHeight || 0;
+      if (!w || !h) return "";
+      const sc = Math.min(1, 480 / Math.max(w, h));     // 大きすぎると重いので縮める
+      canvas.width = Math.round(w * sc); canvas.height = Math.round(h * sc);
+      try {
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const r = jsQR(img.data, img.width, img.height);
+        return (r && r.data) || "";
+      } catch { return ""; }
+    };
+  };
+
+  // 読み取れたら、そのまま友達追加まで進める
+  const qrGotText = (text) => {
+    const c = CODE_FROM(text);
+    if (!c) return false;
+    setQrOpen(false);
+    setFrAddInput(c);
+    frAddFriend(c);
+    return true;
+  };
+
+  // 写真から読む（カメラが使えない端末や、送られてきたQRの画像用）
+  const qrFromPhoto = async (file) => {
+    if (!file) return;
+    setQrMsg("写真を読み取っています…");
+    try {
+      const read = await makeQrReader();
+      if (!read) { setQrMsg("この端末ではQRコードを読み取れませんでした。個人IDを手で入れてください"); return; }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      await new Promise((ok, ng) => { img.onload = ok; img.onerror = ng; img.src = url; });
+      const text = await read(img, document.createElement("canvas"));
+      try { URL.revokeObjectURL(url); } catch {}
+      if (!qrGotText(text)) setQrMsg("QRコードが見つかりませんでした。もう一度お試しください");
+    } catch { setQrMsg("写真を読み取れませんでした"); }
+  };
+
+  React.useEffect(() => {
+    if (!qrOpen) return;
+    let dead = false, stream = null, timer = 0;
+    const video = document.createElement("video");
+    video.setAttribute("playsinline", "true");     // iPhoneで全画面にしない
+    video.setAttribute("muted", "true");
+    video.muted = true;
+    video.style.width = "100%"; video.style.height = "100%"; video.style.objectFit = "cover";
+    const canvas = document.createElement("canvas");
+    (async () => {
+      const read = await makeQrReader();
+      if (dead) return;
+      if (!read) { setQrFail(true); setQrMsg("この端末ではカメラで読み取れません。下の「写真から読み取る」か、個人IDの入力をお使いください"); return; }
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no camera");
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      } catch {
+        if (!dead) { setQrFail(true); setQrMsg("カメラを使えませんでした。カメラを許可するか、下の「写真から読み取る」をお使いください"); }
+        return;
+      }
+      if (dead) { stream.getTracks().forEach(tr => tr.stop()); return; }
+      const box = document.getElementById("mj-qr-box");
+      if (box) box.appendChild(video);
+      video.srcObject = stream;
+      // 再生を待たない。映り始めるまで読み取りは空振りするだけで、待つと止まる端末がある
+      try { const pr = video.play(); if (pr && pr.catch) pr.catch(() => {}); } catch {}
+      if (!dead) setQrMsg("相手のQRコードを枠に入れてください");
+      const tick = async () => {
+        if (dead) return;
+        const text = await read(video, canvas);
+        if (dead) return;
+        if (text && qrGotText(text)) return;
+        timer = setTimeout(tick, 250);
+      };
+      tick();
+    })();
+    return () => {
+      dead = true;
+      clearTimeout(timer);
+      if (stream) stream.getTracks().forEach(tr => tr.stop());
+      try { video.pause(); video.srcObject = null; video.remove(); } catch {}
+    };
+  }, [qrOpen]);
+
   const frInput = { width: "100%", padding: "13px 12px", borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx, fontSize: 16, boxSizing: "border-box" };
 
-  const renderFriends = () => (
+  const frIconBtn = { flexShrink: 0, width: 40, height: 36, borderRadius: 8, cursor: "pointer", border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 14 };
+
+  const renderFriends = () => {
+    const fids = Object.keys(friendsMap);
+    const pend = CODE_FROM(frAddInput);
+    return (
     <div style={body}>
       <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>👥 友達とオンライン共有</div>
 
       {frNotice && (
-        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.gn}`, color: t.gn, fontSize: 13, fontWeight: 700, textAlign: "center" }}>✓ {frNotice}</div>
+        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.gn}`, color: t.gn, fontSize: 13, fontWeight: 700, textAlign: "center", lineHeight: 1.8, textWrap: "balance" }}>✓ {frNotice}</div>
       )}
       {frError && (
-        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.rd}`, color: t.rd, fontSize: 13, fontWeight: 700, textAlign: "center" }}>{frError}</div>
+        <div style={{ ...card, padding: 12, marginBottom: 14, border: `1px solid ${t.rd}`, color: t.rd, fontSize: 13, fontWeight: 700, textAlign: "center", lineHeight: 1.8, textWrap: "balance" }}>{frError}</div>
       )}
 
       {!myCode ? (
+        /* ── まだ個人IDが無い人。ここだけ見せる ── */
         <div style={{ ...card, padding: 16, marginBottom: 14 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>はじめての設定</div>
+          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>はじめに、自分の名前を登録します</div>
           <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
-            友達に表示される名前を決めてください。登録すると、あなたの友達コード（6文字）が発行されます。
-            対局結果を送り合うときだけ、結果（名前と点数）がサーバを経由します。
+            登録すると、あなただけの<b style={{ color: t.tx }}>個人ID（6文字）</b>ができます。
+            友達はこのIDか、QRコード・リンクであなたを追加します。
           </div>
           <input value={frNameInput} onChange={(e) => setFrNameInput(e.target.value)} maxLength={10}
             placeholder="例）たかし" style={{ ...frInput, marginBottom: 10 }} />
@@ -14097,10 +14400,38 @@ input, select { padding: 10px 14px; }
             style={{ ...actionBtn("p"), marginBottom: 0, opacity: frBusy ? 0.5 : 1 }}>
             {frBusy ? "登録しています…" : "この名前で登録する"}
           </button>
+          {pend && (
+            <div style={{ fontSize: 12, color: t.ac, fontWeight: 700, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
+              登録すると、そのまま個人ID「{pend}」の人と友達になります
+            </div>
+          )}
         </div>
       ) : (
         <>
-          {/* 自分のコード */}
+          {/* ── ① 友達を追加する。いちばん使うので先頭に置く ── */}
+          <div style={{ ...card, padding: 16, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 6 }}>友達を追加する</div>
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
+              どちらか片方が追加すれば、お互いの友達リストに入ります。
+            </div>
+            <button disabled={frBusy} onClick={() => { setFrError(null); setFrNotice(null); setQrFail(false); setQrMsg("カメラを準備しています…"); setQrOpen(true); }}
+              style={{ ...actionBtn("p"), marginBottom: 10, opacity: frBusy ? 0.5 : 1, fontSize: "clamp(13px, 4vw, 15px)" }}>
+              {["📷 QRコードを", "読み取る"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+            </button>
+            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>個人IDを入力して追加</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.toUpperCase())} maxLength={6}
+                placeholder="例）ABC345" autoCapitalize="characters" autoCorrect="off"
+                style={{ ...frInput, flex: 1, minWidth: 0, letterSpacing: "0.12em", fontWeight: 700 }} />
+              <button disabled={frBusy} onClick={() => frAddFriend()}
+                style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
+            </div>
+            <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
+              友達から届いた追加リンクを開いても、この欄に入ります。
+            </div>
+          </div>
+
+          {/* ── ② 自分を追加してもらう ── */}
           <div style={{ ...card, padding: 16, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 14, fontWeight: 800, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{myName}</span>
@@ -14113,7 +14444,7 @@ input, select { padding: 10px 14px; }
                 <button disabled={frBusy} onClick={frRename} style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700 }}>保存</button>
               </div>
             )}
-            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>あなたの友達コード</div>
+            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>あなたの個人ID</div>
             <div style={{ fontSize: 30, fontWeight: 900, letterSpacing: "0.18em", textAlign: "center", marginBottom: 10 }}>{myCode}</div>
             {myQR && (
               <div style={{ textAlign: "center", marginBottom: 10 }}>
@@ -14121,15 +14452,14 @@ input, select { padding: 10px 14px; }
                   dangerouslySetInnerHTML={{ __html: myQR }} />
               </div>
             )}
-            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12 }}>
-              このコードを友達のアプリで入力（またはQRを読み取り）してもらうと、お互いの友達リストに入ります。
+            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12, textWrap: "balance" }}>
+              目の前の人には、このQRコードを読み取ってもらいます。離れている人には、下のボタンでリンクを送ります。
             </div>
-            {/* 対面でないときは、リンクにして送る。QRとコードは対面用にそのまま残す */}
             <button disabled={!myCode} onClick={shareMyCode} style={{
               width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
               border: `1px solid ${t.ac}`, background: t.acS, color: t.ac,
               fontSize: 14, fontWeight: 800, opacity: myCode ? 1 : 0.45,
-            }}>📤 友達リンクを送る</button>
+            }}>📤 追加用のリンクを送る</button>
             {shareMsg && (
               <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>✓ {shareMsg}</div>
             )}
@@ -14149,33 +14479,102 @@ input, select { padding: 10px 14px; }
             </div>
           </div>
 
-          {/* 友達リスト */}
+          {/* ── ③ 友達リスト。呼び名はこの端末だけのもの ── */}
           <div style={{ ...card, padding: 16, marginBottom: 14 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>友達リスト{Object.keys(friendsMap).length > 0 ? `（${Object.keys(friendsMap).length}人）` : ""}</div>
-            {Object.keys(friendsMap).length === 0 ? (
-              <div style={{ fontSize: 12, color: t.dm, marginBottom: 12 }}>まだ友達がいません。下でコードを入力して追加してください。</div>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 10 }}>友達リスト{fids.length > 0 ? `（${fids.length}人）` : ""}</div>
+            {fids.length === 0 ? (
+              <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8 }}>まだ友達がいません。上のQRコードか個人IDで追加してください。</div>
             ) : (
-              <div style={{ marginBottom: 12 }}>
-                {Object.entries(friendsMap).map(([fid, f], fi) => (
-                  <div key={fid} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: fi === 0 ? 0 : 10 }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
-                    <button aria-label="友達を削除" onClick={() => frRemoveFriend(fid, f.name)}
-                      style={{ flexShrink: 0, width: 40, height: 36, borderRadius: 8, cursor: "pointer", border: `1px solid ${t.bd}`, background: t.sf, color: t.dm, fontSize: 14 }}>🗑</button>
-                  </div>
-                ))}
-              </div>
+              <>
+                {fids.map((fid, fi) => {
+                  const nm = friendLinks[fid] || friendsMap[fid].name;
+                  const their = friendsMap[fid].name;
+                  return (
+                    <div key={fid} style={{ marginTop: fi === 0 ? 0 : 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nm}</span>
+                        <button aria-label="呼び名を変える" onClick={() => { setFrError(null); setFrEditFid(frEditFid === fid ? null : fid); setFrEditInput(nm); }}
+                          style={frIconBtn}>✏️</button>
+                        <button aria-label="友達を削除" onClick={() => frRemoveFriend(fid, nm)} style={frIconBtn}>🗑</button>
+                      </div>
+                      {their && their !== nm && (
+                        <div style={{ fontSize: 10, color: t.dm, marginTop: 3, lineHeight: 1.6 }}>相手の登録名：{their}</div>
+                      )}
+                      {frEditFid === fid && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.7, marginBottom: 6, textWrap: "balance" }}>
+                            この端末での呼び名です。相手には伝わりません。名簿の名前も一緒に変わります。
+                          </div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <input value={frEditInput} onChange={(e) => setFrEditInput(e.target.value)} maxLength={10}
+                              style={{ ...frInput, flex: 1, minWidth: 0 }} />
+                            <button onClick={() => frSetAlias(fid)}
+                              style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700 }}>保存</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 12, textWrap: "balance" }}>
+                  友達の名前は、対局のメンバーにも登録されています。
+                </div>
+              </>
             )}
-            <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>友達のコードを入力して追加</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.toUpperCase())} maxLength={6}
-                placeholder="例）ABC345" autoCapitalize="characters" autoCorrect="off"
-                style={{ ...frInput, flex: 1, minWidth: 0, letterSpacing: "0.12em", fontWeight: 700 }} />
-              <button disabled={frBusy} onClick={frAddFriend}
-                style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
-            </div>
+
+            {/* 自動共有の入切 */}
+            <button onClick={() => { const v = !frAuto; setFrAuto(v); try { localStorage.setItem("mj_fr_auto", v ? "1" : "0"); } catch {} }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10, marginTop: 14,
+                padding: "12px 12px", borderRadius: 10, cursor: "pointer", textAlign: "left", boxSizing: "border-box",
+                border: frAuto ? `2px solid ${t.ac}` : `1px solid ${t.bd}`, background: frAuto ? t.acS : t.sf, color: t.tx,
+              }}>
+              <span style={{
+                width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                border: `2px solid ${frAuto ? t.ac : t.bd}`, background: frAuto ? t.ac : "transparent",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1,
+              }}>{frAuto ? "✓" : ""}</span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 800 }}>
+                  {["対局が終わったら", "自動で送る"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+                </span>
+                <span style={{ display: "block", fontSize: 11, color: t.dm, lineHeight: 1.7, marginTop: 2 }}>
+                  {["卓にいた友達へ、", "結果を自動で届けます"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))}
+                </span>
+              </span>
+            </button>
           </div>
         </>
       )}
+    </div>
+    );
+  };
+
+  // カメラでQRコードを読む
+  const renderQrScan = () => (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 160, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ width: "100%", maxWidth: 400 }}>
+        <div style={card}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 800, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📷 QRコードを読み取る</span>
+            <button aria-label="閉じる" style={{ width: 36, height: 36, flexShrink: 0, background: "none", border: "none", color: t.dm, fontSize: 20, cursor: "pointer" }}
+              onClick={() => setQrOpen(false)}>✕</button>
+          </div>
+          {/* カメラが使えなかったときは、黒い枠を出しても仕方がないので畳む */}
+          {!qrFail && (
+            <div id="mj-qr-box" style={{
+              width: "100%", aspectRatio: "1 / 1", borderRadius: 12, overflow: "hidden",
+              background: "#000", border: `1px solid ${t.bd}`, marginBottom: 10,
+            }} />
+          )}
+          <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 12, textWrap: "balance" }}>{qrMsg}</div>
+          <label style={{ ...actionBtn(), marginBottom: 0, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 44 }}>
+            写真から読み取る
+            <input type="file" accept="image/*" style={{ display: "none" }}
+              onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ""; qrFromPhoto(f); }} />
+          </label>
+        </div>
+      </div>
     </div>
   );
 
@@ -14887,6 +15286,7 @@ input, select { padding: 10px 14px; }
         {view === "startguide" && renderStartGuide()}
         {view === "names" && renderNames()}
         {view === "friends" && renderFriends()}
+        {qrOpen && renderQrScan()}
         {sendPick && renderSendModal()}
         {showFuHelp && FuHelpModal()}
         {showInstall && InstallModal()}
