@@ -6,7 +6,7 @@
 //
 // ★ このファイルは手で置いているが、下の2行は build.js が書き替える。
 //   VERSION が変わると新しい入れ物に入れ直し、古いものは捨てる。
-const VERSION = "2fcd41798b12";
+const VERSION = "689c8742992f";
 const EXTRA = [];   // React など、外から読み込むもの（build.js が入れる）
 
 const CACHE = "ponzuke-" + VERSION;

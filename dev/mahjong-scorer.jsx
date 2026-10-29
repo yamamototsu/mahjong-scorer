@@ -329,13 +329,26 @@ const RotateIcon = ({ size = 34 }) => (
   </svg>
 );
 
-// レート設定のカード（ルール編集用）
+// 問い合わせ先（Googleフォームができたら、ここと privacy.html の CONTACT_URL を差し替える）
+const CONTACT_URL = "https://github.com/yamamototsu/mahjong-scorer/issues";
+const CONTACT_LABEL = "問い合わせ・データ削除の依頼";
+
+// 換算の単位にお金の単位は使わない。賭けの道具に見えるとストアの決まりに触れるため、
+// 円・ドルなどは受け付けず、昔の記録に入っていても「G」として表示する
+const MONEY_UNIT = /[円¥$€£₩元]|ドル|えん|エン|yen|jpy|usd/i;
+const SAFE_UNIT = (u) => {
+  const v = String(u == null ? "" : u).normalize("NFKC").trim().slice(0, 3);
+  return !v || MONEY_UNIT.test(v) ? "G" : v;
+};
+
+// ポイント換算の設定カード（ルール編集用）
 // 画面の中で定義すると打鍵のたびに作り直されて入力欄からカーソルが外れるので、
 // ここ（画面の外）に置いて形を固定している。配色 t は呼ぶ側から渡す。
 const RateSetting = ({ t, rate, onChange, unit, onUnitChange }) => {
   const on = !!rate;
-  const U = unit || "G";
+  const U = SAFE_UNIT(unit);
   const [unitDraft, setUnitDraft] = React.useState(U);
+  const [unitErr, setUnitErr] = React.useState("");
   const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
   // 「決定」ボタンを置かず、打った内容をそのまま設定へ反映する。
   // 自分で反映した分まで下の useEffect が拾うと打っている途中の文字が
@@ -349,13 +362,15 @@ const RateSetting = ({ t, rate, onChange, unit, onUnitChange }) => {
   // 単位は空のままだと表示できないので、空の間は反映せず既定の「G」に戻す
   const commitUnit = (raw) => {
     const v = (raw || "").trim().slice(0, 3);
+    if (v && MONEY_UNIT.test(v.normalize("NFKC"))) { setUnitErr("お金の単位（円・ドルなど）は使えません。G・pt などにしてください"); return; }
+    setUnitErr("");
     if (!v || v === U) return;
     unitRef.current = v;
     onUnitChange && onUnitChange(v);
   };
   const blurUnit = () => {
-    const v = (unitDraft || "").trim().slice(0, 3) || "G";
-    setUnitDraft(v);
+    const v = SAFE_UNIT(unitDraft);
+    setUnitDraft(v); setUnitErr("");
     commitUnit(v);
   };
   // "0." や空文字など、入力の途中の数字は確定しない
@@ -371,13 +386,13 @@ const RateSetting = ({ t, rate, onChange, unit, onUnitChange }) => {
   };
   return (
     <div style={{ marginBottom: 16 }}>
-      {/* レート精算をするかどうか */}
+      {/* ポイント換算をするかどうか */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: on ? 12 : 0 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>レート計算</div>
-          <div style={{ fontSize: 10, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.tx }}>ポイント換算</div>
+          <div style={{ fontSize: 12, color: t.dm, marginTop: 2, lineHeight: 1.7 }}>
             {/* 280px幅で「表示しま/す。」と途中で折り返さないよう意味の切れ目で区切る */}
-            {["点数を違うレート単位で", "表示します。"].map((x, k) => (
+            {["精算の結果を、", "決めた単位のポイントに", "換算して表示します。"].map((x, k) => (
               <span key={k} style={{ display: "inline-block" }}>{x}</span>
             ))}
           </div>
@@ -399,7 +414,7 @@ const RateSetting = ({ t, rate, onChange, unit, onUnitChange }) => {
 
       {on && (<>
         <div style={{ marginBottom: 12, padding: 10, borderRadius: 10, background: t.sf, border: `1px solid ${t.bd}` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 6 }}>レート単位を変える</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 6 }}>単位を変える</div>
           <input value={unitDraft} maxLength={3}
             onChange={(e) => { const v = e.target.value.slice(0, 3); setUnitDraft(v); commitUnit(v); }}
             onBlur={blurUnit}
@@ -410,12 +425,14 @@ const RateSetting = ({ t, rate, onChange, unit, onUnitChange }) => {
               border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
               fontSize: 16, fontWeight: 800, textAlign: "center", outline: "none",
             }} />
-          <div style={{ fontSize: 10, color: t.dm, marginTop: 6 }}>3文字以内（入力するとそのまま反映されます）</div>
+          <div style={{ fontSize: 11, color: unitErr ? t.rd : t.dm, marginTop: 6, lineHeight: 1.7 }}>
+            {unitErr || "3文字以内（G・pt など。入力するとそのまま反映されます）"}
+          </div>
         </div>
 
-        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>レート単位（{U}）</div>
+        <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>1点あたりの{U}</div>
         <div style={{ fontSize: 11, color: t.dm, marginBottom: 8, lineHeight: 1.7 }}>
-          1点あたりの{U}。精算画面に{U}の増減が表示されます
+          精算画面に{U}の増減が表示されます
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <input value={rateDraft}
@@ -1062,27 +1079,47 @@ export default function MahjongScorer() {
     };
   };
 
+  // はじめて使う人の初期ルール。いちばんよく遊ばれている
+  // 「25,000点持ち・30,000点返し・ウマ10-20・テンパイ連荘」にしてある
   const FACTORY_RULES = {
-    tenpaiRenchan: false,   // テンパイ連荘
-    agariRenchan: true,     // あがり連荘のみ
+    tenpaiRenchan: true,    // テンパイ連荘
+    agariRenchan: false,    // あがり連荘のみ
     kuitan: true,           // 食いタン
     atozuke: true,          // 後付け
     kiriage: false,         // 切り上げ満貫（4翻30符・3翻60符を満貫扱い）
     doubleYakuman: false,   // ダブル役満（役満の複合を2倍・3倍で計算）
     honbaUnit: 300,         // 1本場の点数（三麻連盟ルールは600）
-    rate: 0,                // レート（1点あたりの単位）。0=なし
-    rateUnit: "G",          // レートの単位名（3文字以内）
+    rate: 0,                // ポイント換算（1点あたりの単位）。0=なし
+    rateUnit: "G",          // 換算の単位名（3文字以内。お金の単位は使わない）
     kazoeYakuman: true,     // 数え役満（OFFなら11翻以上は三倍満どまり）
     orasYame: true,         // オーラスで親がトップなら終了（アガリやめ・テンパイやめ）
     multiRon: "atamahane",  // 複数ロン: "atamahane"=頭ハネ / "double"=ダブロンまで / "triple"=トリプルロンまで
-    startPoints: 30000,     // 持ち点
+    startPoints: 25000,     // 持ち点
     returnPoints: 30000,    // 返し点
     tobiEnd: true,          // 持ち点が0未満になったら終了（トビ・ハコ下）
-    umaKey: "none",         // ウマ（順位点）
-    uma: [0, 0, 0, 0],
+    umaKey: "10-20",        // ウマ（順位点）
+    uma: [20, 10, -10, -20],
+  };
+  // これまでの初期ルール（30,000点持ち・30,000点返し・ウマなし・あがり連荘）。
+  // すでに使っている人は、初期ルールを変えても今までどおり遊べるよう、こちらを保存しておく
+  const PREV_FACTORY_RULES = {
+    ...FACTORY_RULES,
+    tenpaiRenchan: false, agariRenchan: true,
+    startPoints: 30000, returnPoints: 30000, umaKey: "none", uma: [0, 0, 0, 0],
   };
   const loadDefaultRules = () => {
     try {
+      // すでに使っている人（履歴・名簿・前回のルールがある）で、初期ルールを保存していない人には
+      // これまでの初期ルールを保存しておく（勝手にルールが変わらないように）
+      // 見分けは初回の起動で1度だけする（新しく使い始めた人が次に開いたとき、古いルールにならないように）
+      if (!localStorage.getItem("mj_rules_v2")) {
+        if (!localStorage.getItem("mj_default_rules")) {
+          const used = ["mj_history", "mj_preset_names", "mj_last_rules", "mj_onboard", "mj_ongoing"]
+            .some(k => { const x = localStorage.getItem(k); return x && x !== "[]"; });
+          if (used) localStorage.setItem("mj_default_rules", JSON.stringify(PREV_FACTORY_RULES));
+        }
+        localStorage.setItem("mj_rules_v2", "1");
+      }
       const v = JSON.parse(localStorage.getItem("mj_default_rules") || "null");
       const r = v ? { ...FACTORY_RULES, ...v } : { ...FACTORY_RULES };
       // 返し点は必ず持ち点以上
@@ -6018,6 +6055,8 @@ input, select { padding: 10px 14px; }
   const [tableMode, setTableMode] = useState(true);
   const [homeCat, setHomeCat] = useState(null); // null | play | practice | settings
   const [tmWinStep, setTmWinStep] = useState(null); // null | "winner" | "how"
+  // 向かいの席（上側のボタン）から入力を始めたか。翻・符・確認の画面をその人向きにする
+  const [gwFlip, setGwFlip] = useState(false);
   // 最終確認画面の「訂正」で卓の選択に戻ったときの控え。
   // 選択をキャンセルしたら対局画面ではなく元の確認画面に戻す
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
@@ -6358,11 +6397,30 @@ input, select { padding: 10px 14px; }
   // リロード・電池切れ・誤操作でアプリが閉じても対局が消えないよう、
   // 対局中はひと操作ごとに局面を端末へ保存する。タイトルの「つづきを再開」で戻れる。
   // 消えるのは、履歴やリーグへ記録したとき（recordGame）と、再開カードで破棄したとき。
+  // 保存した局面へまるごと戻す（つづきの再開・直前の入力の取り消し・開き直しで共用）
+  const restoreGame = (sg) => {
+    setGameConfig(sg.config);
+    setPlayerCount((sg.config && sg.config.playerCount) || 4);
+    setPlayers(sg.players);
+    setScores(sg.scores);
+    setRounds(sg.rounds);
+    setDealerIdx(sg.dealerIdx);
+    setRoundWind(sg.roundWind);
+    setHonba(sg.honba);
+    setRiichiBets(sg.riichiBets);
+    // 宣言中のリーチ・直接修正・リーグとの紐づけも戻す（古い保存データには無いので既定値で補う）
+    setDeclaredRiichi(sg.declaredRiichi || [false, false, false, false]);
+    setManualAdj(sg.manualAdj || [0, 0, 0, 0]);
+    setActiveLeagueId(sg.activeLeagueId || null);
+    setGameStarted(true); setGameFinished(!!sg.finished);
+    setTableMode(sg.tableMode !== false);
+  };
   const snapshotGame = () => ({
     config: gameConfig, players: [...players], scores: [...scores], rounds: [...rounds],
     dealerIdx, roundWind, honba, riichiBets,
     declaredRiichi: [...declaredRiichi], manualAdj: [...manualAdj],
     activeLeagueId, tableMode, finished: gameFinished,
+    savedAt: Date.now(),   // 開き直したとき、対局へそのまま戻すかの目安
   });
   React.useEffect(() => {
     try {
@@ -6371,6 +6429,80 @@ input, select { padding: 10px 14px; }
     } catch {}
   }, [gameStarted, gameFinished, gameConfig, players, scores, rounds, dealerIdx, roundWind,
       honba, riichiBets, declaredRiichi, manualAdj, activeLeagueId, tableMode, suspendedGame]);
+
+  // ── 開き直したときに対局へ戻す ──
+  // 対局の途中でアプリが閉じた（電池切れ・誤って閉じた・端末に落とされた）ときは、
+  // 開き直したら演出を飛ばしてそのまま卓へ戻す。⏸ で自分で保留したときは今までどおりメニューから
+  const markPaused = () => { try { localStorage.setItem("mj_ongoing_paused", "1"); } catch {} };
+  React.useEffect(() => {
+    if (gameStarted) { try { localStorage.removeItem("mj_ongoing_paused"); } catch {} }
+  }, [gameStarted]);
+  const [restoredNote, setRestoredNote] = useState(false);
+  React.useEffect(() => {
+    const sg = suspendedGame;
+    let paused = false;
+    try { paused = localStorage.getItem("mj_ongoing_paused") === "1"; } catch {}
+    // 6時間より前の対局は、その日の続きではないかもしれないのでメニューから選んでもらう
+    const fresh = sg && sg.savedAt && Date.now() - sg.savedAt < 6 * 60 * 60 * 1000;
+    if (!sg || paused || !fresh) return;
+    restoreGame(sg);
+    setSuspendedGame(null);
+    setView("game");
+    setRestoredNote(true);
+    const id = setTimeout(() => setRestoredNote(false), 5000);
+    return () => clearTimeout(id);
+  }, []);
+
+  // ── 直前の入力を取り消す ──
+  // アガリ・流局・チョンボを反映すると、卓の下に「直前の入力」と「取り消す」を出す。
+  // 取り消すと、入力を始める前の局面（点数・局・本場・リーチ・供託）へまるごと戻す。
+  // 入力の途中でない間は「いまの局面」を控え続け、局が増えた瞬間にその控えを取り消し用にする
+  const stableSnapRef = React.useRef(null);
+  const roundsSeenRef = React.useRef({ len: 0, started: false });
+  const riichiSeenRef = React.useRef("");
+  const [undoInfo, setUndoInfo] = useState(null);       // { snap, text, at }
+  const describeRound = (r) => {
+    if (!r) return "";
+    const nm = (i) => players[i] || "";
+    if (r.chombo) return `チョンボ ${nm(r.offender)}`;
+    if (r.draw) {
+      const tp = (r.tenpai || []).map((x, i) => (x ? nm(i) : null)).filter(Boolean);
+      return tp.length ? `流局（テンパイ: ${tp.join("・")}）` : "流局（全員ノーテン）";
+    }
+    return `${nm(r.winner)} ${r.tsumo ? "ツモ" : `ロン ← ${nm(r.loser)}`} ${(r.score || 0).toLocaleString()}点${r.multiRon ? "（ダブロン）" : ""}`;
+  };
+  React.useEffect(() => {
+    const prev = roundsSeenRef.current;
+    roundsSeenRef.current = { len: rounds.length, started: gameStarted };
+    if (!gameStarted) { stableSnapRef.current = null; if (undoInfo) setUndoInfo(null); return; }
+    const inputting = !!tmWinStep || showGW || tmDrawMode || showDrawWiz || !!chomboStep || fixIdx !== null || reviewing;
+    // 局が1〜3件（ダブロン・トリプルロン）増えた → 入力前の控えを取り消し用にする
+    if (prev.started && rounds.length > prev.len && rounds.length <= prev.len + 3 && stableSnapRef.current && !reviewing) {
+      setUndoInfo({ snap: stableSnapRef.current, text: describeRound(rounds[rounds.length - 1]), at: Date.now() });
+    } else if (undoInfo && inputting) {
+      setUndoInfo(null);   // 次の入力を始めたら、前の取り消しは出さない
+    }
+    // リーチを宣言・取り消したら、取り消しは出さない（戻すとリーチまで消えてしまう）
+    const rk = declaredRiichi.join(",");
+    if (riichiSeenRef.current && riichiSeenRef.current !== rk && rounds.length === prev.len && undoInfo) setUndoInfo(null);
+    riichiSeenRef.current = rk;
+    if (!inputting) stableSnapRef.current = snapshotGame();
+  });
+  // しばらくしたら帯を消す
+  React.useEffect(() => {
+    if (!undoInfo) return;
+    const id = setTimeout(() => setUndoInfo(u => (u && u.at === undoInfo.at ? null : u)), 20000);
+    return () => clearTimeout(id);
+  }, [undoInfo && undoInfo.at]);
+  const undoLast = () => {
+    if (!undoInfo) return;
+    const sg = undoInfo.snap;
+    setUndoInfo(null);
+    restoreGame(sg);
+    setShowExtendConfirm(false); setExtendNext(null);
+    // 戻したぶん局が減るので、取り消しの帯がまた出ないよう見張りを合わせる
+    roundsSeenRef.current = { len: sg.rounds.length, started: true };
+  };
 
   // ── 卓上モード中は画面を固定し、ずれても中央に戻す ──
   const tableLocked = tableMode && gameStarted && !gameFinished && view === "game";
@@ -6940,7 +7072,7 @@ input, select { padding: 10px 14px; }
       : (rs.uma && rs.uma.length === PC) ? rs.uma : null;
     const umaLabel = (!umaArr || umaArr.every(u => !u))
       ? "なし" : umaArr.map(u => (u > 0 ? "+" : "") + u).join(" / ");
-    const rateUnit = rs.rateUnit || "G";
+    const rateUnit = SAFE_UNIT(rs.rateUnit);
 
     return (
       <div style={{
@@ -7002,7 +7134,7 @@ input, select { padding: 10px 14px; }
                 rs.chomboCalc !== false
                   ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し`
                   : "点数は動かさず記録だけ残します。局はやり直し")}
-              {row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし",
+              {row("ポイント換算", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし",
                 rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)}
             </>
           ) : (() => {
@@ -7562,7 +7694,7 @@ input, select { padding: 10px 14px; }
     const myRank = ranked.findIndex(r => r.i === pi) + 1;
     const rs = gameConfig?.rules || {};
     const rate = rs.rate || 0;
-    const unit = rs.rateUnit || "G";
+    const unit = SAFE_UNIT(rs.rateUnit);
     // 「いま終局した場合」の計算。持ち点（配給原点）・返し点・ウマ・オカから出す。
     // 「返し点<持ち点」の古い設定はオカが負になるので、返し＝持ち点として扱う
     const sp = rs.startPoints ?? 25000;
@@ -7735,7 +7867,7 @@ input, select { padding: 10px 14px; }
               }} onClick={() => setRankPeekMode(m => (m === "gold" ? "rank" : "gold"))}>
                 {mode === "gold" ? "点数表示に戻す" : (
                   <>
-                    <span style={{ display: "block", whiteSpace: "nowrap" }}>💰 レート換算</span>
+                    <span style={{ display: "block", whiteSpace: "nowrap" }}>📈 ポイント換算</span>
                     <span style={{ display: "block", fontSize: 10, opacity: 0.85, whiteSpace: "nowrap" }}>
                       1点 = {RATE_LABEL(rate)}{unit}
                     </span>
@@ -7929,26 +8061,15 @@ input, select { padding: 10px 14px; }
   // ── タイトル画面（アプリを開いて最初に出るページ） ──
   const renderTitle = () => {
     const resumeGame = () => {
-      setGameConfig(suspendedGame.config);
-      setPlayerCount(suspendedGame.config.playerCount || 4);
-      setPlayers(suspendedGame.players);
-      setScores(suspendedGame.scores);
-      setRounds(suspendedGame.rounds);
-      setDealerIdx(suspendedGame.dealerIdx);
-      setRoundWind(suspendedGame.roundWind);
-      setHonba(suspendedGame.honba);
-      setRiichiBets(suspendedGame.riichiBets);
-      // 宣言中のリーチ・直接修正・リーグとの紐づけも戻す（古い保存データには無いので既定値で補う）
-      setDeclaredRiichi(suspendedGame.declaredRiichi || [false, false, false, false]);
-      setManualAdj(suspendedGame.manualAdj || [0, 0, 0, 0]);
-      setActiveLeagueId(suspendedGame.activeLeagueId || null);
-      setGameStarted(true); setGameFinished(!!suspendedGame.finished);
-      setTableMode(suspendedGame.tableMode !== false);
+      restoreGame(suspendedGame);
       setSuspendedGame(null);   // 再開したらカードを消す（以後は自動保存が引き継ぐ）
       setView("game");
     };
     const startPlay = () => {
       setActiveLeagueId(null);
+      // 東の席が仮の名前のままなら、自分の名前を入れておく（たいてい自分も打つので）
+      if (myName) setPlayers(prev => (/^[A-D]プレーヤー$/.test(prev[0] || "") && !prev.includes(myName))
+        ? [myName, ...prev.slice(1)] : prev);
       setView("game"); setGameStarted(false); setGameFinished(false); setSetupStep(3);
     };
     const subBtn = (icon, label, sub, onClick) => (
@@ -8109,7 +8230,7 @@ input, select { padding: 10px 14px; }
           <div style={{ ...card, padding: 20, marginBottom: 0, ...reveal(1) }}>
             <div style={{ fontSize: 17, fontWeight: 900, color: t.tx, marginBottom: 7, lineHeight: 1.5 }}>はじめまして</div>
             <div style={{ fontSize: 14, color: t.dm, lineHeight: 1.9, marginBottom: 14 }}>
-              {["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される名前に使います。", "あとで変えられます。"].map((x, k) => (
+              {["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される", "名前に使います。", "あとで変えられます。"].map((x, k) => (
                 <span key={k} style={{ display: "inline-block" }}>{x}</span>
               ))}
             </div>
@@ -8846,7 +8967,7 @@ input, select { padding: 10px 14px; }
               </div>
             )}
 
-            {secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${draftRules.rateUnit || "G"}` : "レート計算なし")}
+            {secHdr("rate", "📈", "ポイント換算", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${SAFE_UNIT(draftRules.rateUnit)}` : "換算しない")}
             {setOpen === "rate" && (
               <div style={{ ...card, padding: 16, marginTop: 4 }}>
                 <RateSetting t={t} rate={draftRules.rate || 0} onChange={(v) => editDraft({ rate: v })}
@@ -8913,8 +9034,14 @@ input, select { padding: 10px 14px; }
                 </div>
 
                 <div style={{ fontSize: 14, fontWeight: 800, marginTop: 18, marginBottom: 6 }}>問い合わせ</div>
-                <a href="https://github.com/yamamototsu/mahjong-scorer/issues" target="_blank" rel="noopener"
-                  style={{ fontSize: 13, color: t.ac, wordBreak: "break-all" }}>github.com/yamamototsu/mahjong-scorer/issues</a>
+                <a href={CONTACT_URL} target="_blank" rel="noopener" style={{
+                  display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "10px 12px",
+                  borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                  fontSize: 14, fontWeight: 700, textDecoration: "none", boxSizing: "border-box",
+                }}>
+                  <span style={{ flex: 1 }}>✉️ {CONTACT_LABEL}</span>
+                  <span style={{ color: t.dm }}>›</span>
+                </a>
               </div>
             )}
 
@@ -11294,7 +11421,10 @@ input, select { padding: 10px 14px; }
               base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ",
               base.kuitan ? "食いタンあり" : "食いタンなし",
               base.doubleYakuman ? "ダブル役満あり" : null,
-              `持ち点${(base.startPoints || 0).toLocaleString()}`,
+              `${(base.startPoints || 0).toLocaleString()}点持ち${(base.returnPoints || 0).toLocaleString()}点返し`,
+              (base.uma || []).some(u => u !== 0)
+                ? `ウマ${(base.uma || []).filter(u => u > 0).sort((a, b) => a - b).join("-")}`
+                : "ウマなし",
             ].filter(Boolean).join(" ・ ");
             return (
               <div style={{
@@ -11305,7 +11435,7 @@ input, select { padding: 10px 14px; }
                 <div style={{ fontSize: 12, fontWeight: 800, color: ok ? t.gn : t.ac, marginBottom: 5 }}>
                   {!hasLast ? "初期設定ルール" : same ? "✓ 前回と同じルールです" : "前回のルール"}
                 </div>
-                <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginBottom: 11 }}>{sum}</div>
+                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginBottom: 11 }}>{sum}</div>
                 <button disabled={!matchType}
                   onClick={() => { setRules({ ...base }); setSetupStep(0); }} style={{
                   width: "100%", padding: "13px 10px", borderRadius: 10, cursor: matchType ? "pointer" : "default", border: "none",
@@ -11462,7 +11592,7 @@ input, select { padding: 10px 14px; }
             </div>
           )}
 
-          {gsHdr("rate", "💰", "レート設定", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${rules.rateUnit || "G"}` : "レート計算なし")}
+          {gsHdr("rate", "📈", "ポイント換算", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${SAFE_UNIT(rules.rateUnit)}` : "換算しない")}
           {gsOpen === "rate" && (
             <div style={{ ...card, padding: 16, marginTop: 4 }}>
               <RateSetting t={t} rate={rules.rate || 0} onChange={(v) => setRules(r => ({ ...r, rate: v }))}
@@ -11952,6 +12082,18 @@ input, select { padding: 10px 14px; }
           {item("📋", "ルールの確認・変更",
             "この対局のルールを確認して、その場で変えられます",
             () => { setTmMenu(false); setShowRuleCheck(flip ? "flip" : true); })}
+          {/* 誤ロンなどは「アガリ入力」から探されることが多いので、ここにも入口を置く */}
+          {!reviewing && fixIdx === null && item("⚠️", "チョンボ",
+            "誤ロン・誤ツモなどの罰符を入れます（局はやり直し）",
+            () => { setTmMenu(false); setTmWinStep(null); setTmDrawMode(false); openChombo(); })}
+          {!reviewing && item("⏸", "対局を保留",
+            "メニューに戻ります。「対局のつづきを再開」から戻れます",
+            () => {
+              setTmMenu(false);
+              if (!window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) return;
+              setSuspendedGame(snapshotGame()); markPaused();
+              setGameStarted(false); setHomeCat(null); setView("title");
+            })}
           <button style={{ ...actionBtn(), marginTop: 4 }} onClick={close}>閉じる</button>
         </div>
       </div>
@@ -12027,6 +12169,27 @@ input, select { padding: 10px 14px; }
     // ルールで許される同時ロンの人数（1=頭ハネ）
     const mrRule = (gameConfig || {}).rules?.multiRon || "atamahane";
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
+    // 放銃した人を決めたら、そのまま翻の入力へ進む（「確定」を押す手間をなくした）。
+    // 「ロン」と読み上げ終わってから次の画面へ
+    const confirmRonLoser = (i) => {
+      setRonLoserPick(i);
+      playVoice("ロン", () => {
+        setTmWinStep(null);
+        setGTsumo(false); setGLoser(i);
+        if (ronPick.length >= 2) {
+          const order = [...ronPick].sort((x, y) => ((x - i + PC) % PC) - ((y - i + PC) % PC));
+          setMultiRon({ loser: i, queue: order, done: [] });
+          setGWinner(order[0]);
+        } else {
+          setMultiRon(null);
+          // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
+          if (ronPick.length === 1) setGWinner(ronPick[0]);
+        }
+        setRonLoserPick(null);
+        setGHan(null); setGFu(null); setFuGuide(null);
+        setShowGW(true); setGStep(5);
+      });
+    };
     // 席順: players[0]=手前, [1]=右, [2]=向かい, [3]=左（反時計回り＝下家が右）
     // 卓（正方形）の一辺に対する比率で決める。端末サイズが変わっても重ならない
     const PW = "36cqmin";   // パネルの長辺
@@ -12110,6 +12273,11 @@ input, select { padding: 10px 14px; }
               const maxRon = PC - 1;
               return (
                 <button onClick={() => {
+                  // 頭ハネ（アガれるのは1人）なら、選んだ時点で次へ進む（「1人で確定」を押す手間をなくした）
+                  if (multiRonMax === 1) {
+                    setRonPick([i]); setGWinner(i); setRonRuleWarn(false); setTmWinStep("how");
+                    return;
+                  }
                   setRonPick(prev => prev.includes(i)
                     ? prev.filter(x => x !== i)
                     : (prev.length >= maxRon ? prev : [...prev, i]));
@@ -12156,7 +12324,7 @@ input, select { padding: 10px 14px; }
               const sel = ronLoserPick === i;
               const dim = ronLoserPick !== null && !sel;   // 他が選ばれている
               return (
-              <button onClick={() => setRonLoserPick(sel ? null : i)} style={{
+              <button onClick={() => { if (ronLoserPick === null) confirmRonLoser(i); }} style={{
                 width: "100%", height: "100%", borderRadius: 10, cursor: "pointer", padding: "2cqmin",
                 border: `2px solid ${sel ? t.rd : dim ? "rgba(255,255,255,0.55)" : t.rd}`,
                 background: sel ? "rgba(239,68,68,0.32)" : dim ? "rgba(255,255,255,0.06)" : t.rdS,
@@ -12284,8 +12452,16 @@ input, select { padding: 10px 14px; }
     const BAR_GAP = "clamp(4px, 1.6vw, 8px)";
     const barIcon = (fs) => ({
       ...smallBtn(), flex: "0 0 clamp(32px, 10vw, 44px)",
-      fontSize: fs || "clamp(15px, 4.6vw, 19px)", padding: "10px 0",
+      fontSize: fs || "clamp(15px, 4.6vw, 19px)", padding: "6px 0",
+      display: "flex", alignItems: "center", justifyContent: "center",
     });
+    // 絵だけでは意味が伝わりにくいので、下に2文字で役目を添える
+    const withLabel = (icon, label) => (
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, lineHeight: 1 }}>
+        <span style={{ lineHeight: 1.1 }}>{icon}</span>
+        <span style={{ fontSize: "max(10px, 2.6vw)", fontWeight: 700, color: t.dm, whiteSpace: "nowrap", lineHeight: 1.15 }}>{label}</span>
+      </span>
+    );
     // basis を中身の幅にしておくと、余った幅を分け合っても
     // 「アガリ入力」だけ足りなくなることがない
     const barMain = (v) => ({
@@ -12296,13 +12472,13 @@ input, select { padding: 10px 14px; }
     });
     const rankBtn = (flip) => (
       <button aria-label="順位と点差" style={{ ...barIcon("clamp(14px, 4.2vw, 17px)") }}
-        onClick={() => { setRankPeekMode("rank"); setRankPeek(rowSeat(flip)); }}>📊</button>
+        onClick={() => { setRankPeekMode("rank"); setRankPeek(rowSeat(flip)); }}>{withLabel("📊", "順位")}</button>
     );
     const rotateBtn = () => (
       <button aria-label="席順を回す" style={{
         ...barIcon(), display: "flex", alignItems: "center", justifyContent: "center",
       }} onClick={() => setSeatRot(r => (r + PC - 1) % PC)}>
-        <RotateIcon size={20} />
+        {withLabel(<RotateIcon size={18} />, "向き")}
       </button>
     );
     const actionRow = (flip) => (flip && (reviewing || correctingDrawIdx !== null)) ? null : (
@@ -12390,7 +12566,7 @@ input, select { padding: 10px 14px; }
              「アガリ入力」「流局」は出さない（押すと局が増えてしまう） */
           <div style={{ display: "flex", gap: BAR_GAP }}>
             <button aria-label="ルール確認" style={barIcon()}
-              onClick={() => setShowRuleCheck(flip ? "flip" : true)}>📋</button>
+              onClick={() => setShowRuleCheck(flip ? "flip" : true)}>{withLabel("📋", "ルール")}</button>
             {rankBtn(flip)}
             <button style={barMain("p")}
               onClick={() => { setEditingRoundIdx(null); setShowRoundEdit(true); }}>✏️ 局を選んで修正</button>
@@ -12399,18 +12575,18 @@ input, select { padding: 10px 14px; }
         ) : (
           <div style={{ display: "flex", gap: BAR_GAP }}>
             <button aria-label="メニュー" style={barIcon()}
-              onClick={() => setTmMenu(flip ? "flip" : true)}>📋</button>
+              onClick={() => setTmMenu(flip ? "flip" : true)}>{withLabel("📋", "修正")}</button>
             {rankBtn(flip)}
-            <button style={barMain("p")} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setTmWinStep("winner"); }}>アガリ入力</button>
+            <button style={barMain("p")} onClick={() => { resetGW(); setGRiichi(fixSeedRiichi()); setRonPick([]); setMultiRon(null); setRonLoserPick(null); setTmCorrectBackup(null); setGwFlip(!!flip && PC === 4); setTmWinStep("winner"); }}>アガリ入力</button>
             <button style={barMain()} onClick={() => { setDrawTenpai(fixSeedTenpai()); setTmDrawMode(true); }}>流局</button>
             {/* 対局を保留はめったに押さないので、「アガリ入力」から離して外側に置く */}
             <button aria-label="対局を保留" style={barIcon()}
               onClick={() => {
                 // 1回押しただけで卓が消えると「対局が消えた」と思われるので、たずねてから保留する
                 if (!window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) return;
-                setSuspendedGame(snapshotGame());
+                setSuspendedGame(snapshotGame()); markPaused();
                 setGameStarted(false); setHomeCat(null); setView("title");
-              }}>⏸</button>
+              }}>{withLabel("⏸", "保留")}</button>
             {rotateBtn()}
           </div>
         )}
@@ -12449,6 +12625,12 @@ input, select { padding: 10px 14px; }
               fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", minHeight: 34,
             }}>局を選び直す</button>
           </div>
+        )}
+        {restoredNote && (
+          <div style={{
+            padding: "9px 12px", marginBottom: 8, borderRadius: 10, textAlign: "center",
+            background: t.gnS, border: `1px solid ${t.gn}66`, color: t.gn, fontSize: 13, fontWeight: 800,
+          }}>✓ 前回の対局のつづきから再開しました</div>
         )}
         {RuleCheckModal()}
         {TableMenuModal()}
@@ -12549,24 +12731,7 @@ input, select { padding: 10px 14px; }
                 /* 放銃者を選んだら確定ボタン */
                 <button onClick={(e) => {
                   e.stopPropagation();
-                  const i = ronLoserPick;
-                  // 「ロン」と読み上げ終わってから次の画面へ
-                  playVoice("ロン", () => {
-                    setTmWinStep(null);
-                    setGTsumo(false); setGLoser(i);
-                    if (ronPick.length >= 2) {
-                      const order = [...ronPick].sort((x, y) => ((x - i + PC) % PC) - ((y - i + PC) % PC));
-                      setMultiRon({ loser: i, queue: order, done: [] });
-                      setGWinner(order[0]);
-                    } else {
-                      setMultiRon(null);
-                      // 結果画面からの訂正で戻ってきた場合にgWinnerが空なので再設定する
-                      if (ronPick.length === 1) setGWinner(ronPick[0]);
-                    }
-                    setRonLoserPick(null);
-                    setGHan(null); setGFu(null); setFuGuide(null);
-                    setShowGW(true); setGStep(5);
-                  });
+                  confirmRonLoser(ronLoserPick);
                 }} style={{
                   width: "100%", height: "100%", borderRadius: 16, cursor: "pointer",
                   border: "none", background: t.acB, color: "#fff",
@@ -12705,6 +12870,26 @@ input, select { padding: 10px 14px; }
         </div>
         </div>
 
+        {/* 直前の入力の取り消し */}
+        {undoInfo && !reviewing && fixIdx === null && !tmWinStep && !tmDrawMode && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, margin: "6px 0 8px",
+            padding: "8px 10px", borderRadius: 10, background: t.card, border: `1px solid ${t.bd}`,
+          }}>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, lineHeight: 1.5, color: t.tx }}>
+              <span style={{ color: t.dm, fontSize: 12 }}>直前の入力 </span>
+              <span style={{ fontWeight: 700 }}>{undoInfo.text}</span>
+            </span>
+            <button onClick={() => {
+              if (!window.confirm("直前の入力を取り消して、入力前の状態に戻しますか？\n" + undoInfo.text)) return;
+              undoLast();
+            }} style={{
+              flexShrink: 0, minHeight: 38, padding: "8px 12px", borderRadius: 9, cursor: "pointer",
+              border: `1px solid ${t.rd}88`, background: "transparent", color: t.rd,
+              fontSize: 13, fontWeight: 800, whiteSpace: "nowrap",
+            }}>取り消す</button>
+          </div>
+        )}
         {actionRow(false)}
         {reviewing && (
           <button onClick={() => {
@@ -12849,7 +13034,8 @@ input, select { padding: 10px 14px; }
 
       {/* ── Round Wizard Modal ── */}
       {showGW && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        /* 向かいの席から入力を始めたときは、画面ごと逆さにしてその人が読める向きにする */
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch", transform: (tableMode && gwFlip) ? "rotate(180deg)" : "none" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             {/* 確認画面の「訂正」から来たときは、どのステップからでも
                 やめて確認画面に戻れるようにする */}
@@ -13457,7 +13643,7 @@ input, select { padding: 10px 14px; }
                     <span style={{ color: t.ac, fontWeight: 600 }}>{players[r.winner]}</span>
                     {" "}<span style={{ color: t.dm }}>{r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`}</span>
                     {" "}<span style={{ fontWeight: 700, color: t.tx }}>{r.score?.toLocaleString()}</span>
-                    {r.limitName && <span style={{ color: t.gd, marginLeft: 4 }}>{r.limitName}</span>}
+                    {r.limitName && !(r.han >= 13 && r.limitName === getLimitName(r.han)) && <span style={{ color: t.gd, marginLeft: 4 }}>{r.limitName}</span>}
                   </span>
                 )}
               </button>
@@ -13517,7 +13703,7 @@ input, select { padding: 10px 14px; }
       )}
 
       <button style={actionBtn()} onClick={() => {
-        setSuspendedGame(snapshotGame());
+        setSuspendedGame(snapshotGame()); markPaused();
         setGameStarted(false);
         setView("home");
       }}>⏸ 対局保留</button>
@@ -13747,15 +13933,15 @@ input, select { padding: 10px 14px; }
                 {hasUma && detail("小計", pm(r.sub), t.tx)}
                 {hasUma && detail("五捨六入", pm(r.roundedPt * 1000), t.tx)}
                 {hasUma && detail("ウマ", pm(r.umaPt * 1000), r.umaPt > 0 ? t.gd : r.umaPt < 0 ? t.rd : t.dm)}
-                {r.gold !== null && detail("レート換算",
-                  `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${ruleSet.rateUnit || "G"}`,
+                {r.gold !== null && detail("ポイント換算",
+                  `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${SAFE_UNIT(ruleSet.rateUnit)}`,
                   r.gold > 0 ? t.gd : r.gold < 0 ? t.rd : t.dm)}
               </div>
             </div>
           ))}
           {!!ruleSet.rate && (
             <div style={{ fontSize: 12, color: t.dm, marginTop: 8, lineHeight: 1.9 }}>
-              レート 1点 = {RATE_LABEL(ruleSet.rate)} {ruleSet.rateUnit || "G"}。
+              換算 1点 = {RATE_LABEL(ruleSet.rate)} {SAFE_UNIT(ruleSet.rateUnit)}。
               <span style={{ display: "inline-block" }}>1,000点単位に五捨六入してから掛けています</span>
             </div>
           )}
@@ -13786,7 +13972,7 @@ input, select { padding: 10px 14px; }
                   <span style={{ color: t.ac, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>{players[r.winner]}</span>
                   <span style={{ color: t.dm, whiteSpace: "nowrap" }}>{r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`}</span>
                   <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{r.score?.toLocaleString()}</span>
-                  {r.limitName && <span style={{ color: t.gd, whiteSpace: "nowrap" }}>{r.limitName}</span>}
+                  {r.limitName && !(r.han >= 13 && r.limitName === getLimitName(r.han)) && <span style={{ color: t.gd, whiteSpace: "nowrap" }}>{r.limitName}</span>}
                 </span>
               )}
             </div>
@@ -13819,7 +14005,7 @@ input, select { padding: 10px 14px; }
                       width: 62, textAlign: "right", fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums",
                       color: res[i].pt > 0 ? t.gd : res[i].pt < 0 ? t.rd : t.dm,
                     }}>{res[i].pt > 0 ? "+" : ""}{GOLD_LABEL(GOLD(res[i].pt, lg.rules.rate))}
-                      <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{lg.rules.rateUnit || "G"}</span>
+                      <span style={{ fontSize: 10, marginLeft: 2, opacity: 0.85 }}>{SAFE_UNIT(lg.rules.rateUnit)}</span>
                     </span>
                   )}
                 </div>
@@ -15229,6 +15415,8 @@ input, select { padding: 10px 14px; }
   // ── 履歴の選択集計 ──
   // 対局を選んで、素点合計・ウマオカ込みpt合計・レート換算・参加数・トップ数を出す
   const [histSelMode, setHistSelMode] = useState(false);
+  // 履歴が多いと一覧の描画が重くなるので、新しい順に30件ずつ出す
+  const [histShowN, setHistShowN] = useState(30);
   const [histSel, setHistSel] = useState([]);     // 選択した対局のid
   const [histSelPurpose, setHistSelPurpose] = useState("agg");   // "agg"=集計 / "send"=友達に送る
   const [histAgg, setHistAgg] = useState(null);   // 集計結果 { rows, count, unit, hasRate }
@@ -15248,7 +15436,7 @@ input, select { padding: 10px 14px; }
       const rp = Math.max(sp, rs.returnPoints ?? 30000);
       const uma = (rs.uma && rs.uma.length === n) ? rs.uma : Array(n).fill(0);
       const rate = rs.rate || 0;
-      if (rate > 0 && !unit) unit = rs.rateUnit || "G";
+      if (rate > 0 && !unit) unit = SAFE_UNIT(rs.rateUnit);
       const ranked = g.finalScores.map((v, i) => ({ i, v })).sort((a, b) => (b.v - a.v) || (a.i - b.i));
       ranked.forEach((r, rank) => {
         const nm = names[r.i];
@@ -15433,7 +15621,7 @@ input, select { padding: 10px 14px; }
               </div>
             </div>
           ) : (
-            [...gameHistory].reverse().map((g, idx) => {
+            [...gameHistory].reverse().slice(0, histShowN).map((g, idx) => {
               // 保存済みの古い三麻記録は players が4人のことがあるので、点数がある人数で切る
               const sorted = g.players.slice(0, g.finalScores.length).map((p, i) => ({ name: p, score: g.finalScores[i] })).sort((a, b) => b.score - a.score);
               const sel = histSelMode && histSel.includes(g.id);
@@ -15500,6 +15688,11 @@ input, select { padding: 10px 14px; }
                 </div>
               );
             })
+          )}
+          {gameHistory.length > histShowN && (
+            <button onClick={() => setHistShowN(n => n + 30)} style={{ ...actionBtn(), marginTop: 4, marginBottom: 0 }}>
+              もっと見る（残り{gameHistory.length - histShowN}件）
+            </button>
           )}
 
           {/* バックアップは使う頻度が低いので、一覧の下に置く */}
@@ -15733,7 +15926,7 @@ input, select { padding: 10px 14px; }
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13, color: t.dm, marginTop: 3, lineHeight: 1.8, fontVariantNumeric: "tabular-nums" }}>
                           {histAgg.hasRate && (
                             <span style={{ whiteSpace: "nowrap", color: r.gold > 0 ? t.gn : r.gold < 0 ? t.rd : t.dm }}>
-                              レート換算 {r.gold > 0 ? "+" : ""}{GOLD_LABEL(r.gold)}{histAgg.unit || "G"}
+                              ポイント換算 {r.gold > 0 ? "+" : ""}{GOLD_LABEL(r.gold)}{SAFE_UNIT(histAgg.unit)}
                             </span>
                           )}
                           <span style={{ whiteSpace: "nowrap" }}>トップ {r.top}回（{r.n}戦）</span>
@@ -15750,7 +15943,6 @@ input, select { padding: 10px 14px; }
         </>
       ) : (
         <>
-          <button style={backBtn} onClick={() => setHistoryDetail(null)}>← 一覧に戻る</button>
           <div style={{ ...card, padding: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <span style={{ fontSize: 16, fontWeight: 700, minWidth: 0 }}>
@@ -15820,7 +16012,7 @@ input, select { padding: 10px 14px; }
                     <span style={{ color: t.ac, fontWeight: 600 }}>{historyDetail.players[r.winner]}</span>
                     {" "}<span style={{ color: t.dm }}>{r.han >= 13 ? getLimitName(r.han) : r.fu ? `${r.han}翻${r.fu}符` : `${r.han}翻`}</span>
                     {" "}<span style={{ fontWeight: 700 }}>{r.score?.toLocaleString()}</span>
-                    {r.limitName && <span style={{ color: t.gd, marginLeft: 4 }}>{r.limitName}</span>}
+                    {r.limitName && !(r.han >= 13 && r.limitName === getLimitName(r.han)) && <span style={{ color: t.gd, marginLeft: 4 }}>{r.limitName}</span>}
                   </span>
                 )}
               </div>
@@ -15863,7 +16055,7 @@ input, select { padding: 10px 14px; }
     // 対局中に戻ると対局が消えたように見えるので、保留してメニューへ戻るかたずねる
     if (view === "game" && gameStarted) {
       if (window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) {
-        setSuspendedGame(snapshotGame());
+        setSuspendedGame(snapshotGame()); markPaused();
         setGameStarted(false);
         setView("home");
       }
@@ -15932,6 +16124,7 @@ input, select { padding: 10px 14px; }
                 else if (view === "leagueform") setView("league");
                 else if (view === "leaguedetail") setView("league");
                 else if (view === "leaguestart") setView("leaguedetail");
+                else if (view === "history" && historyDetail) setHistoryDetail(null);
                 else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
                   // 問題の途中から解説を見に来たときは、その問題にそのまま戻す
                   const back = sqLessonBackTo; setSqLessonBackTo(null); setSqMode(back);

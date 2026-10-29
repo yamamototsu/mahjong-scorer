@@ -422,6 +422,13 @@ const RotateIcon = ({
   fill: "currentColor",
   d: "M19.83,9.75A8.15,8.15 0 0 0 4.17,9.75L6.18,10.33A6.05,6.05 0 0 1 17.82,10.33Z M4.27,13.22L7.91,10.31L2.72,8.82Z M4.17,14.25A8.15,8.15 0 0 0 19.83,14.25L17.82,13.67A6.05,6.05 0 0 1 6.18,13.67Z M19.73,10.78L16.09,13.69L21.28,15.18Z"
 }));
+const CONTACT_URL = "https://github.com/yamamototsu/mahjong-scorer/issues";
+const CONTACT_LABEL = "問い合わせ・データ削除の依頼";
+const MONEY_UNIT = /[円¥$€£₩元]|ドル|えん|エン|yen|jpy|usd/i;
+const SAFE_UNIT = u => {
+  const v = String(u == null ? "" : u).normalize("NFKC").trim().slice(0, 3);
+  return !v || MONEY_UNIT.test(v) ? "G" : v;
+};
 const RateSetting = ({
   t,
   rate,
@@ -430,8 +437,9 @@ const RateSetting = ({
   onUnitChange
 }) => {
   const on = !!rate;
-  const U = unit || "G";
+  const U = SAFE_UNIT(unit);
   const [unitDraft, setUnitDraft] = React.useState(U);
+  const [unitErr, setUnitErr] = React.useState("");
   const [rateDraft, setRateDraft] = React.useState(String(rate || 0.1));
   const unitRef = React.useRef(U);
   const rateRef = React.useRef(rate);
@@ -451,13 +459,19 @@ const RateSetting = ({
   const rateValid = !isNaN(rateNum) && rateNum >= 0.001 && rateNum <= 10;
   const commitUnit = raw => {
     const v = (raw || "").trim().slice(0, 3);
+    if (v && MONEY_UNIT.test(v.normalize("NFKC"))) {
+      setUnitErr("お金の単位（円・ドルなど）は使えません。G・pt などにしてください");
+      return;
+    }
+    setUnitErr("");
     if (!v || v === U) return;
     unitRef.current = v;
     onUnitChange && onUnitChange(v);
   };
   const blurUnit = () => {
-    const v = (unitDraft || "").trim().slice(0, 3) || "G";
+    const v = SAFE_UNIT(unitDraft);
     setUnitDraft(v);
+    setUnitErr("");
     commitUnit(v);
   };
   const commitRate = raw => {
@@ -489,14 +503,14 @@ const RateSetting = ({
       fontWeight: 700,
       color: t.tx
     }
-  }, "レート計算"), React.createElement("div", {
+  }, "ポイント換算"), React.createElement("div", {
     style: {
-      fontSize: 10,
+      fontSize: 12,
       color: t.dm,
       marginTop: 2,
       lineHeight: 1.7
     }
-  }, ["点数を違うレート単位で", "表示します。"].map((x, k) => React.createElement("span", {
+  }, ["精算の結果を、", "決めた単位のポイントに", "換算して表示します。"].map((x, k) => React.createElement("span", {
     key: k,
     style: {
       display: "inline-block"
@@ -551,7 +565,7 @@ const RateSetting = ({
       color: t.tx,
       marginBottom: 6
     }
-  }, "レート単位を変える"), React.createElement("input", {
+  }, "単位を変える"), React.createElement("input", {
     value: unitDraft,
     maxLength: 3,
     onChange: e => {
@@ -579,24 +593,25 @@ const RateSetting = ({
     }
   }), React.createElement("div", {
     style: {
-      fontSize: 10,
-      color: t.dm,
-      marginTop: 6
+      fontSize: 11,
+      color: unitErr ? t.rd : t.dm,
+      marginTop: 6,
+      lineHeight: 1.7
     }
-  }, "3文字以内（入力するとそのまま反映されます）")), React.createElement("div", {
+  }, unitErr || "3文字以内（G・pt など。入力するとそのまま反映されます）")), React.createElement("div", {
     style: {
       fontSize: 13,
       fontWeight: 700,
       marginBottom: 4
     }
-  }, "レート単位（", U, "）"), React.createElement("div", {
+  }, "1点あたりの", U), React.createElement("div", {
     style: {
       fontSize: 11,
       color: t.dm,
       marginBottom: 8,
       lineHeight: 1.7
     }
-  }, "1点あたりの", U, "。精算画面に", U, "の増減が表示されます"), React.createElement("div", {
+  }, "精算画面に", U, "の増減が表示されます"), React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -1418,8 +1433,8 @@ function MahjongScorer() {
     };
   };
   const FACTORY_RULES = {
-    tenpaiRenchan: false,
-    agariRenchan: true,
+    tenpaiRenchan: true,
+    agariRenchan: false,
     kuitan: true,
     atozuke: true,
     kiriage: false,
@@ -1430,14 +1445,33 @@ function MahjongScorer() {
     kazoeYakuman: true,
     orasYame: true,
     multiRon: "atamahane",
-    startPoints: 30000,
+    startPoints: 25000,
     returnPoints: 30000,
     tobiEnd: true,
+    umaKey: "10-20",
+    uma: [20, 10, -10, -20]
+  };
+  const PREV_FACTORY_RULES = {
+    ...FACTORY_RULES,
+    tenpaiRenchan: false,
+    agariRenchan: true,
+    startPoints: 30000,
+    returnPoints: 30000,
     umaKey: "none",
     uma: [0, 0, 0, 0]
   };
   const loadDefaultRules = () => {
     try {
+      if (!localStorage.getItem("mj_rules_v2")) {
+        if (!localStorage.getItem("mj_default_rules")) {
+          const used = ["mj_history", "mj_preset_names", "mj_last_rules", "mj_onboard", "mj_ongoing"].some(k => {
+            const x = localStorage.getItem(k);
+            return x && x !== "[]";
+          });
+          if (used) localStorage.setItem("mj_default_rules", JSON.stringify(PREV_FACTORY_RULES));
+        }
+        localStorage.setItem("mj_rules_v2", "1");
+      }
       const v = JSON.parse(localStorage.getItem("mj_default_rules") || "null");
       const r = v ? {
         ...FACTORY_RULES,
@@ -11502,6 +11536,7 @@ input, select { padding: 10px 14px; }
   const [tableMode, setTableMode] = useState(true);
   const [homeCat, setHomeCat] = useState(null);
   const [tmWinStep, setTmWinStep] = useState(null);
+  const [gwFlip, setGwFlip] = useState(false);
   const [tmCorrectBackup, setTmCorrectBackup] = useState(null);
   const [tmDrawMode, setTmDrawMode] = useState(false);
   const [showRoundEdit, setShowRoundEdit] = useState(false);
@@ -11915,6 +11950,23 @@ input, select { padding: 10px 14px; }
       localStorage.setItem("mj_dice_hold", String(v));
     } catch {}
   };
+  const restoreGame = sg => {
+    setGameConfig(sg.config);
+    setPlayerCount(sg.config && sg.config.playerCount || 4);
+    setPlayers(sg.players);
+    setScores(sg.scores);
+    setRounds(sg.rounds);
+    setDealerIdx(sg.dealerIdx);
+    setRoundWind(sg.roundWind);
+    setHonba(sg.honba);
+    setRiichiBets(sg.riichiBets);
+    setDeclaredRiichi(sg.declaredRiichi || [false, false, false, false]);
+    setManualAdj(sg.manualAdj || [0, 0, 0, 0]);
+    setActiveLeagueId(sg.activeLeagueId || null);
+    setGameStarted(true);
+    setGameFinished(!!sg.finished);
+    setTableMode(sg.tableMode !== false);
+  };
   const snapshotGame = () => ({
     config: gameConfig,
     players: [...players],
@@ -11928,13 +11980,102 @@ input, select { padding: 10px 14px; }
     manualAdj: [...manualAdj],
     activeLeagueId,
     tableMode,
-    finished: gameFinished
+    finished: gameFinished,
+    savedAt: Date.now()
   });
   React.useEffect(() => {
     try {
       if (gameStarted && gameConfig) localStorage.setItem("mj_ongoing", JSON.stringify(snapshotGame()));else if (suspendedGame) localStorage.setItem("mj_ongoing", JSON.stringify(suspendedGame));
     } catch {}
   }, [gameStarted, gameFinished, gameConfig, players, scores, rounds, dealerIdx, roundWind, honba, riichiBets, declaredRiichi, manualAdj, activeLeagueId, tableMode, suspendedGame]);
+  const markPaused = () => {
+    try {
+      localStorage.setItem("mj_ongoing_paused", "1");
+    } catch {}
+  };
+  React.useEffect(() => {
+    if (gameStarted) {
+      try {
+        localStorage.removeItem("mj_ongoing_paused");
+      } catch {}
+    }
+  }, [gameStarted]);
+  const [restoredNote, setRestoredNote] = useState(false);
+  React.useEffect(() => {
+    const sg = suspendedGame;
+    let paused = false;
+    try {
+      paused = localStorage.getItem("mj_ongoing_paused") === "1";
+    } catch {}
+    const fresh = sg && sg.savedAt && Date.now() - sg.savedAt < 6 * 60 * 60 * 1000;
+    if (!sg || paused || !fresh) return;
+    restoreGame(sg);
+    setSuspendedGame(null);
+    setView("game");
+    setRestoredNote(true);
+    const id = setTimeout(() => setRestoredNote(false), 5000);
+    return () => clearTimeout(id);
+  }, []);
+  const stableSnapRef = React.useRef(null);
+  const roundsSeenRef = React.useRef({
+    len: 0,
+    started: false
+  });
+  const riichiSeenRef = React.useRef("");
+  const [undoInfo, setUndoInfo] = useState(null);
+  const describeRound = r => {
+    if (!r) return "";
+    const nm = i => players[i] || "";
+    if (r.chombo) return `チョンボ ${nm(r.offender)}`;
+    if (r.draw) {
+      const tp = (r.tenpai || []).map((x, i) => x ? nm(i) : null).filter(Boolean);
+      return tp.length ? `流局（テンパイ: ${tp.join("・")}）` : "流局（全員ノーテン）";
+    }
+    return `${nm(r.winner)} ${r.tsumo ? "ツモ" : `ロン ← ${nm(r.loser)}`} ${(r.score || 0).toLocaleString()}点${r.multiRon ? "（ダブロン）" : ""}`;
+  };
+  React.useEffect(() => {
+    const prev = roundsSeenRef.current;
+    roundsSeenRef.current = {
+      len: rounds.length,
+      started: gameStarted
+    };
+    if (!gameStarted) {
+      stableSnapRef.current = null;
+      if (undoInfo) setUndoInfo(null);
+      return;
+    }
+    const inputting = !!tmWinStep || showGW || tmDrawMode || showDrawWiz || !!chomboStep || fixIdx !== null || reviewing;
+    if (prev.started && rounds.length > prev.len && rounds.length <= prev.len + 3 && stableSnapRef.current && !reviewing) {
+      setUndoInfo({
+        snap: stableSnapRef.current,
+        text: describeRound(rounds[rounds.length - 1]),
+        at: Date.now()
+      });
+    } else if (undoInfo && inputting) {
+      setUndoInfo(null);
+    }
+    const rk = declaredRiichi.join(",");
+    if (riichiSeenRef.current && riichiSeenRef.current !== rk && rounds.length === prev.len && undoInfo) setUndoInfo(null);
+    riichiSeenRef.current = rk;
+    if (!inputting) stableSnapRef.current = snapshotGame();
+  });
+  React.useEffect(() => {
+    if (!undoInfo) return;
+    const id = setTimeout(() => setUndoInfo(u => u && u.at === undoInfo.at ? null : u), 20000);
+    return () => clearTimeout(id);
+  }, [undoInfo && undoInfo.at]);
+  const undoLast = () => {
+    if (!undoInfo) return;
+    const sg = undoInfo.snap;
+    setUndoInfo(null);
+    restoreGame(sg);
+    setShowExtendConfirm(false);
+    setExtendNext(null);
+    roundsSeenRef.current = {
+      len: sg.rounds.length,
+      started: true
+    };
+  };
   const tableLocked = tableMode && gameStarted && !gameFinished && view === "game";
   React.useEffect(() => {
     if (!tableLocked) return;
@@ -12914,7 +13055,7 @@ input, select { padding: 10px 14px; }
     const mr = rs.multiRon === "triple" ? "トリプルロンあり" : rs.multiRon === "double" ? "ダブロンあり" : "頭ハネ";
     const umaArr = lg && lg.uma && lg.uma.length === PC ? lg.uma : rs.uma && rs.uma.length === PC ? rs.uma : null;
     const umaLabel = !umaArr || umaArr.every(u => !u) ? "なし" : umaArr.map(u => (u > 0 ? "+" : "") + u).join(" / ");
-    const rateUnit = rs.rateUnit || "G";
+    const rateUnit = SAFE_UNIT(rs.rateUnit);
     return React.createElement("div", {
       style: {
         position: "fixed",
@@ -12984,7 +13125,7 @@ input, select { padding: 10px 14px; }
       const spV = rs.startPoints ?? 25000;
       const okaPt = (Math.max(spV, rs.returnPoints ?? 30000) - spV) * PC / 1000;
       return okaPt > 0 ? `オカ ${okaPt}pt がトップへ` : "オカなし";
-    })()), row("ウマ（順位点）", umaLabel), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし", rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり"), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), row("本場", `1本 = ${HU().toLocaleString()}点`, `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`), row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います"), row("チョンボ", rs.chomboCalc !== false ? "罰符あり" : "記録のみ", rs.chomboCalc !== false ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し` : "点数は動かさず記録だけ残します。局はやり直し"), row("レート", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし", rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)) : (() => {
+    })()), row("ウマ（順位点）", umaLabel), row("流局したときの親", renchan, renchanHint), row("オーラス", rs.orasYame !== false ? "親トップで終了" : "やめなし", rs.orasYame !== false ? "アガリやめ・テンパイやめ" : "親がトップでも続行"), row("複数人が同時にロン", mr, rs.multiRon === "atamahane" ? "アガれるのは1人だけ" : "本場と供託は放銃者に近い人へ"), row("食いタン", rs.kuitan ? "あり" : "なし"), row("後付け", rs.atozuke ? "あり" : "なし"), row("切り上げ満貫", rs.kiriage ? "あり" : "なし", rs.kiriage ? "4翻30符・3翻60符を満貫扱い" : null), row("ダブル役満", rs.doubleYakuman ? "あり" : "なし", rs.doubleYakuman ? "役満の複合を2倍・3倍で計算" : null), row("数え役満", rs.kazoeYakuman !== false ? "あり" : "なし", rs.kazoeYakuman !== false ? "13翻以上は役満として計算" : "11翻以上でも三倍満どまり"), row("トビで終了", rs.tobiEnd !== false ? "あり" : "なし"), row("本場", `1本 = ${HU().toLocaleString()}点`, `ツモのときは他家が ${Math.floor(HU() / (PC - 1)).toLocaleString()}点ずつ負担`), row("ノーテン罰符", "場で3,000点", "ノーテンの人が払い、テンパイの人で分け合います"), row("チョンボ", rs.chomboCalc !== false ? "罰符あり" : "記録のみ", rs.chomboCalc !== false ? `親: 子に${(rs.chomboOya ?? 4000).toLocaleString()}ずつ ／ 子: 親に${(rs.chomboKoOya ?? 4000).toLocaleString()}・子に${(rs.chomboKoKo ?? 2000).toLocaleString()}。局はやり直し` : "点数は動かさず記録だけ残します。局はやり直し"), row("ポイント換算", rs.rate > 0 ? `1点 = ${RATE_LABEL(rs.rate)} ${rateUnit}` : "なし", rs.rate > 0 ? `10,000点なら ${GOLD_LABEL(GOLD(10, rs.rate))} ${rateUnit}` : null)) : (() => {
       const seg = (opts, cur, onPick) => React.createElement("div", {
         style: {
           display: "flex",
@@ -13868,7 +14009,7 @@ input, select { padding: 10px 14px; }
     const myRank = ranked.findIndex(r => r.i === pi) + 1;
     const rs = gameConfig?.rules || {};
     const rate = rs.rate || 0;
-    const unit = rs.rateUnit || "G";
+    const unit = SAFE_UNIT(rs.rateUnit);
     const sp = rs.startPoints ?? 25000;
     const rp = Math.max(sp, rs.returnPoints ?? 30000);
     const uma = rs.uma && rs.uma.length === PC ? rs.uma : Array(PC).fill(0);
@@ -14178,7 +14319,7 @@ input, select { padding: 10px 14px; }
         display: "block",
         whiteSpace: "nowrap"
       }
-    }, "💰 レート換算"), React.createElement("span", {
+    }, "📈 ポイント換算"), React.createElement("span", {
       style: {
         display: "block",
         fontSize: 10,
@@ -14493,26 +14634,13 @@ input, select { padding: 10px 14px; }
   };
   const renderTitle = () => {
     const resumeGame = () => {
-      setGameConfig(suspendedGame.config);
-      setPlayerCount(suspendedGame.config.playerCount || 4);
-      setPlayers(suspendedGame.players);
-      setScores(suspendedGame.scores);
-      setRounds(suspendedGame.rounds);
-      setDealerIdx(suspendedGame.dealerIdx);
-      setRoundWind(suspendedGame.roundWind);
-      setHonba(suspendedGame.honba);
-      setRiichiBets(suspendedGame.riichiBets);
-      setDeclaredRiichi(suspendedGame.declaredRiichi || [false, false, false, false]);
-      setManualAdj(suspendedGame.manualAdj || [0, 0, 0, 0]);
-      setActiveLeagueId(suspendedGame.activeLeagueId || null);
-      setGameStarted(true);
-      setGameFinished(!!suspendedGame.finished);
-      setTableMode(suspendedGame.tableMode !== false);
+      restoreGame(suspendedGame);
       setSuspendedGame(null);
       setView("game");
     };
     const startPlay = () => {
       setActiveLeagueId(null);
+      if (myName) setPlayers(prev => /^[A-D]プレーヤー$/.test(prev[0] || "") && !prev.includes(myName) ? [myName, ...prev.slice(1)] : prev);
       setView("game");
       setGameStarted(false);
       setGameFinished(false);
@@ -14795,7 +14923,7 @@ input, select { padding: 10px 14px; }
         lineHeight: 1.9,
         marginBottom: 14
       }
-    }, ["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される名前に使います。", "あとで変えられます。"].map((x, k) => React.createElement("span", {
+    }, ["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される", "名前に使います。", "あとで変えられます。"].map((x, k) => React.createElement("span", {
       key: k,
       style: {
         display: "inline-block"
@@ -16395,7 +16523,7 @@ input, select { padding: 10px 14px; }
       rules: draftRules,
       onChange: editDraft,
       compact: true
-    })), secHdr("rate", "💰", "レート設定", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${draftRules.rateUnit || "G"}` : "レート計算なし"), setOpen === "rate" && React.createElement("div", {
+    })), secHdr("rate", "📈", "ポイント換算", draftRules.rate ? `1点 = ${RATE_LABEL(draftRules.rate)} ${SAFE_UNIT(draftRules.rateUnit)}` : "換算しない"), setOpen === "rate" && React.createElement("div", {
       style: {
         ...card,
         padding: 16,
@@ -16517,15 +16645,33 @@ input, select { padding: 10px 14px; }
         marginBottom: 6
       }
     }, "問い合わせ"), React.createElement("a", {
-      href: "https://github.com/yamamototsu/mahjong-scorer/issues",
+      href: CONTACT_URL,
       target: "_blank",
       rel: "noopener",
       style: {
-        fontSize: 13,
-        color: t.ac,
-        wordBreak: "break-all"
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        minHeight: 44,
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.tx,
+        fontSize: 14,
+        fontWeight: 700,
+        textDecoration: "none",
+        boxSizing: "border-box"
       }
-    }, "github.com/yamamototsu/mahjong-scorer/issues")), (rulesDirty || rulesSaved) && React.createElement("div", {
+    }, React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }, "✉️ ", CONTACT_LABEL), React.createElement("span", {
+      style: {
+        color: t.dm
+      }
+    }, "›"))), (rulesDirty || rulesSaved) && React.createElement("div", {
       style: {
         ...card,
         padding: 10,
@@ -20987,7 +21133,7 @@ input, select { padding: 10px 14px; }
     if (base.returnPoints != null && base.returnPoints < (base.startPoints ?? 0)) base.returnPoints = base.startPoints;
     const same = JSON.stringify(rules) === JSON.stringify(base);
     const ok = hasLast && same;
-    const sum = [base.agariRenchan ? "あがり連荘" : base.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘", base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ", base.kuitan ? "食いタンあり" : "食いタンなし", base.doubleYakuman ? "ダブル役満あり" : null, `持ち点${(base.startPoints || 0).toLocaleString()}`].filter(Boolean).join(" ・ ");
+    const sum = [base.agariRenchan ? "あがり連荘" : base.tenpaiRenchan ? "テンパイ連荘" : "無条件連荘", base.multiRon === "triple" ? "トリプルロン" : base.multiRon === "double" ? "ダブロン" : "頭ハネ", base.kuitan ? "食いタンあり" : "食いタンなし", base.doubleYakuman ? "ダブル役満あり" : null, `${(base.startPoints || 0).toLocaleString()}点持ち${(base.returnPoints || 0).toLocaleString()}点返し`, (base.uma || []).some(u => u !== 0) ? `ウマ${(base.uma || []).filter(u => u > 0).sort((a, b) => a - b).join("-")}` : "ウマなし"].filter(Boolean).join(" ・ ");
     return React.createElement("div", {
       style: {
         padding: 14,
@@ -21005,7 +21151,7 @@ input, select { padding: 10px 14px; }
       }
     }, !hasLast ? "初期設定ルール" : same ? "✓ 前回と同じルールです" : "前回のルール"), React.createElement("div", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         color: t.dm,
         lineHeight: 1.8,
         marginBottom: 11
@@ -21339,7 +21485,7 @@ input, select { padding: 10px 14px; }
       ...r,
       ...patch
     }))
-  })), gsHdr("rate", "💰", "レート設定", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${rules.rateUnit || "G"}` : "レート計算なし"), gsOpen === "rate" && React.createElement("div", {
+  })), gsHdr("rate", "📈", "ポイント換算", rules.rate ? `1点 = ${RATE_LABEL(rules.rate)} ${SAFE_UNIT(rules.rateUnit)}` : "換算しない"), gsOpen === "rate" && React.createElement("div", {
     style: {
       ...card,
       padding: 16,
@@ -22146,6 +22292,19 @@ input, select { padding: 10px 14px; }
     }, !canFix), item("📋", "ルールの確認・変更", "この対局のルールを確認して、その場で変えられます", () => {
       setTmMenu(false);
       setShowRuleCheck(flip ? "flip" : true);
+    }), !reviewing && fixIdx === null && item("⚠️", "チョンボ", "誤ロン・誤ツモなどの罰符を入れます（局はやり直し）", () => {
+      setTmMenu(false);
+      setTmWinStep(null);
+      setTmDrawMode(false);
+      openChombo();
+    }), !reviewing && item("⏸", "対局を保留", "メニューに戻ります。「対局のつづきを再開」から戻れます", () => {
+      setTmMenu(false);
+      if (!window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) return;
+      setSuspendedGame(snapshotGame());
+      markPaused();
+      setGameStarted(false);
+      setHomeCat(null);
+      setView("title");
     }), React.createElement("button", {
       style: {
         ...actionBtn(),
@@ -22324,6 +22483,32 @@ input, select { padding: 10px 14px; }
   const renderTableMode = () => {
     const mrRule = (gameConfig || {}).rules?.multiRon || "atamahane";
     const multiRonMax = mrRule === "triple" ? 3 : mrRule === "double" ? 2 : 1;
+    const confirmRonLoser = i => {
+      setRonLoserPick(i);
+      playVoice("ロン", () => {
+        setTmWinStep(null);
+        setGTsumo(false);
+        setGLoser(i);
+        if (ronPick.length >= 2) {
+          const order = [...ronPick].sort((x, y) => (x - i + PC) % PC - (y - i + PC) % PC);
+          setMultiRon({
+            loser: i,
+            queue: order,
+            done: []
+          });
+          setGWinner(order[0]);
+        } else {
+          setMultiRon(null);
+          if (ronPick.length === 1) setGWinner(ronPick[0]);
+        }
+        setRonLoserPick(null);
+        setGHan(null);
+        setGFu(null);
+        setFuGuide(null);
+        setShowGW(true);
+        setGStep(5);
+      });
+    };
     const PW = "36cqmin";
     const PH = "28cqmin";
     const PGAP = "3cqmin";
@@ -22430,6 +22615,13 @@ input, select { padding: 10px 14px; }
         const maxRon = PC - 1;
         return React.createElement("button", {
           onClick: () => {
+            if (multiRonMax === 1) {
+              setRonPick([i]);
+              setGWinner(i);
+              setRonRuleWarn(false);
+              setTmWinStep("how");
+              return;
+            }
             setRonPick(prev => prev.includes(i) ? prev.filter(x => x !== i) : prev.length >= maxRon ? prev : [...prev, i]);
           },
           style: {
@@ -22527,7 +22719,9 @@ input, select { padding: 10px 14px; }
         const sel = ronLoserPick === i;
         const dim = ronLoserPick !== null && !sel;
         return React.createElement("button", {
-          onClick: () => setRonLoserPick(sel ? null : i),
+          onClick: () => {
+            if (ronLoserPick === null) confirmRonLoser(i);
+          },
           style: {
             width: "100%",
             height: "100%",
@@ -22738,8 +22932,32 @@ input, select { padding: 10px 14px; }
       ...smallBtn(),
       flex: "0 0 clamp(32px, 10vw, 44px)",
       fontSize: fs || "clamp(15px, 4.6vw, 19px)",
-      padding: "10px 0"
+      padding: "6px 0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
     });
+    const withLabel = (icon, label) => React.createElement("span", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 3,
+        lineHeight: 1
+      }
+    }, React.createElement("span", {
+      style: {
+        lineHeight: 1.1
+      }
+    }, icon), React.createElement("span", {
+      style: {
+        fontSize: "max(10px, 2.6vw)",
+        fontWeight: 700,
+        color: t.dm,
+        whiteSpace: "nowrap",
+        lineHeight: 1.15
+      }
+    }, label));
     const barMain = v => ({
       ...smallBtn(v),
       width: "auto",
@@ -22760,7 +22978,7 @@ input, select { padding: 10px 14px; }
         setRankPeekMode("rank");
         setRankPeek(rowSeat(flip));
       }
-    }, "📊");
+    }, withLabel("📊", "順位"));
     const rotateBtn = () => React.createElement("button", {
       "aria-label": "席順を回す",
       style: {
@@ -22770,9 +22988,9 @@ input, select { padding: 10px 14px; }
         justifyContent: "center"
       },
       onClick: () => setSeatRot(r => (r + PC - 1) % PC)
-    }, React.createElement(RotateIcon, {
-      size: 20
-    }));
+    }, withLabel(React.createElement(RotateIcon, {
+      size: 18
+    }), "向き"));
     const actionRow = flip => flip && (reviewing || correctingDrawIdx !== null) ? null : React.createElement("div", {
       style: {
         transform: flip ? "rotate(180deg)" : "none",
@@ -22913,7 +23131,7 @@ input, select { padding: 10px 14px; }
       "aria-label": "ルール確認",
       style: barIcon(),
       onClick: () => setShowRuleCheck(flip ? "flip" : true)
-    }, "📋"), rankBtn(flip), React.createElement("button", {
+    }, withLabel("📋", "ルール")), rankBtn(flip), React.createElement("button", {
       style: barMain("p"),
       onClick: () => {
         setEditingRoundIdx(null);
@@ -22928,7 +23146,7 @@ input, select { padding: 10px 14px; }
       "aria-label": "メニュー",
       style: barIcon(),
       onClick: () => setTmMenu(flip ? "flip" : true)
-    }, "📋"), rankBtn(flip), React.createElement("button", {
+    }, withLabel("📋", "修正")), rankBtn(flip), React.createElement("button", {
       style: barMain("p"),
       onClick: () => {
         resetGW();
@@ -22937,6 +23155,7 @@ input, select { padding: 10px 14px; }
         setMultiRon(null);
         setRonLoserPick(null);
         setTmCorrectBackup(null);
+        setGwFlip(!!flip && PC === 4);
         setTmWinStep("winner");
       }
     }, "アガリ入力"), React.createElement("button", {
@@ -22951,11 +23170,12 @@ input, select { padding: 10px 14px; }
       onClick: () => {
         if (!window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) return;
         setSuspendedGame(snapshotGame());
+        markPaused();
         setGameStarted(false);
         setHomeCat(null);
         setView("title");
       }
-    }, "⏸"), rotateBtn()));
+    }, withLabel("⏸", "保留")), rotateBtn()));
     return React.createElement("div", {
       style: {
         padding: "6px 8px 10px",
@@ -23020,7 +23240,19 @@ input, select { padding: 10px 14px; }
         whiteSpace: "nowrap",
         minHeight: 34
       }
-    }, "局を選び直す")), RuleCheckModal(), TableMenuModal(), RonRuleWarnModal(), actionRow(true), React.createElement("div", {
+    }, "局を選び直す")), restoredNote && React.createElement("div", {
+      style: {
+        padding: "9px 12px",
+        marginBottom: 8,
+        borderRadius: 10,
+        textAlign: "center",
+        background: t.gnS,
+        border: `1px solid ${t.gn}66`,
+        color: t.gn,
+        fontSize: 13,
+        fontWeight: 800
+      }
+    }, "✓ 前回の対局のつづきから再開しました"), RuleCheckModal(), TableMenuModal(), RonRuleWarnModal(), actionRow(true), React.createElement("div", {
       style: {
         flex: "1 1 auto",
         minHeight: 0,
@@ -23176,30 +23408,7 @@ input, select { padding: 10px 14px; }
     }, "ホウジュウ", React.createElement("br", null), "した人を選択")) : ronLoserPick !== null ? React.createElement("button", {
       onClick: e => {
         e.stopPropagation();
-        const i = ronLoserPick;
-        playVoice("ロン", () => {
-          setTmWinStep(null);
-          setGTsumo(false);
-          setGLoser(i);
-          if (ronPick.length >= 2) {
-            const order = [...ronPick].sort((x, y) => (x - i + PC) % PC - (y - i + PC) % PC);
-            setMultiRon({
-              loser: i,
-              queue: order,
-              done: []
-            });
-            setGWinner(order[0]);
-          } else {
-            setMultiRon(null);
-            if (ronPick.length === 1) setGWinner(ronPick[0]);
-          }
-          setRonLoserPick(null);
-          setGHan(null);
-          setGFu(null);
-          setFuGuide(null);
-          setShowGW(true);
-          setGStep(5);
-        });
+        confirmRonLoser(ronLoserPick);
       },
       style: {
         width: "100%",
@@ -23397,7 +23606,53 @@ input, select { padding: 10px 14px; }
           color: t.ac
         }
       }, "供託", riichiBets, "本")));
-    })())))), actionRow(false), reviewing && React.createElement("button", {
+    })())))), undoInfo && !reviewing && fixIdx === null && !tmWinStep && !tmDrawMode && React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        margin: "6px 0 8px",
+        padding: "8px 10px",
+        borderRadius: 10,
+        background: t.card,
+        border: `1px solid ${t.bd}`
+      }
+    }, React.createElement("span", {
+      style: {
+        flex: 1,
+        minWidth: 0,
+        fontSize: 13,
+        lineHeight: 1.5,
+        color: t.tx
+      }
+    }, React.createElement("span", {
+      style: {
+        color: t.dm,
+        fontSize: 12
+      }
+    }, "直前の入力 "), React.createElement("span", {
+      style: {
+        fontWeight: 700
+      }
+    }, undoInfo.text)), React.createElement("button", {
+      onClick: () => {
+        if (!window.confirm("直前の入力を取り消して、入力前の状態に戻しますか？\n" + undoInfo.text)) return;
+        undoLast();
+      },
+      style: {
+        flexShrink: 0,
+        minHeight: 38,
+        padding: "8px 12px",
+        borderRadius: 9,
+        cursor: "pointer",
+        border: `1px solid ${t.rd}88`,
+        background: "transparent",
+        color: t.rd,
+        fontSize: 13,
+        fontWeight: 800,
+        whiteSpace: "nowrap"
+      }
+    }, "取り消す")), actionRow(false), reviewing && React.createElement("button", {
       onClick: () => {
         if (!window.confirm("修正をやめて、修正前の結果に戻しますか？")) return;
         cancelReviewing();
@@ -23681,7 +23936,8 @@ input, select { padding: 10px 14px; }
       paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)',
       paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)',
       overflowY: "auto",
-      WebkitOverflowScrolling: "touch"
+      WebkitOverflowScrolling: "touch",
+      transform: tableMode && gwFlip ? "rotate(180deg)" : "none"
     }
   }, React.createElement("div", {
     style: {
@@ -24955,7 +25211,7 @@ input, select { padding: 10px 14px; }
       fontWeight: 700,
       color: t.tx
     }
-  }, r.score?.toLocaleString()), r.limitName && React.createElement("span", {
+  }, r.score?.toLocaleString()), r.limitName && !(r.han >= 13 && r.limitName === getLimitName(r.han)) && React.createElement("span", {
     style: {
       color: t.gd,
       marginLeft: 4
@@ -25088,6 +25344,7 @@ input, select { padding: 10px 14px; }
     style: actionBtn(),
     onClick: () => {
       setSuspendedGame(snapshotGame());
+      markPaused();
       setGameStarted(false);
       setView("home");
     }
@@ -25465,14 +25722,14 @@ input, select { padding: 10px 14px; }
           paddingTop: 7,
           borderTop: `1px solid ${t.bd}44`
         }
-      }, detail("素点", r.raw.toLocaleString(), r.raw < 0 ? t.rd : t.tx), detail("返し点", (-returnPt).toLocaleString(), t.dm), r.oka > 0 && detail("オカ", pm(r.oka), t.gd), hasUma && detail("小計", pm(r.sub), t.tx), hasUma && detail("五捨六入", pm(r.roundedPt * 1000), t.tx), hasUma && detail("ウマ", pm(r.umaPt * 1000), r.umaPt > 0 ? t.gd : r.umaPt < 0 ? t.rd : t.dm), r.gold !== null && detail("レート換算", `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${ruleSet.rateUnit || "G"}`, r.gold > 0 ? t.gd : r.gold < 0 ? t.rd : t.dm)))), !!ruleSet.rate && React.createElement("div", {
+      }, detail("素点", r.raw.toLocaleString(), r.raw < 0 ? t.rd : t.tx), detail("返し点", (-returnPt).toLocaleString(), t.dm), r.oka > 0 && detail("オカ", pm(r.oka), t.gd), hasUma && detail("小計", pm(r.sub), t.tx), hasUma && detail("五捨六入", pm(r.roundedPt * 1000), t.tx), hasUma && detail("ウマ", pm(r.umaPt * 1000), r.umaPt > 0 ? t.gd : r.umaPt < 0 ? t.rd : t.dm), r.gold !== null && detail("ポイント換算", `${r.gold > 0 ? "+" : ""}${GOLD_LABEL(r.gold)} ${SAFE_UNIT(ruleSet.rateUnit)}`, r.gold > 0 ? t.gd : r.gold < 0 ? t.rd : t.dm)))), !!ruleSet.rate && React.createElement("div", {
         style: {
           fontSize: 12,
           color: t.dm,
           marginTop: 8,
           lineHeight: 1.9
         }
-      }, "レート 1点 = ", RATE_LABEL(ruleSet.rate), " ", ruleSet.rateUnit || "G", "。", React.createElement("span", {
+      }, "換算 1点 = ", RATE_LABEL(ruleSet.rate), " ", SAFE_UNIT(ruleSet.rateUnit), "。", React.createElement("span", {
         style: {
           display: "inline-block"
         }
@@ -25548,7 +25805,7 @@ input, select { padding: 10px 14px; }
         fontWeight: 700,
         whiteSpace: "nowrap"
       }
-    }, r.score?.toLocaleString()), r.limitName && React.createElement("span", {
+    }, r.score?.toLocaleString()), r.limitName && !(r.han >= 13 && r.limitName === getLimitName(r.han)) && React.createElement("span", {
       style: {
         color: t.gd,
         whiteSpace: "nowrap"
@@ -25625,7 +25882,7 @@ input, select { padding: 10px 14px; }
           marginLeft: 2,
           opacity: 0.85
         }
-      }, lg.rules.rateUnit || "G")))), React.createElement("div", {
+      }, SAFE_UNIT(lg.rules.rateUnit))))), React.createElement("div", {
         style: {
           fontSize: 10,
           color: t.dm,
@@ -28109,6 +28366,7 @@ input, select { padding: 10px 14px; }
   };
   const [historyDetail, setHistoryDetail] = useState(null);
   const [histSelMode, setHistSelMode] = useState(false);
+  const [histShowN, setHistShowN] = useState(30);
   const [histSel, setHistSel] = useState([]);
   const [histSelPurpose, setHistSelPurpose] = useState("agg");
   const [histAgg, setHistAgg] = useState(null);
@@ -28124,7 +28382,7 @@ input, select { padding: 10px 14px; }
       const rp = Math.max(sp, rs.returnPoints ?? 30000);
       const uma = rs.uma && rs.uma.length === n ? rs.uma : Array(n).fill(0);
       const rate = rs.rate || 0;
-      if (rate > 0 && !unit) unit = rs.rateUnit || "G";
+      if (rate > 0 && !unit) unit = SAFE_UNIT(rs.rateUnit);
       const ranked = g.finalScores.map((v, i) => ({
         i,
         v
@@ -28464,7 +28722,7 @@ input, select { padding: 10px 14px; }
     style: {
       display: "inline-block"
     }
-  }, x)))) : [...gameHistory].reverse().map((g, idx) => {
+  }, x)))) : [...gameHistory].reverse().slice(0, histShowN).map((g, idx) => {
     const sorted = g.players.slice(0, g.finalScores.length).map((p, i) => ({
       name: p,
       score: g.finalScores[i]
@@ -28583,7 +28841,14 @@ input, select { padding: 10px 14px; }
         fontWeight: 700
       }
     }, "詳細を見る")));
-  }), !histSelMode && React.createElement("div", {
+  }), gameHistory.length > histShowN && React.createElement("button", {
+    onClick: () => setHistShowN(n => n + 30),
+    style: {
+      ...actionBtn(),
+      marginTop: 4,
+      marginBottom: 0
+    }
+  }, "もっと見る（残り", gameHistory.length - histShowN, "件）"), !histSelMode && React.createElement("div", {
     style: {
       marginTop: 14
     }
@@ -29175,7 +29440,7 @@ input, select { padding: 10px 14px; }
         whiteSpace: "nowrap",
         color: r.gold > 0 ? t.gn : r.gold < 0 ? t.rd : t.dm
       }
-    }, "レート換算 ", r.gold > 0 ? "+" : "", GOLD_LABEL(r.gold), histAgg.unit || "G"), React.createElement("span", {
+    }, "ポイント換算 ", r.gold > 0 ? "+" : "", GOLD_LABEL(r.gold), SAFE_UNIT(histAgg.unit)), React.createElement("span", {
       style: {
         whiteSpace: "nowrap"
       }
@@ -29187,10 +29452,7 @@ input, select { padding: 10px 14px; }
       marginBottom: 0
     },
     onClick: () => setHistAgg(null)
-  }, "閉じる"))))) : React.createElement(React.Fragment, null, React.createElement("button", {
-    style: backBtn,
-    onClick: () => setHistoryDetail(null)
-  }, "← 一覧に戻る"), React.createElement("div", {
+  }, "閉じる"))))) : React.createElement(React.Fragment, null, React.createElement("div", {
     style: {
       ...card,
       padding: 16
@@ -29355,7 +29617,7 @@ input, select { padding: 10px 14px; }
     style: {
       fontWeight: 700
     }
-  }, r.score?.toLocaleString()), r.limitName && React.createElement("span", {
+  }, r.score?.toLocaleString()), r.limitName && !(r.han >= 13 && r.limitName === getLimitName(r.han)) && React.createElement("span", {
     style: {
       color: t.gd,
       marginLeft: 4
@@ -29403,6 +29665,7 @@ input, select { padding: 10px 14px; }
     if (view === "game" && gameStarted) {
       if (window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) {
         setSuspendedGame(snapshotGame());
+        markPaused();
         setGameStarted(false);
         setView("home");
       }
@@ -29471,7 +29734,7 @@ input, select { padding: 10px 14px; }
     }
   }, view !== "home" && !(view === "game" && gameFinished) && !(view === "game" && !gameStarted) && !(view === "calc" && calcStep > 0) ? React.createElement("button", {
     onClick: () => {
-      if (view === "names") goNamesBack();else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
+      if (view === "names") goNamesBack();else if (view === "leagueform") setView("league");else if (view === "leaguedetail") setView("league");else if (view === "leaguestart") setView("leaguedetail");else if (view === "history" && historyDetail) setHistoryDetail(null);else if (view === "scorequiz" && sqMode === "lesson" && sqLessonBackTo) {
         const back = sqLessonBackTo;
         setSqLessonBackTo(null);
         setSqMode(back);
