@@ -15,7 +15,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preload" as="image" href="assets/intro.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 html,body{margin:0;padding:0;background:#0c1117;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:contain}
 *,*::before,*::after{box-sizing:border-box}
@@ -25,8 +25,16 @@ input,select{font-family:inherit}
 </head>
 <body>
 <div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script>
+// 部品が読めなかったとき（通信が切れた初回など）は、真っ黒のままにせず一言出す
+if (!window.React || !window.ReactDOM) {
+  document.getElementById("root").innerHTML =
+    '<div style="color:#e6edf6;padding:48px 24px;font:16px/1.9 sans-serif;text-align:center">' +
+    'アプリを読み込めませんでした。<br>電波のよいところで、もう一度開いてください。</div>';
+}
+</script>
 <script>
 const { useState, useCallback, useMemo } = React;
 
@@ -84,6 +92,10 @@ const Net = (() => {
       const r = real.ref(path).push();
       await r.set(val);
       return r.key;
+    },
+    async deleteUser() {
+      const u = window.firebase && window.firebase.auth().currentUser;
+      if (u) await u.delete();
     }
   };
   return new Proxy(real, {
@@ -96,7 +108,7 @@ const genFriendCode = () => Array.from({
 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
 const FRIEND_LINK = code => location.origin + location.pathname + "?fr=" + code;
 const CODE_FROM = text => {
-  const v = String(text || "");
+  const v = String(text || "").normalize("NFKC");
   const m = /[?&]fr=([0-9A-Za-z]{6})/.exec(v) || /^\s*([0-9A-Za-z]{6})\s*$/.exec(v);
   if (!m) return "";
   const c = m[1].toUpperCase();
@@ -133,6 +145,28 @@ const newGameId = () => Date.now() + "-" + randChars(4, false);
 const gameOrder = g => {
   const n = parseInt(String(g && g.id != null ? g.id : ""), 10);
   return Number.isFinite(n) ? n : g && g.endedAt || 0;
+};
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, ng) => setTimeout(() => ng(new Error("timeout")), ms))]);
+const sanitizeGame = g => {
+  if (!g || typeof g !== "object" || Array.isArray(g)) return null;
+  if (typeof g.id !== "string" && typeof g.id !== "number") return null;
+  if (!Array.isArray(g.players) || !Array.isArray(g.finalScores)) return null;
+  const n = g.finalScores.length;
+  if (n < 3 || n > 4 || g.players.length < n) return null;
+  if (!g.finalScores.every(v => typeof v === "number" && Number.isFinite(v))) return null;
+  return {
+    ...g,
+    players: g.players.slice(0, n).map(x => String(x == null ? "" : x).slice(0, 20)),
+    okaResults: Array.isArray(g.okaResults) ? g.okaResults.filter(o => o && typeof o === "object").map(o => ({
+      ...o,
+      name: String(o.name == null ? "" : o.name),
+      finalPt: Number(o.finalPt) || 0
+    })) : [],
+    rounds: Array.isArray(g.rounds) ? g.rounds.filter(r => r && typeof r === "object") : [],
+    rules: g.rules && typeof g.rules === "object" && !Array.isArray(g.rules) ? g.rules : {},
+    date: typeof g.date === "string" ? g.date : "",
+    matchType: typeof g.matchType === "string" ? g.matchType : ""
+  };
 };
 const DIST = "web";
 const STORE_URL = "";
@@ -612,27 +646,71 @@ const RateSetting = ({
 function MahjongScorer() {
   const [view, setView] = useState("title");
   const [gameHistory, setGameHistory] = useState(() => {
+    let raw = null;
     try {
-      return JSON.parse(localStorage.getItem("mj_history") || "[]");
+      raw = localStorage.getItem("mj_history");
     } catch {
       return [];
     }
+    if (!raw) return [];
+    const stash = v => {
+      try {
+        localStorage.setItem("mj_history_broken_" + Date.now(), v);
+      } catch {}
+    };
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) throw new Error("not array");
+      const ok = [],
+        bad = [];
+      arr.forEach(g => {
+        const c = sanitizeGame(g);
+        if (c) ok.push(c);else bad.push(g);
+      });
+      if (bad.length) stash(JSON.stringify(bad));
+      return ok;
+    } catch {
+      stash(raw);
+      return [];
+    }
   });
+  const [saveFull, setSaveFull] = useState(false);
   React.useEffect(() => {
     try {
       localStorage.setItem("mj_history", JSON.stringify(gameHistory));
-    } catch {}
+      setSaveFull(false);
+    } catch {
+      setSaveFull(true);
+    }
   }, [gameHistory]);
-  const mergeIntoHistory = incoming => {
-    const existingIds = new Set(gameHistory.map(g => g.id));
-    const fresh = (incoming || []).filter(g => g && g.id && !existingIds.has(g.id));
+  const histRef = React.useRef(gameHistory);
+  histRef.current = gameHistory;
+  const mergeIntoHistory = (incoming, fromCloud) => {
+    const have = new Set(histRef.current.map(g => String(g.id)));
+    const fresh = [];
+    (incoming || []).map(sanitizeGame).filter(Boolean).forEach(g => {
+      const k = String(g.id);
+      if (!have.has(k)) {
+        have.add(k);
+        fresh.push(g);
+      }
+    });
     if (fresh.length > 0) {
-      const merged = [...gameHistory, ...fresh];
-      merged.sort((a, b) => gameOrder(a) - gameOrder(b));
-      setGameHistory(merged);
+      histRef.current = [...histRef.current, ...fresh];
+      setGameHistory(prev => {
+        const ids = new Set(prev.map(g => String(g.id)));
+        const add = fresh.filter(g => !ids.has(String(g.id)));
+        if (!add.length) return prev;
+        return [...prev, ...add].sort((a, b) => gameOrder(a) - gameOrder(b));
+      });
+      if (!fromCloud && cloudBoxRef.current) {
+        const ids = fresh.map(g => g.id);
+        saveCloudQueue(prev => [...prev, ...ids.filter(x => !prev.includes(x))]);
+      }
     }
     return fresh.length;
   };
+  const cloudBoxRef = React.useRef("");
   const [suspendedGame, setSuspendedGame] = useState(() => {
     try {
       const s = JSON.parse(localStorage.getItem("mj_ongoing") || "null");
@@ -1718,6 +1796,7 @@ function MahjongScorer() {
   };
   const [gameFinished, setGameFinished] = useState(false);
   const [showExtendConfirm, setShowExtendConfirm] = useState(false);
+  const [extendNext, setExtendNext] = useState(null);
   const [kyotakuAward, setKyotakuAward] = useState(null);
   React.useEffect(() => {
     if (gameFinished && riichiBets > 0) {
@@ -2008,7 +2087,59 @@ function MahjongScorer() {
     out.splice(at, 0, rec);
     return out;
   };
-  const afterFixApplied = () => {
+  const nextPositionAfter = list => {
+    const last = list[list.length - 1];
+    if (!last) return {
+      wind: "東",
+      dealer: 0,
+      honba: 0
+    };
+    const rs = (gameConfig || {}).rules || {};
+    if (last.chombo) return {
+      wind: last.wind,
+      dealer: last.dealer,
+      honba: last.honba || 0
+    };
+    let dealerStays, honbaNext;
+    if (last.draw) {
+      const dealerTenpai = !!(last.tenpai || [])[last.dealer];
+      const rotate = rs.agariRenchan ? true : rs.tenpaiRenchan ? !dealerTenpai : false;
+      dealerStays = !rotate;
+      honbaNext = (last.honba || 0) + 1;
+    } else {
+      const same = list.filter(r => !r.draw && !r.chombo && r.wind === last.wind && r.dealer === last.dealer && (r.honba || 0) === (last.honba || 0) && (r === last || r.multiRon && last.multiRon));
+      const dealerWon = same.some(r => r.winner === last.dealer);
+      dealerStays = dealerWon;
+      honbaNext = dealerWon ? (last.honba || 0) + 1 : 0;
+    }
+    if (dealerStays) return {
+      wind: last.wind,
+      dealer: last.dealer,
+      honba: honbaNext
+    };
+    const next = (last.dealer + 1) % PC;
+    let wind = last.wind;
+    if (next === 0) {
+      const wi = WINDS.indexOf(last.wind);
+      if (wi >= 0 && wi < 3) wind = WINDS[wi + 1];
+    }
+    return {
+      wind,
+      dealer: next,
+      honba: honbaNext
+    };
+  };
+  const moveTableTo = pos => {
+    const lastWi = WINDS.indexOf(LAST_WIND((gameConfig || {}).matchType));
+    if (WINDS.indexOf(pos.wind) > lastWi) return;
+    setRoundWind(pos.wind);
+    setDealerIdx(pos.dealer);
+    setHonba(pos.honba);
+  };
+  const afterFixApplied = newRounds => {
+    if (newRounds && fixIdx !== null && !reviewing && !gameFinished && multiRonGroup(fixIdx).includes(rounds.length - 1)) {
+      moveTableTo(nextPositionAfter(newRounds));
+    }
     setFixIdx(null);
     if (reviewing) finishReviewing();
   };
@@ -2106,7 +2237,7 @@ function MahjongScorer() {
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
       resetChombo();
-      afterFixApplied();
+      afterFixApplied(recalced.rounds);
       return;
     }
     const ns = [...scores];
@@ -2146,7 +2277,9 @@ function MahjongScorer() {
     setDrawTenpai([false, false, false, false]);
     setCorrectingDrawIdx(null);
   }, []);
-  const gParent = gWinner !== null ? gWinner === dealerIdx : false;
+  const gDealer = fixIdx !== null && rounds[fixIdx] ? rounds[fixIdx].dealer : dealerIdx;
+  const gHonba = fixIdx !== null && rounds[fixIdx] ? rounds[fixIdx].honba || 0 : honba;
+  const gParent = gWinner !== null ? gWinner === gDealer : false;
   const gLimit = gHan !== null ? getLimitName(gHan) : null;
   const gResult = useMemo(() => {
     if (gHan === null || gTsumo === null) return null;
@@ -2160,6 +2293,11 @@ function MahjongScorer() {
     if (!dealerWon) {
       const next = (dealerIdx + 1) % PC;
       if (cfg.matchType === "tonpu" && next === 0) {
+        setExtendNext({
+          wind: "南",
+          dealer: 0,
+          honba: "zero"
+        });
         setShowExtendConfirm(true);
       } else if (next === 0 && curWi >= lastWi) {
         setGameFinished(true);
@@ -2176,7 +2314,14 @@ function MahjongScorer() {
         const parentScore = ns[dealerIdx];
         const isTop = ns.every((s, i) => i === dealerIdx || parentScore > s);
         if (isTop && (cfg.rules || {}).orasYame !== false) {
-          if (cfg.matchType === "tonpu") setShowExtendConfirm(true);else setGameFinished(true);
+          if (cfg.matchType === "tonpu") {
+            setExtendNext({
+              wind: roundWind,
+              dealer: dealerIdx,
+              honba: "plus1"
+            });
+            setShowExtendConfirm(true);
+          } else setGameFinished(true);
         } else {
           setHonba(h => h + 1);
         }
@@ -2326,7 +2471,7 @@ function MahjongScorer() {
       setRonPick([]);
       setRonLoserPick(null);
       setMultiRon(null);
-      afterFixApplied();
+      afterFixApplied(recalced.rounds);
       return;
     }
     if (multiRon && multiRon.queue.length > 0) {
@@ -2433,7 +2578,7 @@ function MahjongScorer() {
       setRiichiBets(recalced.carry + liveCount);
       resetDrawWiz();
       setTmDrawMode(false);
-      afterFixApplied();
+      afterFixApplied(recalced.rounds);
       return;
     }
     const ns = [...scores];
@@ -2473,6 +2618,11 @@ function MahjongScorer() {
     if (dealerRotates) {
       const next = (dealerIdx + 1) % PC;
       if (cfg.matchType === "tonpu" && next === 0) {
+        setExtendNext({
+          wind: "南",
+          dealer: 0,
+          honba: "keep"
+        });
         setShowExtendConfirm(true);
       } else if (next === 0 && curWi2 >= lastWi2) {
         setGameFinished(true);
@@ -2487,13 +2637,26 @@ function MahjongScorer() {
       const parentScore = ns[dealerIdx];
       const isTop = ns.every((s, i) => i === dealerIdx || parentScore > s);
       if (isTop && ruleSet.orasYame !== false) {
-        if (cfg.matchType === "tonpu") setShowExtendConfirm(true);else setGameFinished(true);
+        if (cfg.matchType === "tonpu") {
+          setExtendNext({
+            wind: roundWind,
+            dealer: dealerIdx,
+            honba: "keep"
+          });
+          setShowExtendConfirm(true);
+        } else setGameFinished(true);
       }
     }
     if (ruleSet.tobiEnd !== false && ns.some(s => s < 0)) setGameFinished(true);
     resetDrawWiz();
   }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, fixIdx, manualAdj, rounds, declaredRiichi]);
   const startGame = useCallback(() => {
+    if (suspendedGame) {
+      const sg = suspendedGame;
+      const label = `${sg.config?.date || ""} ${MATCH_LABEL_SHORT(sg.config?.matchType)}（${(sg.players || []).join("・")}）`;
+      if (!window.confirm("保留中の対局があります。\n" + label + "\n\n" + "新しい対局をはじめると、保留中の対局は消えます。\n" + "つづきを遊ぶときは「キャンセル」を押し、メニューの「対局のつづきを再開」から戻ってください。\n\n" + "新しくはじめますか？")) return;
+      setSuspendedGame(null);
+    }
     const sp = rules.startPoints || 25000;
     const useRules = {
       ...rules
@@ -2544,7 +2707,7 @@ function MahjongScorer() {
     if (splashTimer.current) clearTimeout(splashTimer.current);
     splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
     playRoundVoice("東", 0, 0);
-  }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
+  }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues, suspendedGame]);
   const prevRoundKey = React.useRef(null);
   React.useEffect(() => {
     if (!gameStarted || gameFinished) {
@@ -2579,6 +2742,7 @@ function MahjongScorer() {
     sf: "#161d27",
     card: "#1c2533",
     ac: "#5b9bff",
+    acB: "#2f6fd6",
     acS: "rgba(91,155,255,0.14)",
     gn: "#34d872",
     gnS: "rgba(52,216,114,0.14)",
@@ -2654,7 +2818,7 @@ function MahjongScorer() {
     boxSizing: "border-box",
     lineHeight: 1.5,
     ...(v === "p" ? {
-      background: t.ac,
+      background: t.acB,
       color: "#fff"
     } : v === "d" ? {
       background: t.rd,
@@ -3465,7 +3629,7 @@ function MahjongScorer() {
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.92)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 200,
       display: "flex",
       alignItems: "flex-start",
@@ -6057,7 +6221,7 @@ function MahjongScorer() {
           fontSize: 40,
           fontWeight: 900,
           color: t.ac,
-          lineHeight: 1.1,
+          lineHeight: 1.2,
           fontVariantNumeric: "tabular-nums"
         }
       }, receive.toLocaleString(), React.createElement("span", {
@@ -9883,6 +10047,7 @@ input, select { padding: 10px 14px; }
         ...friendLinks,
         [fid]: v
       });
+      renameInGroups(before, v);
       setEditNameIdx(null);
       setEditErr("");
     };
@@ -10030,6 +10195,7 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("input", {
         value: editNameVal,
+        maxLength: 10,
         onChange: e => {
           setEditNameVal(e.target.value);
           if (editErr) setEditErr("");
@@ -10056,7 +10222,7 @@ input, select { padding: 10px 14px; }
           padding: "8px 12px",
           borderRadius: 8,
           border: "none",
-          background: t.ac,
+          background: t.acB,
           color: "#fff",
           fontSize: 12,
           fontWeight: 700,
@@ -10143,6 +10309,7 @@ input, select { padding: 10px 14px; }
         },
         style: {
           padding: "7px 12px",
+          minHeight: 36,
           borderRadius: 8,
           border: `1px solid ${t.bd}`,
           background: "transparent",
@@ -10154,6 +10321,7 @@ input, select { padding: 10px 14px; }
         onClick: () => removeName(i),
         style: {
           padding: "7px 12px",
+          minHeight: 36,
           borderRadius: 8,
           border: `1px solid ${t.rd}55`,
           background: t.rdS,
@@ -11343,8 +11511,9 @@ input, select { padding: 10px 14px; }
     const ok = location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
     if (!ok) return;
     let reloading = false;
+    const hadController = !!navigator.serviceWorker.controller;
     const onChange = () => {
-      if (!reloading) {
+      if (hadController && !reloading) {
         reloading = true;
         location.reload();
       }
@@ -11364,6 +11533,25 @@ input, select { padding: 10px 14px; }
     }).catch(() => {});
     return () => navigator.serviceWorker.removeEventListener("controllerchange", onChange);
   }, []);
+  React.useEffect(() => {
+    try {
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    } catch {}
+  }, []);
+  React.useEffect(() => {
+    const so = window.screen && window.screen.orientation;
+    if (!so || !so.lock) return;
+    const small = Math.min(window.screen.width || 0, window.screen.height || 0) < 600;
+    if (gameStarted && tableMode && small) {
+      try {
+        so.lock("portrait").catch(() => {});
+      } catch {}
+    } else {
+      try {
+        so.unlock && so.unlock();
+      } catch {}
+    }
+  }, [gameStarted, tableMode]);
   const [obNameInput, setObNameInput] = useState("");
   const [obErr, setObErr] = useState("");
   const [obDone, setObDone] = useState(() => {
@@ -11627,6 +11815,20 @@ input, select { padding: 10px 14px; }
     try {
       localStorage.setItem("mj_groups", JSON.stringify(arr));
     } catch {}
+  };
+  const renameInGroups = (before, after) => {
+    if (!before || !after || before === after) return;
+    setGroups(prev => {
+      if (!prev.some(g => (g.members || []).includes(before))) return prev;
+      const next = prev.map(g => ({
+        ...g,
+        members: (g.members || []).map(m => m === before ? after : m)
+      }));
+      try {
+        localStorage.setItem("mj_groups", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
   const [groupNameInput, setGroupNameInput] = useState("");
   const [showGroupSave, setShowGroupSave] = useState(false);
@@ -12086,7 +12288,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 12,
         marginBottom: 8,
         border: "none",
-        background: diceRolling ? "#2a5d4a" : t.ac,
+        background: diceRolling ? "#2a5d4a" : t.acB,
         color: "#fff",
         fontSize: 15,
         fontWeight: 800,
@@ -12345,7 +12547,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 11,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         fontSize: 14,
         fontWeight: 800,
@@ -13240,14 +13442,14 @@ input, select { padding: 10px 14px; }
   };
   const payInfo = () => {
     const payers = PC - 1;
-    const hb = honba * HU();
+    const hb = gHonba * HU();
     const pool = (riichiBets + gRiichi.filter(Boolean).length) * 1000;
     const flows = [];
     if (gTsumo) {
       for (let i = 0; i < PC; i++) {
         if (i === gWinner) continue;
         let amt;
-        if (isSanma || gParent) amt = gResult.each;else amt = i === dealerIdx ? gResult.fromParent : gResult.fromChild;
+        if (isSanma || gParent) amt = gResult.each;else amt = i === gDealer ? gResult.fromParent : gResult.fromChild;
         flows.push({
           from: i,
           amt: amt + Math.floor(hb / payers)
@@ -13268,7 +13470,7 @@ input, select { padding: 10px 14px; }
   };
   const honbaGet = () => {
     const payers = PC - 1;
-    const hb = honba * HU();
+    const hb = gHonba * HU();
     return gTsumo ? Math.floor(hb / payers) * payers : gLoser !== null ? hb : 0;
   };
   const riichiSticks = () => riichiBets + gRiichi.filter(Boolean).length;
@@ -14048,7 +14250,7 @@ input, select { padding: 10px 14px; }
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(0,0,0,0.9)",
+        background: "rgba(12,17,23,0.98)",
         zIndex: 150,
         display: "flex",
         alignItems: "flex-start",
@@ -14221,6 +14423,14 @@ input, select { padding: 10px 14px; }
     setScores(newScores);
     setRiichiBets(recalced.carry + liveCount);
     setEditingRoundIdx(null);
+    if (delSet.has(rounds.length - 1) && !reviewing && !gameFinished) {
+      const head = rounds[Math.min(...delSet)];
+      if (head) moveTableTo({
+        wind: head.wind,
+        dealer: head.dealer,
+        honba: head.honba || 0
+      });
+    }
   };
   const reviewExitCleanup = () => {
     setFixIdx(null);
@@ -14327,17 +14537,17 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 19,
-        lineHeight: 1
+        lineHeight: 1.15
       }
     }, icon), React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 800,
         whiteSpace: "nowrap"
       }
     }, label), React.createElement("span", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         color: t.dm,
         whiteSpace: "nowrap"
       }
@@ -14365,13 +14575,13 @@ input, select { padding: 10px 14px; }
       }
     }, icon), React.createElement("span", {
       style: {
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 800,
         whiteSpace: "nowrap"
       }
     }, label), React.createElement("span", {
       style: {
-        fontSize: 11,
+        fontSize: 12,
         color: t.dm,
         whiteSpace: "nowrap"
       }
@@ -14461,7 +14671,7 @@ input, select { padding: 10px 14px; }
         textShadow: "0 0 14px rgba(234,179,8,0.4), 0 2px 10px rgba(0,0,0,0.85)",
         animation: "tapIn 0.6s 1.8s ease-out both, tapBlink 1.7s 2.6s ease-in-out infinite"
       }
-    }, "TAP TO START"), React.createElement("div", {
+    }, "タップしてはじめる"), React.createElement("div", {
       style: {
         textAlign: "center",
         marginBottom: 22,
@@ -14557,8 +14767,8 @@ input, select { padding: 10px 14px; }
       }
     }), React.createElement("div", {
       style: {
-        fontSize: 10,
-        color: t.dm,
+        fontSize: 14,
+        color: "#c3d0e0",
         marginTop: 2,
         animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
         opacity: intro ? undefined : 0.9
@@ -14580,7 +14790,7 @@ input, select { padding: 10px 14px; }
       }
     }, "はじめまして"), React.createElement("div", {
       style: {
-        fontSize: 12,
+        fontSize: 14,
         color: t.dm,
         lineHeight: 1.9,
         marginBottom: 14
@@ -14722,7 +14932,7 @@ input, select { padding: 10px 14px; }
         cursor: "pointer",
         marginBottom: 12,
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         boxShadow: "0 8px 24px rgba(91,155,255,0.28)",
         ...reveal(1)
@@ -14735,8 +14945,7 @@ input, select { padding: 10px 14px; }
       }
     }, "対局をはじめる"), React.createElement("div", {
       style: {
-        fontSize: 11,
-        opacity: 0.9,
+        fontSize: 12,
         marginTop: 3
       }
     }, "東風戦・半荘戦・全荘戦 / 四人・三人麻雀")), React.createElement("div", {
@@ -14864,7 +15073,7 @@ input, select { padding: 10px 14px; }
     }, React.createElement("span", {
       style: {
         fontSize: 16,
-        lineHeight: 1,
+        lineHeight: 1.15,
         flexShrink: 0
       }
     }, "📲"), React.createElement("span", {
@@ -15364,7 +15573,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 6,
         flexShrink: 0,
         border: `2px solid ${frAuto ? t.ac : t.bd}`,
-        background: frAuto ? t.ac : "transparent",
+        background: frAuto ? t.acB : "transparent",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
@@ -15440,7 +15649,12 @@ input, select { padding: 10px 14px; }
       style: {
         display: "inline-block"
       }
-    }, x)), Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します", () => {
+    }, x)), Net.enabled() ? ["名前だけ／QR／リンク", "から選べます"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)) : "名前を登録します", () => {
       setAddwhoBackTo("members");
       setAddNameOpen(false);
       setAddedMsg("");
@@ -15729,7 +15943,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 9,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         fontSize: 12,
         fontWeight: 700
@@ -15764,7 +15978,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 10,
         border: "none",
         cursor: "pointer",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         fontSize: 14,
         fontWeight: 800,
@@ -15810,7 +16024,12 @@ input, select { padding: 10px 14px; }
       style: {
         marginTop: 12
       }
-    }, menuItem("📤", "このアプリを友達に教える", "リンクを送ります", shareApp), shareMsg && React.createElement("div", {
+    }, menuItem("📤", ["このアプリを", "友達に教える"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)), "リンクを送ります", shareApp), shareMsg && React.createElement("div", {
       style: {
         fontSize: 12,
         color: t.gn,
@@ -16192,7 +16411,121 @@ input, select { padding: 10px 14px; }
       onUnitChange: u => editDraft({
         rateUnit: u
       })
-    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止"), setOpen === "screen" && screenPanelCard(), (rulesDirty || rulesSaved) && React.createElement("div", {
+    })), secHdr("dice", "🎲", "サイコロ設定", "結果の表示時間"), setOpen === "dice" && dicePanelCard(), secHdr("voice", "🔊", "音の設定", `${[diceSoundOn, voiceRonOn, voiceRiichiOn, voiceTsumoOn, voiceRoundOn, voiceSeatOn].filter(Boolean).length}/6 がオン`), setOpen === "voice" && voicePanelCard(), secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止"), setOpen === "screen" && screenPanelCard(), secHdr("about", "ℹ️", "このアプリについて", "プライバシー・データの削除・ライセンス"), setOpen === "about" && React.createElement("div", {
+      style: {
+        ...card,
+        padding: 16,
+        marginTop: 4
+      }
+    }, React.createElement("a", {
+      href: "privacy.html",
+      target: "_blank",
+      rel: "noopener",
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        minHeight: 44,
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: `1px solid ${t.bd}`,
+        background: t.sf,
+        color: t.tx,
+        fontSize: 14,
+        fontWeight: 700,
+        textDecoration: "none",
+        boxSizing: "border-box"
+      }
+    }, React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }, "🔒 プライバシーポリシー"), React.createElement("span", {
+      style: {
+        color: t.dm
+      }
+    }, "›")), React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginTop: 18,
+        marginBottom: 6
+      }
+    }, "オンラインのデータ"), Net.enabled() && (myCode || cloudBox) ? React.createElement(React.Fragment, null, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: t.dm,
+        lineHeight: 1.9,
+        marginBottom: 10,
+        textWrap: "balance"
+      }
+    }, "個人ID・友達のリスト・受信箱・クラウドに預けた記録を、まとめて削除できます。 この端末の中の対局記録や名簿は消えません。"), React.createElement("button", {
+      disabled: delBusy,
+      onClick: deleteOnlineData,
+      style: {
+        width: "100%",
+        minHeight: 44,
+        padding: "12px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        border: `1px solid ${t.rd}`,
+        background: "transparent",
+        color: t.rd,
+        fontSize: 14,
+        fontWeight: 800,
+        opacity: delBusy ? 0.5 : 1
+      }
+    }, delBusy ? "削除しています…" : ["オンラインのデータを", "すべて削除"].map((x, k) => React.createElement("span", {
+      key: k,
+      style: {
+        display: "inline-block"
+      }
+    }, x)))) : React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: t.dm,
+        lineHeight: 1.9,
+        textWrap: "balance"
+      }
+    }, "オンラインに保存しているデータはありません（対局の記録は、この端末の中だけにあります）。"), delMsg && React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        lineHeight: 1.8,
+        marginTop: 10,
+        color: delMsg.ok ? t.gn : t.rd,
+        textWrap: "balance"
+      }
+    }, delMsg.ok ? "✓ " : "", delMsg.text), React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginTop: 18,
+        marginBottom: 6
+      }
+    }, "使っている部品とライセンス"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.9
+      }
+    }, "React（MIT License, © Meta Platforms, Inc.）", React.createElement("br", null), "Noto Sans JP（SIL Open Font License 1.1, Google Fonts）", React.createElement("br", null), "Firebase JavaScript SDK（Apache License 2.0）", React.createElement("br", null), "jsQR（Apache License 2.0）", React.createElement("br", null), "qrcode-generator（MIT License, © Kazuhiko Arase）"), React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 800,
+        marginTop: 18,
+        marginBottom: 6
+      }
+    }, "問い合わせ"), React.createElement("a", {
+      href: "https://github.com/yamamototsu/mahjong-scorer/issues",
+      target: "_blank",
+      rel: "noopener",
+      style: {
+        fontSize: 13,
+        color: t.ac,
+        wordBreak: "break-all"
+      }
+    }, "github.com/yamamototsu/mahjong-scorer/issues")), (rulesDirty || rulesSaved) && React.createElement("div", {
       style: {
         ...card,
         padding: 10,
@@ -17538,7 +17871,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 13,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         fontWeight: 800,
         fontSize: "clamp(13px, 4.6vw, 16px)",
@@ -18350,7 +18683,7 @@ input, select { padding: 10px 14px; }
           width: 24,
           height: 24,
           borderRadius: "50%",
-          background: t.ac,
+          background: t.acB,
           color: "#fff",
           fontSize: 13,
           fontWeight: 900,
@@ -20528,9 +20861,11 @@ input, select { padding: 10px 14px; }
         marginTop: 12
       }
     }, oyaRolling ? "振っています…" : oyaDice?.sum ? "もう一度振る" : "タップしてサイコロを振る")), React.createElement("button", {
-      style: {
-        ...actionBtn("p"),
-        opacity: oyaDice?.sum > 0 ? 1 : 0.4
+      style: oyaDice?.sum > 0 ? actionBtn("p") : {
+        ...actionBtn(),
+        background: t.card,
+        color: "#6b7a90",
+        cursor: "default"
       },
       disabled: !(oyaDice?.sum > 0),
       onClick: applyOya
@@ -20689,7 +21024,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 10,
         cursor: matchType ? "pointer" : "default",
         border: "none",
-        background: ok ? t.gn : t.ac,
+        background: ok ? t.gn : t.acB,
         color: "#fff",
         fontSize: 14,
         fontWeight: 800,
@@ -21199,7 +21534,7 @@ input, select { padding: 10px 14px; }
           borderRadius: 9,
           border: "none",
           cursor: "pointer",
-          background: t.ac,
+          background: t.acB,
           color: "#fff",
           fontSize: 13,
           fontWeight: 700,
@@ -21826,7 +22161,7 @@ input, select { padding: 10px 14px; }
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.9)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 150,
       display: "flex",
       alignItems: "flex-start",
@@ -22271,13 +22606,13 @@ input, select { padding: 10px 14px; }
         }
       }, React.createElement("div", {
         style: {
-          fontSize: nameFont(players[i], 4),
+          fontSize: nameFont(players[i], 4.6),
           fontWeight: 700,
           color: t.tx,
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
-          lineHeight: 1.2,
+          lineHeight: 1.15,
           textAlign: "center",
           width: "100%",
           flexShrink: 0
@@ -22287,12 +22622,12 @@ input, select { padding: 10px 14px; }
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: "1cqmin",
-          marginTop: "1cqmin"
+          gap: "0.8cqmin",
+          marginTop: "0.8cqmin"
         }
       }, React.createElement("span", {
         style: {
-          fontSize: "3.9cqmin",
+          fontSize: "4cqmin",
           fontWeight: 900,
           lineHeight: 1,
           color: isDealer ? "#1a1a1a" : t.tx,
@@ -22304,10 +22639,11 @@ input, select { padding: 10px 14px; }
         }
       }, seatWind), React.createElement("span", {
         style: {
-          fontSize: "5.3cqmin",
+          fontSize: "6cqmin",
           fontWeight: 900,
-          lineHeight: 1.1,
+          lineHeight: 1.15,
           flexShrink: 0,
+          letterSpacing: "-0.02em",
           color: score < 0 ? t.rd : t.tx,
           fontVariantNumeric: "tabular-nums"
         }
@@ -22327,22 +22663,22 @@ input, select { padding: 10px 14px; }
         },
         style: {
           width: "100%",
-          padding: "2.4cqmin 1.2cqmin",
+          padding: "1.4cqmin 1cqmin",
           borderRadius: "2cqmin",
           cursor: "pointer",
-          marginTop: "1.4cqmin",
+          marginTop: "0.8cqmin",
           minHeight: "32px",
           flexShrink: 0,
           boxSizing: "border-box",
           border: `1px solid ${isRiichi ? t.rd : t.bd}`,
           background: isRiichi ? t.rd : "transparent",
           color: isRiichi ? "#fff" : t.dm,
-          fontSize: "max(10px, 2.9cqmin)",
+          fontSize: isRiichi ? "max(10.5px, 3.2cqmin)" : "max(12px, 3.4cqmin)",
           fontWeight: 800,
-          letterSpacing: "0.04em",
+          letterSpacing: isRiichi ? 0 : "0.04em",
           whiteSpace: "nowrap"
         }
-      }, isRiichi ? "🔴 リーチ中 (取消)" : "リーチ")));
+      }, isRiichi ? "リーチ中・取消" : "リーチ")));
     };
     const hSlot = (i, pos, rot) => React.createElement("div", {
       key: i,
@@ -22388,7 +22724,7 @@ input, select { padding: 10px 14px; }
       boxSizing: "border-box",
       lineHeight: 1.4,
       ...(v === "p" ? {
-        background: t.ac,
+        background: t.acB,
         color: "#fff"
       } : {
         background: t.sf,
@@ -22413,7 +22749,7 @@ input, select { padding: 10px 14px; }
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis",
-      fontSize: "clamp(11px, 3.2vw, 14px)"
+      fontSize: "clamp(12px, 3.7vw, 16px)"
     });
     const rankBtn = flip => React.createElement("button", {
       "aria-label": "順位と点差",
@@ -22514,7 +22850,7 @@ input, select { padding: 10px 14px; }
         border: `1px solid ${t.bd}`,
         background: t.sf
       }
-    }, multiRonMax >= 3 ? "トリプルロン" : multiRonMax === 2 ? "ダブロン" : "頭ハネ")) : React.createElement("span", null, ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ or ホウジュウした人をタップ")), tmWinStep === "how" && ronPick.length >= 2 && React.createElement("div", {
+    }, multiRonMax >= 3 ? "トリプルロン" : multiRonMax === 2 ? "ダブロン" : "頭ハネ")) : React.createElement("span", null, ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ、またはホウジュウした人をタップ")), tmWinStep === "how" && ronPick.length >= 2 && React.createElement("div", {
       style: {
         fontSize: 10,
         color: t.dm,
@@ -22613,6 +22949,7 @@ input, select { padding: 10px 14px; }
       "aria-label": "対局を保留",
       style: barIcon(),
       onClick: () => {
+        if (!window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) return;
         setSuspendedGame(snapshotGame());
         setGameStarted(false);
         setHomeCat(null);
@@ -22760,15 +23097,17 @@ input, select { padding: 10px 14px; }
         setTmDrawMode(false);
       },
       style: {
-        padding: "12px 26px",
+        padding: "2.6cqmin 4cqmin",
+        minHeight: 36,
         borderRadius: 12,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
-        fontSize: 17,
+        fontSize: "max(13px, 5.2cqmin)",
         fontWeight: 900,
-        letterSpacing: "0.05em"
+        letterSpacing: "0.05em",
+        whiteSpace: "nowrap"
       }
     }, "確定"), tmWinStep === "winner" && (ronPick.length > 0 ? React.createElement("button", {
       onClick: e => {
@@ -22783,20 +23122,20 @@ input, select { padding: 10px 14px; }
         setTmWinStep("how");
       },
       style: {
-        padding: "10px 14px",
+        padding: "2.4cqmin 3cqmin",
         borderRadius: 12,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
-        fontSize: 14,
+        fontSize: "max(12px, 4.4cqmin)",
         fontWeight: 900,
         lineHeight: 1.4,
         whiteSpace: "nowrap"
       }
     }, ronPick.length, "人", React.createElement("br", null), "で確定") : React.createElement("div", {
       style: {
-        fontSize: 14,
+        fontSize: "max(12px, 4.2cqmin)",
         fontWeight: 800,
         color: "#fff",
         lineHeight: 1.5,
@@ -22868,7 +23207,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 16,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         display: "flex",
         flexDirection: "column",
@@ -23024,7 +23363,7 @@ input, select { padding: 10px 14px; }
         justifyContent: "center",
         gap: 6,
         whiteSpace: "nowrap",
-        lineHeight: 1
+        lineHeight: 1.25
       });
       return React.createElement(React.Fragment, null, React.createElement("div", {
         style: posBase(-8.5)
@@ -23047,13 +23386,13 @@ input, select { padding: 10px 14px; }
         style: posBase(8.5)
       }, React.createElement("span", {
         style: {
-          fontSize: "max(10px, 3.2cqmin)",
+          fontSize: "max(11px, 3.6cqmin)",
           fontWeight: 800,
-          color: honba > 0 ? t.gd : "rgba(255,255,255,0.45)"
+          color: honba > 0 ? t.gd : "rgba(255,255,255,0.8)"
         }
       }, honba, "本場"), riichiBets > 0 && React.createElement("span", {
         style: {
-          fontSize: "max(10px, 3.2cqmin)",
+          fontSize: "max(11px, 3.6cqmin)",
           fontWeight: 800,
           color: t.ac
         }
@@ -23333,7 +23672,7 @@ input, select { padding: 10px 14px; }
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.88)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 100,
       display: "flex",
       alignItems: "flex-start",
@@ -24155,7 +24494,7 @@ input, select { padding: 10px 14px; }
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.88)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 100,
       display: "flex",
       alignItems: "flex-start",
@@ -24342,7 +24681,7 @@ input, select { padding: 10px 14px; }
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.9)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 130,
       display: "flex",
       alignItems: "flex-start",
@@ -24602,7 +24941,7 @@ input, select { padding: 10px 14px; }
       marginLeft: 4,
       color: t.gn
     }
-  }, "聴", r.tenpai.map((tp, i) => tp ? players[i]?.charAt(0) : null).filter(Boolean).join(""))) : React.createElement("span", null, React.createElement("span", {
+  }, "（テンパイ: ", r.tenpai.map((tp, i) => tp ? players[i] : null).filter(Boolean).join("・"), "）")) : React.createElement("span", null, React.createElement("span", {
     style: {
       color: t.ac,
       fontWeight: 600
@@ -24659,7 +24998,7 @@ input, select { padding: 10px 14px; }
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.88)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 100,
       display: "flex",
       alignItems: "flex-start",
@@ -24724,14 +25063,20 @@ input, select { padding: 10px 14px; }
       marginBottom: 8
     },
     onClick: () => {
+      const nx = extendNext || {
+        wind: "南",
+        dealer: 0,
+        honba: "zero"
+      };
       setShowExtendConfirm(false);
+      setExtendNext(null);
       setGameConfig(prev => ({
         ...prev,
         matchType: "hanchan"
       }));
-      setRoundWind("南");
-      setDealerIdx(0);
-      setHonba(0);
+      setRoundWind(nx.wind);
+      setDealerIdx(nx.dealer);
+      if (nx.honba === "zero") setHonba(0);else if (nx.honba === "plus1") setHonba(h => h + 1);
     }
   }, "🔄 半荘戦に延長する"), React.createElement("button", {
     style: actionBtn(),
@@ -24790,6 +25135,7 @@ input, select { padding: 10px 14px; }
           endedAt: Date.now()
         };
         setGameHistory(prev => [...prev, rec]);
+        histRef.current = [...histRef.current, rec];
         frAutoSend(rec);
         if (cloudBox) {
           saveCloudQueue(prev => prev.includes(rec.id) ? prev : [...prev, rec.id]);
@@ -25174,7 +25520,7 @@ input, select { padding: 10px 14px; }
         marginLeft: 4,
         color: t.gn
       }
-    }, "聴", r.tenpai.map((tp, i) => tp ? players[i]?.charAt(0) : null).filter(Boolean).join(""))) : React.createElement("span", {
+    }, "（テンパイ: ", r.tenpai.map((tp, i) => tp ? players[i] : null).filter(Boolean).join("・"), "）")) : React.createElement("span", {
       style: {
         marginLeft: "auto",
         textAlign: "right",
@@ -25309,7 +25655,7 @@ input, select { padding: 10px 14px; }
       }, "📤 終了すると、この結果が ", to.join("、"), " さんにも自動で届きます"));
     })(), React.createElement("button", {
       style: {
-        ...actionBtn("d"),
+        ...actionBtn("p"),
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -25341,14 +25687,16 @@ input, select { padding: 10px 14px; }
     }, "✓ 終了"), React.createElement("span", {
       style: {
         width: "100%",
-        fontSize: "min(12px, 3.6vw)",
+        fontSize: "max(12px, min(13px, 3.6vw))",
         fontWeight: 600,
-        opacity: 0.9,
         marginTop: 2
       }
     }, activeLeagueId ? "リーグに記録します" : "履歴に記録して対局を終わります")), !activeLeagueId && React.createElement("button", {
       style: {
-        ...actionBtn("p"),
+        ...actionBtn(),
+        border: `2px solid ${t.ac}`,
+        background: "transparent",
+        color: t.ac,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -25362,13 +25710,13 @@ input, select { padding: 10px 14px; }
         fontSize: "min(20px, 6vw)",
         fontWeight: 900
       }
-    }, "🔁 再試合"), React.createElement("span", {
+    }, "再試合"), React.createElement("span", {
       style: {
         width: "100%",
-        fontSize: "min(12px, 3.6vw)",
+        fontSize: "max(12px, min(13px, 3.6vw))",
         fontWeight: 600,
-        opacity: 0.9,
-        marginTop: 2
+        marginTop: 2,
+        color: t.dm
       }
     }, "履歴を残して同じメンバーでもう一度")), rematchPick && React.createElement("div", {
       style: {
@@ -25377,7 +25725,7 @@ input, select { padding: 10px 14px; }
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(0,0,0,0.88)",
+        background: "rgba(12,17,23,0.98)",
         zIndex: 100,
         display: "flex",
         alignItems: "flex-start",
@@ -25610,6 +25958,7 @@ input, select { padding: 10px 14px; }
   const [myErr, setMyErr] = useState("");
   const applyMyName = nm => {
     const before = myName;
+    renameInGroups(before, nm);
     setMyName(nm);
     try {
       localStorage.setItem("mj_my_name", nm);
@@ -25692,7 +26041,10 @@ input, select { padding: 10px 14px; }
       return [];
     }
   });
-  const saveFrQueue = arr => {
+  const frQueueRef = React.useRef(frQueue);
+  const saveFrQueue = next => {
+    const arr = typeof next === "function" ? next(frQueueRef.current) : next;
+    frQueueRef.current = arr;
     setFrQueue(arr);
     try {
       localStorage.setItem("mj_fr_queue", JSON.stringify(arr));
@@ -25744,10 +26096,13 @@ input, select { padding: 10px 14px; }
       const [fr, inb] = await Promise.all([Net.get("friends/" + uid), Net.get("inbox/" + uid)]);
       setFriendsMap(fr || {});
       syncFriendNames(fr || {});
-      const items = Object.entries(inb || {}).map(([k, v]) => ({
+      const items = Object.entries(inb && typeof inb === "object" ? inb : {}).filter(([, v]) => v && typeof v === "object").map(([k, v]) => ({
         key: k,
-        ...v
-      })).sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
+        from: typeof v.from === "string" ? v.from : "",
+        fromName: String(v.fromName == null ? "" : v.fromName).slice(0, 20),
+        sentAt: Number(v.sentAt) || 0,
+        game: v.game
+      })).sort((a, b) => b.sentAt - a.sentAt);
       setInboxItems(items);
       const auto = items.filter(i => i.game && i.from && (fr || {})[i.from]);
       if (auto.length) await frImportInbox(auto, true);
@@ -25818,7 +26173,8 @@ input, select { padding: 10px 14px; }
     const code = CODE_FROM(typeof codeArg === "string" ? codeArg : frAddInput);
     const me = meName || myName;
     if (!code) {
-      setFrError("6文字の個人IDを入れてください");
+      const raw = String(typeof codeArg === "string" ? codeArg : frAddInput).normalize("NFKC").trim().toUpperCase();
+      setFrError(raw.length === 6 ? "個人IDに 0・1・2・I・L・O・Z は使いません。もう一度確かめてください" : "6文字の個人IDを入れてください");
       return;
     }
     if (code === myCode) {
@@ -25878,6 +26234,7 @@ input, select { padding: 10px 14px; }
       ...friendLinks,
       [fid]: nm
     });
+    renameInGroups(before, nm);
     updatePresetNames(prev => prev.includes(before) ? prev.map(x => x === before ? nm : x).filter((x, i, a) => a.indexOf(x) === i) : prev.includes(nm) ? prev : [...prev, nm]);
     setFrEditFid(null);
     setFrError(null);
@@ -25931,6 +26288,14 @@ input, select { padding: 10px 14px; }
   };
   const frImportInbox = async (items, quiet) => {
     const added = mergeIntoHistory(items.map(i => i.game));
+    if (added > 0) {
+      try {
+        localStorage.setItem("mj_history", JSON.stringify(histRef.current));
+      } catch {
+        setSaveFull(true);
+        return;
+      }
+    }
     try {
       const {
         uid
@@ -25948,55 +26313,58 @@ input, select { padding: 10px 14px; }
     setFrNotice(added > 0 ? added + "件を履歴に取り込みました" : "すでに取り込み済みの対局でした");
   };
   const frAutoSendTargets = names => Array.from(new Set((names || []).map(fidOfName).filter(Boolean)));
+  const frSendOne = async (uid, gameRec, fids) => {
+    let left = [...fids];
+    for (const fid of fids) {
+      await withTimeout(Net.push("inbox/" + fid, {
+        from: uid,
+        fromName: myName,
+        sentAt: Date.now(),
+        game: gameRec
+      }), 8000);
+      left = left.filter(x => x !== fid);
+      saveFrQueue(q => q.map(x => x.id === gameRec.id ? {
+        ...x,
+        fids: left
+      } : x).filter(x => x.fids.length > 0));
+    }
+  };
   const frAutoSend = async rec => {
     if (!frAuto || !Net.enabled() || !myCode) return;
     const fids = frAutoSendTargets(rec.players);
     if (!fids.length) return;
+    saveFrQueue(q => [...q.filter(x => x.id !== rec.id), {
+      id: rec.id,
+      fids
+    }]);
     try {
       const {
         uid
-      } = await Net.ensureReady();
-      for (const fid of fids) {
-        await Net.push("inbox/" + fid, {
-          from: uid,
-          fromName: myName,
-          sentAt: Date.now(),
-          game: rec
-        });
-      }
+      } = await withTimeout(Net.ensureReady(), 8000);
+      await frSendOne(uid, rec, fids);
       setFrNotice(fids.map(f => friendLinks[f]).join("、") + " さんに結果を送りました");
-    } catch {
-      saveFrQueue(frQueue.some(q => q.id === rec.id) ? frQueue : [...frQueue, {
-        id: rec.id,
-        fids
-      }]);
-    }
+    } catch {}
   };
+  const frFlushing = React.useRef(false);
   const frFlushQueue = async () => {
-    if (!frQueue.length || !frAuto || !Net.enabled() || !myCode) return;
+    if (frFlushing.current || !frQueueRef.current.length || !frAuto || !Net.enabled() || !myCode) return;
+    frFlushing.current = true;
     try {
       const {
         uid
-      } = await Net.ensureReady();
-      const rest = [];
-      for (const q of frQueue) {
-        const g = gameHistory.find(x => x.id === q.id);
-        if (!g) continue;
-        try {
-          for (const fid of q.fids) {
-            await Net.push("inbox/" + fid, {
-              from: uid,
-              fromName: myName,
-              sentAt: Date.now(),
-              game: g
-            });
-          }
-        } catch {
-          rest.push(q);
+      } = await withTimeout(Net.ensureReady(), 8000);
+      for (const q of [...frQueueRef.current]) {
+        const g = histRef.current.find(x => String(x.id) === String(q.id));
+        if (!g) {
+          saveFrQueue(list => list.filter(x => x.id !== q.id));
+          continue;
         }
+        try {
+          await frSendOne(uid, g, q.fids);
+        } catch {}
       }
-      if (rest.length !== frQueue.length) saveFrQueue(rest);
     } catch {}
+    frFlushing.current = false;
   };
   const LS = k => {
     try {
@@ -26007,6 +26375,7 @@ input, select { padding: 10px 14px; }
   };
   const [cloudKey, setCloudKey] = useState(() => LS("mj_cloud_key"));
   const [cloudBox, setCloudBox] = useState(() => LS("mj_cloud_box"));
+  cloudBoxRef.current = cloudBox;
   const [cloudQueue, setCloudQueue] = useState(() => {
     try {
       const v = JSON.parse(LS("mj_cloud_queue") || "[]");
@@ -26077,7 +26446,7 @@ input, select { padding: 10px 14px; }
     return failed;
   };
   const cloudPull = async (box, meta) => {
-    const have = new Set(gameHistory.map(g => String(g.id)));
+    const have = new Set(histRef.current.map(g => String(g.id)));
     if (!meta || !meta.ids) {
       const games = (await Net.get(`box/${box}/games`)) || {};
       const ids = {};
@@ -26089,13 +26458,13 @@ input, select { padding: 10px 14px; }
           await Net.update(`box/${box}/meta/ids`, ids);
         } catch {}
       }
-      return mergeIntoHistory(Object.values(games));
+      return mergeIntoHistory(Object.values(games), true);
     }
     const missing = Object.keys(meta.ids).filter(id => !have.has(id));
     if (missing.length === 0) return 0;
     if (missing.length > 40) {
       const games = (await Net.get(`box/${box}/games`)) || {};
-      return mergeIntoHistory(Object.values(games));
+      return mergeIntoHistory(Object.values(games), true);
     }
     const got = [];
     for (const id of missing) {
@@ -26104,7 +26473,7 @@ input, select { padding: 10px 14px; }
         if (g) got.push(g);
       } catch {}
     }
-    return mergeIntoHistory(got);
+    return mergeIntoHistory(got, true);
   };
   const cloudSync = async (opts = {}) => {
     if (!cloudBox || cloudSyncing.current) return;
@@ -26225,7 +26594,7 @@ input, select { padding: 10px 14px; }
       } = await Net.ensureReady();
       await Net.set(`box/${rec.box}/owners/${uid}`, true);
       const games = (await Net.get(`box/${rec.box}/games`)) || {};
-      const added = mergeIntoHistory(Object.values(games));
+      const added = mergeIntoHistory(Object.values(games), true);
       saveCloudId(key, rec.box);
       const cloudIds = Object.keys(games);
       if (cloudIds.length > 0) {
@@ -26237,7 +26606,7 @@ input, select { padding: 10px 14px; }
           await Net.update(`box/${rec.box}/meta/ids`, ids);
         } catch {}
       }
-      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
+      const mine = histRef.current.filter(g => !cloudIds.includes(String(g.id)));
       const failed = await cloudPush(mine, rec.box);
       saveCloudQueue(failed);
       try {
@@ -26256,6 +26625,87 @@ input, select { padding: 10px 14px; }
       });
     }
     setCloudBusy(false);
+  };
+  const [delBusy, setDelBusy] = useState(false);
+  const [delMsg, setDelMsg] = useState(null);
+  const deleteOnlineData = async () => {
+    if (!window.confirm("オンラインに保存している、あなたのデータをすべて削除します。\n\n" + "・個人ID、表示名、友達のリスト、受信箱\n" + "・クラウドに預けた対局の記録\n\n" + "この端末の中の対局記録や名簿は消えません。\n" + "友達の端末にすでに届いている記録は、友達の端末に残ります。\n\n" + "削除してよろしいですか？")) return;
+    setDelBusy(true);
+    setDelMsg(null);
+    let uid = null;
+    try {
+      uid = (await withTimeout(Net.ensureReady(), 15000)).uid;
+    } catch {
+      setDelBusy(false);
+      setDelMsg({
+        ok: false,
+        text: NET_FAIL
+      });
+      return;
+    }
+    const fails = [];
+    const step = async (label, fn) => {
+      try {
+        await withTimeout(fn(), 20000);
+      } catch {
+        fails.push(label);
+      }
+    };
+    await step("友達のリスト", async () => {
+      const fr = (await Net.get("friends/" + uid)) || {};
+      for (const fid of Object.keys(fr)) {
+        await Net.remove("friends/" + fid + "/" + uid);
+        await Net.remove("friends/" + uid + "/" + fid);
+      }
+    });
+    await step("受信箱", async () => {
+      const inb = (await Net.get("inbox/" + uid)) || {};
+      for (const k of Object.keys(inb)) await Net.remove("inbox/" + uid + "/" + k);
+    });
+    if (cloudBox) {
+      await step("クラウドの記録", async () => {
+        await Net.remove(`box/${cloudBox}/games`);
+        await Net.remove(`box/${cloudBox}/meta`);
+        if (cloudKey) await Net.remove(`keys/${await sha256Hex(KEY_NORM(cloudKey))}`);
+        await Net.remove(`box/${cloudBox}/owners/${uid}`);
+      });
+    }
+    if (myCode) {
+      await step("個人ID", async () => {
+        await Net.remove("codes/" + myCode);
+        await Net.remove("users/" + uid);
+      });
+    }
+    if (fails.length) {
+      setDelBusy(false);
+      setDelMsg({
+        ok: false,
+        text: fails.join("・") + " を消せませんでした。電波のよいところで、もう一度お試しください。"
+      });
+      return;
+    }
+    try {
+      if (Net.deleteUser) await withTimeout(Net.deleteUser(), 10000);
+    } catch {}
+    ["mj_my_code", "mj_friend_link", "mj_fr_queue", "mj_cloud_key", "mj_cloud_box", "mj_cloud_queue", "mj_cloud_pulled"].forEach(k => {
+      try {
+        localStorage.removeItem(k);
+      } catch {}
+    });
+    setMyCode("");
+    setFriendsMap({});
+    setInboxItems(null);
+    setMyQR(null);
+    saveFriendLinks({});
+    saveFrQueue([]);
+    setCloudKey("");
+    setCloudBox("");
+    saveCloudQueue([]);
+    setDelBusy(false);
+    setDelMsg({
+      ok: true,
+      text: "オンラインのデータをすべて削除しました。この端末の記録はそのまま残っています。"
+    });
   };
   const shareRestoreKey = () => shareLink("卓上ポンづけ｜復元キー", `卓上ポンづけの復元キーです。機種を変えたときにこれを入れると、対局の記録を引き継げます。人に見せないでください。\n${KEY_VIEW(cloudKey)}`, SHARE_URL(), {
     fallback: KEY_VIEW(cloudKey),
@@ -26324,7 +26774,7 @@ input, select { padding: 10px 14px; }
         qr.addData(FRIEND_LINK(myCode));
         qr.make();
         if (!dead) setMyQR(qr.createSvgTag({
-          cellSize: 3,
+          cellSize: 5,
           margin: 0
         }));
       } catch {}
@@ -26612,7 +27062,23 @@ input, select { padding: 10px 14px; }
         marginBottom: 0,
         opacity: frBusy ? 0.5 : 1
       }
-    }, frBusy ? "登録しています…" : "この名前で登録する"), pend && React.createElement("div", {
+    }, frBusy ? "登録しています…" : "この名前で登録する"), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: t.dm,
+        lineHeight: 1.8,
+        marginTop: 10,
+        textWrap: "balance"
+      }
+    }, "登録すると、表示名と個人IDがサーバ（Google Firebase）に保存されます。", React.createElement("a", {
+      href: "privacy.html",
+      target: "_blank",
+      rel: "noopener",
+      style: {
+        color: t.ac,
+        display: "inline-block"
+      }
+    }, "プライバシーポリシー")), pend && React.createElement("div", {
       style: {
         fontSize: 12,
         color: t.ac,
@@ -26736,7 +27202,7 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("input", {
       value: frAddInput,
-      onChange: e => setFrAddInput(e.target.value.toUpperCase()),
+      onChange: e => setFrAddInput(e.target.value.normalize("NFKC").toUpperCase()),
       maxLength: 6,
       placeholder: "例）ABC345",
       autoCapitalize: "characters",
@@ -26756,7 +27222,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 10,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         fontSize: 13,
         fontWeight: 700,
@@ -26864,7 +27330,7 @@ input, select { padding: 10px 14px; }
           borderRadius: 10,
           cursor: "pointer",
           border: "none",
-          background: t.ac,
+          background: t.acB,
           color: "#fff",
           fontSize: 13,
           fontWeight: 700
@@ -26911,7 +27377,7 @@ input, select { padding: 10px 14px; }
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(0,0,0,0.92)",
+        background: "rgba(12,17,23,0.98)",
         zIndex: 160,
         display: "flex",
         alignItems: "flex-start",
@@ -27281,7 +27747,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 10,
         cursor: "pointer",
         border: "none",
-        background: newNameInput.trim() ? t.ac : t.bd,
+        background: newNameInput.trim() ? t.acB : t.bd,
         color: "#fff",
         fontSize: 13,
         fontWeight: 700
@@ -27383,7 +27849,7 @@ input, select { padding: 10px 14px; }
       }
     }, React.createElement("input", {
       value: frAddInput,
-      onChange: e => setFrAddInput(e.target.value.toUpperCase()),
+      onChange: e => setFrAddInput(e.target.value.normalize("NFKC").toUpperCase()),
       maxLength: 6,
       placeholder: "例）ABC345",
       autoCapitalize: "characters",
@@ -27403,7 +27869,7 @@ input, select { padding: 10px 14px; }
         borderRadius: 10,
         cursor: "pointer",
         border: "none",
-        background: t.ac,
+        background: t.acB,
         color: "#fff",
         fontSize: 13,
         fontWeight: 700,
@@ -27522,7 +27988,7 @@ input, select { padding: 10px 14px; }
         left: 0,
         right: 0,
         bottom: 0,
-        background: "rgba(0,0,0,0.9)",
+        background: "rgba(12,17,23,0.98)",
         zIndex: 150,
         display: "flex",
         alignItems: "flex-start",
@@ -27611,7 +28077,7 @@ input, select { padding: 10px 14px; }
           borderRadius: "50%",
           flexShrink: 0,
           border: `2px solid ${on ? t.ac : t.bd}`,
-          background: on ? t.ac : "transparent",
+          background: on ? t.acB : "transparent",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -27874,7 +28340,7 @@ input, select { padding: 10px 14px; }
       textOverflow: "ellipsis",
       whiteSpace: "nowrap"
     }
-  }, it.game?.date, " ", MATCH_LABEL_SHORT(it.game?.matchType), " — ", (it.game?.players || []).join("・"))), React.createElement("button", {
+  }, String(it.game?.date || ""), " ", MATCH_LABEL_SHORT(String(it.game?.matchType || "")), " — ", (Array.isArray(it.game?.players) ? it.game.players : []).map(x => String(x)).join("・"))), React.createElement("button", {
     onClick: () => frImportInbox([it]),
     style: {
       flexShrink: 0,
@@ -27883,7 +28349,7 @@ input, select { padding: 10px 14px; }
       borderRadius: 8,
       cursor: "pointer",
       border: "none",
-      background: t.ac,
+      background: t.acB,
       color: "#fff",
       fontSize: 12,
       fontWeight: 700
@@ -28046,7 +28512,7 @@ input, select { padding: 10px 14px; }
         borderRadius: "50%",
         flexShrink: 0,
         border: `2px solid ${sel ? t.ac : t.bd}`,
-        background: sel ? t.ac : "transparent",
+        background: sel ? t.acB : "transparent",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
@@ -28227,7 +28693,22 @@ input, select { padding: 10px 14px; }
       fontWeight: 700,
       whiteSpace: "nowrap"
     }
-  }, "別の端末から引き継ぐ")) : React.createElement(React.Fragment, null, React.createElement("div", {
+  }, "別の端末から引き継ぐ"), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: t.dm,
+      lineHeight: 1.8,
+      textWrap: "balance"
+    }
+  }, "はじめると、対局の記録がサーバ（Google Firebase）にも保存されます。", React.createElement("a", {
+    href: "privacy.html",
+    target: "_blank",
+    rel: "noopener",
+    style: {
+      color: t.ac,
+      display: "inline-block"
+    }
+  }, "プライバシーポリシー"))) : React.createElement(React.Fragment, null, React.createElement("div", {
     style: {
       fontSize: 11,
       color: t.dm,
@@ -28279,7 +28760,7 @@ input, select { padding: 10px 14px; }
       borderRadius: 10,
       cursor: "pointer",
       border: "none",
-      background: t.ac,
+      background: t.acB,
       color: "#fff",
       fontSize: 13,
       fontWeight: 700,
@@ -28547,7 +29028,7 @@ input, select { padding: 10px 14px; }
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.9)",
+      background: "rgba(12,17,23,0.98)",
       zIndex: 150,
       display: "flex",
       alignItems: "flex-start",
@@ -28861,7 +29342,7 @@ input, select { padding: 10px 14px; }
       marginLeft: 4,
       color: t.gn
     }
-  }, "聴", r.tenpai.map((tp, i) => tp ? historyDetail.players[i]?.charAt(0) : null).filter(Boolean).join(""))) : React.createElement("span", null, React.createElement("span", {
+  }, "（テンパイ: ", r.tenpai.map((tp, i) => tp ? historyDetail.players[i] : null).filter(Boolean).join("・"), "）")) : React.createElement("span", null, React.createElement("span", {
     style: {
       color: t.ac,
       fontWeight: 600
@@ -28880,6 +29361,90 @@ input, select { padding: 10px 14px; }
       marginLeft: 4
     }
   }, r.limitName)))))));
+  const appBackRef = React.useRef(() => false);
+  appBackRef.current = () => {
+    if (qrOpen) {
+      setQrOpen(false);
+      return true;
+    }
+    if (sendPick) {
+      setSendPick(null);
+      setSendSel([]);
+      return true;
+    }
+    if (showInstall) {
+      setShowInstall(false);
+      return true;
+    }
+    if (rematchPick) {
+      setRematchPick(false);
+      return true;
+    }
+    if (view === "game" && gameStarted && gameFinished) {
+      window.alert("この結果はまだ記録されていません。\n画面の「✓ 終了」を押すと履歴に記録されます。");
+      return true;
+    }
+    if (view === "history" && historyDetail) {
+      setHistoryDetail(null);
+      return true;
+    }
+    const back = [...document.querySelectorAll("button")].find(b => b.offsetParent !== null && /^←\s*戻る/.test((b.textContent || "").trim()));
+    if (back) {
+      back.click();
+      return true;
+    }
+    if (view === "game" && gameStarted) {
+      const cancel = [...document.querySelectorAll("button")].find(b => b.offsetParent !== null && (b.textContent || "").trim() === "キャンセル");
+      if (cancel) {
+        cancel.click();
+        return true;
+      }
+    }
+    if (view === "game" && gameStarted) {
+      if (window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) {
+        setSuspendedGame(snapshotGame());
+        setGameStarted(false);
+        setView("home");
+      }
+      return true;
+    }
+    if (view === "home") {
+      if (homeCat !== null) {
+        setHomeCat(null);
+        return true;
+      }
+      return false;
+    }
+    if (view === "title") return false;
+    setView("home");
+    return true;
+  };
+  React.useEffect(() => {
+    if (view === "game") return;
+    try {
+      window.scrollTo(0, 0);
+    } catch {}
+  }, [view, homeCat]);
+  const needBackGuard = !(view === "title" || view === "home" && homeCat === null) || qrOpen || !!sendPick || showInstall;
+  const [backTick, setBackTick] = useState(0);
+  React.useEffect(() => {
+    if (!needBackGuard) return;
+    try {
+      if (!history.state || history.state.mj !== "guard") history.pushState({
+        mj: "guard"
+      }, "");
+    } catch {}
+  }, [needBackGuard, backTick]);
+  React.useEffect(() => {
+    const onPop = () => {
+      try {
+        appBackRef.current();
+      } catch {}
+      setBackTick(n => n + 1);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   return React.createElement(React.Fragment, null, React.createElement("style", null, globalStyle), React.createElement("div", {
     style: {
       minHeight: "100vh",
@@ -28935,14 +29500,16 @@ input, select { padding: 10px 14px; }
   }), React.createElement("h1", {
     style: {
       flex: 1,
-      fontSize: 17,
+      minWidth: 0,
+      fontSize: "clamp(14px, 4.6vw, 17px)",
       fontWeight: 800,
       margin: 0,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       gap: 6,
-      cursor: "pointer"
+      cursor: "pointer",
+      whiteSpace: "nowrap"
     },
     onClick: () => {
       setHomeCat(null);
@@ -28953,10 +29520,80 @@ input, select { padding: 10px 14px; }
       width: 62,
       flexShrink: 0
     }
-  })), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "addwho" && renderAddWho(), view === "friends" && renderFriends(), qrOpen && renderQrScan(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
+  })), saveFull && view !== "title" && view !== "game" && React.createElement("div", {
+    style: {
+      margin: "10px 14px 0",
+      padding: "11px 12px",
+      borderRadius: 10,
+      background: t.rdS,
+      border: `1px solid ${t.rd}66`,
+      color: t.tx,
+      fontSize: 13,
+      lineHeight: 1.8
+    }
+  }, React.createElement("div", {
+    style: {
+      fontWeight: 800,
+      color: t.rd
+    }
+  }, "⚠ 対局の記録を保存できませんでした"), React.createElement("div", {
+    style: {
+      textWrap: "balance"
+    }
+  }, "端末の保存領域がいっぱいです。このままアプリを閉じると、最近の記録が消えることがあります。 「対局履歴」の下にある「データのバックアップ」から書き出して控えてください。"), view !== "history" && React.createElement("button", {
+    onClick: () => {
+      setActiveLeagueId(null);
+      setView("history");
+    },
+    style: {
+      marginTop: 8,
+      minHeight: 40,
+      padding: "9px 14px",
+      borderRadius: 9,
+      cursor: "pointer",
+      border: `1px solid ${t.rd}`,
+      background: "transparent",
+      color: t.rd,
+      fontSize: 13,
+      fontWeight: 800
+    }
+  }, "対局履歴を開く")), view === "title" && renderTitle(), view === "home" && renderHome(), view === "calc" && renderCalc(), view === "game" && renderGame(), view === "history" && renderHistory(), view === "quiz" && renderQuiz(), view === "termquiz" && renderTermQuiz(), view === "scorequiz" && renderScoreQuiz(), view === "league" && renderLeagueList(), view === "leagueform" && renderLeagueForm(), view === "leaguedetail" && renderLeagueDetail(), view === "leaguestart" && renderLeagueStart(), view === "dict" && renderDict(), view === "fucourse" && renderFuCourse(), view === "table" && renderTable(), view === "startguide" && renderStartGuide(), view === "names" && renderNames(), view === "addwho" && renderAddWho(), view === "friends" && renderFriends(), qrOpen && renderQrScan(), sendPick && renderSendModal(), showFuHelp && FuHelpModal(), showInstall && InstallModal()));
 }
 
-ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));
+// 画面のどこかで思わぬエラーが起きても、真っ白にせず立て直せるようにする
+class AppGuard extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err) { try { console.error(err); } catch (e) {} }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const h = React.createElement;
+    // 記録は端末に残っているので、念のため書き出せるようにしておく（バックアップと同じ形）
+    const save = () => {
+      try {
+        const data = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(),
+          history: JSON.parse(localStorage.getItem("mj_history") || "[]") }, null, 2);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+        a.download = "ponzuke-backup.json";
+        document.body.appendChild(a); a.click(); a.remove();
+      } catch (e) {}
+    };
+    const btn = (label, onClick, main) => h("button", { onClick, style: {
+      display: "block", width: "100%", margin: "12px 0 0", padding: "15px 12px", borderRadius: 12,
+      border: main ? "none" : "1px solid #2a3442", background: main ? "#2f6fd6" : "transparent",
+      color: main ? "#fff" : "#e6edf6", fontSize: 16, fontWeight: 700 } }, label);
+    return h("div", { style: { maxWidth: 420, margin: "0 auto", padding: "56px 24px", color: "#e6edf6",
+        fontFamily: "sans-serif", lineHeight: 1.9 } },
+      h("div", { style: { fontSize: 20, fontWeight: 800, marginBottom: 8 } }, "うまく表示できませんでした"),
+      h("div", { style: { fontSize: 15, color: "#9fb0c6" } },
+        "対局の記録は端末に残っています。もう一度開いてみてください。直らないときは、記録を書き出して控えておけます。"),
+      btn("もう一度開く", () => location.reload(), true),
+      btn("記録を書き出す", save, false));
+  }
+}
+
+ReactDOM.render(React.createElement(AppGuard, null, React.createElement(MahjongScorer)), document.getElementById("root"));
 </script>
 </body>
 </html>

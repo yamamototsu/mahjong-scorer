@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0c1117">
+<title>プライバシーポリシー｜卓上ポンづけ</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0c1117; color: #e6edf6; font: 16px/1.9 "Noto Sans JP", "Hiragino Kaku Gothic ProN", system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 24px; line-height: 1.5; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 36px 0 8px; padding-top: 12px; border-top: 1px solid #2a3442; }
+  p, li { color: #c9d4e3; }
+  ul { padding-left: 1.3em; }
+  li { margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid #2a3442; }
+  th { color: #e6edf6; white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+  .note { font-size: 14px; color: #9fb0c6; }
+  a { color: #8cb8ff; }
+  .back { display: inline-block; margin-top: 32px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>プライバシーポリシー</h1>
+  <p class="note">卓上ポンづけ（麻雀スコアラー）／ 制定日：2026年10月29日</p>
+
+  <p>
+    「卓上ポンづけ」（以下「本アプリ」）は、麻雀の点数計算と対局の記録をするアプリです。
+    本アプリの開発者（個人。以下「開発者」）は、利用者の情報を次のとおり扱います。
+  </p>
+
+  <h2>1. 端末の中だけに保存するもの</h2>
+  <p>
+    次の情報は、お使いの端末（アプリのデータ領域）にだけ保存します。下の「オンライン機能」を使わない限り、
+    端末の外へ送ることはありません。開発者がこれらを見ることもできません。
+  </p>
+  <ul>
+    <li>対局の記録（日付、対局者の名前、点数、各局の内容、ルール）</li>
+    <li>あなたの名前、登録したメンバーの名前、グループ、リーグ</li>
+    <li>ルールや音などの設定</li>
+  </ul>
+
+  <h2>2. オンライン機能を使うときに送るもの</h2>
+  <p>
+    「友達」機能と「クラウド保存」は、使うと決めた人だけが使う機能です（使わなくても、ほかの機能はすべて使えます）。
+    使うときは、次の情報を Google LLC が提供する <b>Firebase</b>（Realtime Database と匿名認証）に保存します。
+    保存先のサーバはシンガポールにあります。
+  </p>
+  <div class="scroll">
+  <table>
+    <tr><th>使う機能</th><th>送る情報</th><th>見られる人</th></tr>
+    <tr>
+      <td>個人IDを作る</td>
+      <td>あなたが決めた表示名、個人ID（6文字）、利用者を区別するための番号（匿名認証の番号。氏名やメールアドレスとは結びつきません）</td>
+      <td>個人IDを知っている本アプリの利用者</td>
+    </tr>
+    <tr>
+      <td>友達を追加する</td>
+      <td>友達のリスト（相手の番号、相手の表示名、追加した日時）</td>
+      <td>あなたと、その友達</td>
+    </tr>
+    <tr>
+      <td>対局結果を友達に送る（自動・手動）</td>
+      <td>対局の記録（対局者の名前、点数、各局の内容など）、送った人の表示名、送った日時</td>
+      <td>受け取る友達。受け取った記録は友達の端末にも保存されます</td>
+    </tr>
+    <tr>
+      <td>クラウド保存</td>
+      <td>あなたの対局の記録すべて、復元キーから作った照合用の値（復元キーそのものは保存しません）</td>
+      <td>復元キーを持っている人（あなたの別の端末）</td>
+    </tr>
+  </table>
+  </div>
+  <p class="note">
+    対局の記録には、いっしょに遊んだ人の名前が入ります。友達に送る・クラウドに預けるときは、
+    同卓者が名前の扱いに同意しているかに気をつけてください。
+    対局後の自動送信は、メンバー画面の「対局が終わったら自動で送る」で止められます。
+  </p>
+
+  <h2>3. そのほかに通信するもの</h2>
+  <ul>
+    <li>文字の表示に Google Fonts を使っています。文字のデータを取りに行くとき、端末のIPアドレスなど通常の通信の情報が Google に届きます。</li>
+    <li>QRコードの表示・読み取りの部品を、cdnjs（Cloudflare）と jsDelivr から読み込むことがあります。</li>
+    <li>本アプリは広告を出しません。利用状況の分析（アクセス解析）もしていません。</li>
+  </ul>
+
+  <h2>4. 使う目的</h2>
+  <p>
+    送った情報は、友達の追加、対局結果の受け渡し、機種変更のときの記録の引き継ぎのためだけに使います。
+    ほかの目的に使ったり、売ったり、第三者に渡したりはしません（保存の場所として Google の Firebase を使うことを除きます）。
+  </p>
+
+  <h2>5. 消すには</h2>
+  <ul>
+    <li>
+      <b>オンラインに保存した情報</b>：アプリの「メニュー → 設定 → このアプリについて →
+      オンラインのデータをすべて削除」で、個人ID、表示名、友達のリスト、受信箱、クラウドに預けた記録を消せます。
+      友達の端末にすでに届いている対局記録は、その友達の端末に残ります。
+    </li>
+    <li>
+      <b>端末に保存した情報</b>：アプリをアンインストールするか、端末の設定でアプリ（またはブラウザのサイト）のデータを消すと消えます。
+    </li>
+    <li>
+      <b>アプリを消してしまった後にオンラインの情報を消したいとき</b>：
+      下の問い合わせ先に「削除の依頼」と、わかれば個人ID（6文字）を書いてお知らせください。開発者が手作業で消します。
+    </li>
+  </ul>
+
+  <h2>6. 安全のために</h2>
+  <p>
+    通信は暗号化（HTTPS）しています。オンラインの情報は、Firebase の権限の設定で、本人と必要な相手だけが読み書きできるようにしています。
+  </p>
+
+  <h2>7. 子どもの利用について</h2>
+  <p>本アプリは、13歳未満の子どもを主な対象としていません。</p>
+
+  <h2>8. このポリシーを変えるとき</h2>
+  <p>内容を変えるときは、このページを更新し、制定日の横に更新日を書きます。</p>
+
+  <h2>9. 問い合わせ先</h2>
+  <p>
+    卓上ポンづけ 開発者<br>
+    <a href="https://github.com/yamamototsu/mahjong-scorer/issues" rel="noopener">https://github.com/yamamototsu/mahjong-scorer/issues</a>
+  </p>
+
+  <a class="back" href="./">← 卓上ポンづけに戻る</a>
+</main>
+</body>
+</html>

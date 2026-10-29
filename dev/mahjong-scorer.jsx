@@ -50,6 +50,8 @@ const Net = (() => {
     async update(path, patch) { await real.ref(path).update(patch); },
     async remove(path) { await real.ref(path).remove(); },
     async push(path, val) { const r = real.ref(path).push(); await r.set(val); return r.key; },
+    // オンラインのデータを消し終えたあと、匿名の利用者も消す
+    async deleteUser() { const u = window.firebase && window.firebase.auth().currentUser; if (u) await u.delete(); },
   };
   return new Proxy(real, { get: (t, k) => (window.__MJ_TEST_NET && window.__MJ_TEST_NET[k]) || t[k] });
 })();
@@ -60,7 +62,8 @@ const genFriendCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floo
 const FRIEND_LINK = (code) => location.origin + location.pathname + "?fr=" + code;
 // QRやリンクから個人IDを取り出す。「…?fr=ABC345」でも「ABC345」でも受ける
 const CODE_FROM = (text) => {
-  const v = String(text || "");
+  // 日本語入力のまま打つと全角になるので、半角にそろえてから読む
+  const v = String(text || "").normalize("NFKC");
   const m = /[?&]fr=([0-9A-Za-z]{6})/.exec(v) || /^\s*([0-9A-Za-z]{6})\s*$/.exec(v);
   if (!m) return "";
   const c = m[1].toUpperCase();
@@ -101,6 +104,33 @@ const newGameId = () => Date.now() + "-" + randChars(4, false);
 const gameOrder = (g) => {
   const n = parseInt(String(g && g.id != null ? g.id : ""), 10);
   return Number.isFinite(n) ? n : (g && g.endedAt) || 0;
+};
+// 通信が返ってこないまま待ち続けないよう、時間を区切る（圏外だと Firebase は失敗せずに待つ）
+const withTimeout = (p, ms) => Promise.race([
+  p, new Promise((_, ng) => setTimeout(() => ng(new Error("timeout")), ms)),
+]);
+// 対局の形を確かめる。友達・クラウド・バックアップから来たものは何が入っているか
+// 分からないので、表示で落ちる形（名前や点数が配列でないなど）は受け取らない
+const sanitizeGame = (g) => {
+  if (!g || typeof g !== "object" || Array.isArray(g)) return null;
+  if (typeof g.id !== "string" && typeof g.id !== "number") return null;
+  if (!Array.isArray(g.players) || !Array.isArray(g.finalScores)) return null;
+  const n = g.finalScores.length;
+  if (n < 3 || n > 4 || g.players.length < n) return null;
+  if (!g.finalScores.every(v => typeof v === "number" && Number.isFinite(v))) return null;
+  return {
+    ...g,
+    // 三麻で使わない4人目の名前が残っていると履歴が開けないので、人数で切る
+    players: g.players.slice(0, n).map(x => String(x == null ? "" : x).slice(0, 20)),
+    okaResults: Array.isArray(g.okaResults)
+      ? g.okaResults.filter(o => o && typeof o === "object")
+          .map(o => ({ ...o, name: String(o.name == null ? "" : o.name), finalPt: Number(o.finalPt) || 0 }))
+      : [],
+    rounds: Array.isArray(g.rounds) ? g.rounds.filter(r => r && typeof r === "object") : [],
+    rules: g.rules && typeof g.rules === "object" && !Array.isArray(g.rules) ? g.rules : {},
+    date: typeof g.date === "string" ? g.date : "",
+    matchType: typeof g.matchType === "string" ? g.matchType : "",
+  };
 };
 
 // ══════════════════════════════════
@@ -414,23 +444,57 @@ export default function MahjongScorer() {
   const [view, setView] = useState("title");
   // 対局履歴。端末に保存する（これまでメモリ上だけで、閉じると消えていた）
   const [gameHistory, setGameHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("mj_history") || "[]"); } catch { return []; }
+    let raw = null;
+    try { raw = localStorage.getItem("mj_history"); } catch { return []; }
+    if (!raw) return [];
+    // 読めなかった分は消さずに別の場所へ退避しておく（空で上書きすると二度と戻せない）
+    const stash = (v) => { try { localStorage.setItem("mj_history_broken_" + Date.now(), v); } catch {} };
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) throw new Error("not array");
+      const ok = [], bad = [];
+      arr.forEach(g => { const c = sanitizeGame(g); if (c) ok.push(c); else bad.push(g); });
+      if (bad.length) stash(JSON.stringify(bad));
+      return ok;
+    } catch { stash(raw); return []; }
   });
+  // 端末の保存領域がいっぱいで保存できなかったとき（黙って消えないよう知らせる）
+  const [saveFull, setSaveFull] = useState(false);
   React.useEffect(() => {
-    try { localStorage.setItem("mj_history", JSON.stringify(gameHistory)); } catch {}
+    try { localStorage.setItem("mj_history", JSON.stringify(gameHistory)); setSaveFull(false); }
+    catch { setSaveFull(true); }
   }, [gameHistory]);
+  // いちばん新しい履歴。取り込みが同時に走っても、前の分を上書きしないように使う
+  const histRef = React.useRef(gameHistory);
+  histRef.current = gameHistory;
   // 受け取った対局を履歴へ合流させる（同じidは二重登録しない）。戻り値は追加できた件数。
-  // バックアップの読み込みと、友達から受け取った結果の取り込みで共用する
-  const mergeIntoHistory = (incoming) => {
-    const existingIds = new Set(gameHistory.map(g => g.id));
-    const fresh = (incoming || []).filter(g => g && g.id && !existingIds.has(g.id));
+  // バックアップの読み込み・友達からの取り込み・クラウドからの取り込みで共用する。
+  // fromCloud=クラウドから来た分（クラウドへ送り返さない）
+  const mergeIntoHistory = (incoming, fromCloud) => {
+    const have = new Set(histRef.current.map(g => String(g.id)));
+    const fresh = [];
+    (incoming || []).map(sanitizeGame).filter(Boolean).forEach(g => {
+      const k = String(g.id);
+      if (!have.has(k)) { have.add(k); fresh.push(g); }
+    });
     if (fresh.length > 0) {
-      const merged = [...gameHistory, ...fresh];
-      merged.sort((a, b) => gameOrder(a) - gameOrder(b));
-      setGameHistory(merged);
+      histRef.current = [...histRef.current, ...fresh];
+      // 古い履歴を土台にせず、その時点の最新に足す
+      setGameHistory(prev => {
+        const ids = new Set(prev.map(g => String(g.id)));
+        const add = fresh.filter(g => !ids.has(String(g.id)));
+        if (!add.length) return prev;
+        return [...prev, ...add].sort((a, b) => gameOrder(a) - gameOrder(b));
+      });
+      // クラウド保存を使っているなら、友達やバックアップから来た分も預けておく
+      if (!fromCloud && cloudBoxRef.current) {
+        const ids = fresh.map(g => g.id);
+        saveCloudQueue(prev => [...prev, ...ids.filter(x => !prev.includes(x))]);
+      }
     }
     return fresh.length;
   };
+  const cloudBoxRef = React.useRef("");
   // 保留中・進行中の対局。端末に保存して、リロードや電池切れの後も再開できるようにする
   const [suspendedGame, setSuspendedGame] = useState(() => {
     try {
@@ -1317,6 +1381,9 @@ export default function MahjongScorer() {
   };
   const [gameFinished, setGameFinished] = useState(false);
   const [showExtendConfirm, setShowExtendConfirm] = useState(false); // tonpu → hanchan extension // natural game end
+  // 延長したときの続き（半荘戦なら次はどの局・何本場か）。延長の確認を出すところで決めておく。
+  // honba: zero=0本場から / keep=そのまま（流局で積んだ分） / plus1=親の連荘で1本積む
+  const [extendNext, setExtendNext] = useState(null);
 
   // 終局時に卓上へ残った供託リーチ棒（オーラス流局など）はトップが受け取る
   const [kyotakuAward, setKyotakuAward] = useState(null); // { idx, n } 表示用
@@ -1512,8 +1579,48 @@ export default function MahjongScorer() {
     out.splice(at, 0, rec);
     return out;
   };
-  // 修正を反映したら、結果画面から来ていた場合はそのまま結果へ戻す
-  const afterFixApplied = () => {
+  // 最後の局の結果から、次の局（場・親・本場）を出す。
+  // 局を直した・消したあと、卓の「いまの局」を記録に合わせるのに使う
+  const nextPositionAfter = (list) => {
+    const last = list[list.length - 1];
+    if (!last) return { wind: "東", dealer: 0, honba: 0 };
+    const rs = (gameConfig || {}).rules || {};
+    // チョンボは局のやり直し（場・親・本場はそのまま）
+    if (last.chombo) return { wind: last.wind, dealer: last.dealer, honba: last.honba || 0 };
+    let dealerStays, honbaNext;
+    if (last.draw) {
+      // 流局は本場を1本積む。親が流れるかはルール次第（流れても本場は持ち越す）
+      const dealerTenpai = !!(last.tenpai || [])[last.dealer];
+      const rotate = rs.agariRenchan ? true : rs.tenpaiRenchan ? !dealerTenpai : false;
+      dealerStays = !rotate; honbaNext = (last.honba || 0) + 1;
+    } else {
+      // ダブロンは同じ局のアガリが続けて入っているので、まとめて親がアガったかを見る
+      const same = list.filter(r => !r.draw && !r.chombo && r.wind === last.wind
+        && r.dealer === last.dealer && (r.honba || 0) === (last.honba || 0)
+        && (r === last || (r.multiRon && last.multiRon)));
+      const dealerWon = same.some(r => r.winner === last.dealer);
+      dealerStays = dealerWon; honbaNext = dealerWon ? (last.honba || 0) + 1 : 0;
+    }
+    if (dealerStays) return { wind: last.wind, dealer: last.dealer, honba: honbaNext };
+    const next = (last.dealer + 1) % PC;
+    let wind = last.wind;
+    if (next === 0) { const wi = WINDS.indexOf(last.wind); if (wi >= 0 && wi < 3) wind = WINDS[wi + 1]; }
+    return { wind, dealer: next, honba: honbaNext };
+  };
+  // 卓を、決めた局に合わせる。対局の終わりを越える位置にはしない（そのときは動かさない）
+  const moveTableTo = (pos) => {
+    const lastWi = WINDS.indexOf(LAST_WIND((gameConfig || {}).matchType));
+    if (WINDS.indexOf(pos.wind) > lastWi) return;
+    setRoundWind(pos.wind); setDealerIdx(pos.dealer); setHonba(pos.honba);
+  };
+  // 修正を反映したら、結果画面から来ていた場合はそのまま結果へ戻す。
+  // 対局中に「最後の局」を直したときは、親・本場も直した結果に合わせる
+  // （アガった人を取り違えると連荘のあり・なしが変わるため）
+  const afterFixApplied = (newRounds) => {
+    if (newRounds && fixIdx !== null && !reviewing && !gameFinished
+        && multiRonGroup(fixIdx).includes(rounds.length - 1)) {
+      moveTableTo(nextPositionAfter(newRounds));
+    }
     setFixIdx(null);
     if (reviewing) finishReviewing();
   };
@@ -1600,7 +1707,7 @@ export default function MahjongScorer() {
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
       resetChombo();
-      afterFixApplied();
+      afterFixApplied(recalced.rounds);
       return;
     }
 
@@ -1632,7 +1739,11 @@ export default function MahjongScorer() {
   const [correctingDrawIdx, setCorrectingDrawIdx] = useState(null); // 修正中の流局の局番号
   // キャンセル時に修正対象も忘れる（残っていると次の本物の流局が過去の局を上書きしてしまう）
   const resetDrawWiz = useCallback(() => { setShowDrawWiz(false); setDrawTenpai([false, false, false, false]); setCorrectingDrawIdx(null); }, []);
-  const gParent = gWinner !== null ? gWinner === dealerIdx : false;
+  // 過去の局を直しているときは、いまの親・本場ではなく「その局の親・本場」で計算して見せる
+  // （いまの親で見ると、親のアガリが子の点数で表示されてしまう）
+  const gDealer = fixIdx !== null && rounds[fixIdx] ? rounds[fixIdx].dealer : dealerIdx;
+  const gHonba = fixIdx !== null && rounds[fixIdx] ? (rounds[fixIdx].honba || 0) : honba;
+  const gParent = gWinner !== null ? gWinner === gDealer : false;
   const gLimit = gHan !== null ? getLimitName(gHan) : null;
   const gResult = useMemo(() => {
     if (gHan === null || gTsumo === null) return null;
@@ -1648,6 +1759,8 @@ export default function MahjongScorer() {
     if (!dealerWon) {
       const next = (dealerIdx + 1) % PC;
       if (cfg.matchType === "tonpu" && next === 0) {
+        // 子のアガリで親が流れる → 延長なら南1局0本場
+        setExtendNext({ wind: "南", dealer: 0, honba: "zero" });
         setShowExtendConfirm(true);
       } else if (next === 0 && curWi >= lastWi) {
         setGameFinished(true);
@@ -1661,7 +1774,8 @@ export default function MahjongScorer() {
         const parentScore = ns[dealerIdx];
         const isTop = ns.every((s, i) => i === dealerIdx || parentScore > s);
         if (isTop && (cfg.rules || {}).orasYame !== false) {
-          if (cfg.matchType === "tonpu") setShowExtendConfirm(true);
+          // 親のアガリやめ → 延長するなら親の連荘（同じ局で1本場積む）
+          if (cfg.matchType === "tonpu") { setExtendNext({ wind: roundWind, dealer: dealerIdx, honba: "plus1" }); setShowExtendConfirm(true); }
           else setGameFinished(true);
         } else {
           setHonba(h => h + 1);
@@ -1778,7 +1892,7 @@ export default function MahjongScorer() {
       setScores(newScores);
       setRiichiBets(recalced.carry + liveCount);
       resetGW(); setTmWinStep(null); setRonPick([]); setRonLoserPick(null); setMultiRon(null);
-      afterFixApplied();
+      afterFixApplied(recalced.rounds);
       return;
     }
 
@@ -1856,7 +1970,7 @@ export default function MahjongScorer() {
       setRiichiBets(recalced.carry + liveCount);
       resetDrawWiz();
       setTmDrawMode(false);
-      afterFixApplied();
+      afterFixApplied(recalced.rounds);
       return;
     }
 
@@ -1898,6 +2012,8 @@ export default function MahjongScorer() {
     if (dealerRotates) {
       const next = (dealerIdx + 1) % PC;
       if (cfg.matchType === "tonpu" && next === 0) {
+        // 流局で親が流れる → 延長なら南1局。本場は流局で積んだ分をそのまま持ち越す
+        setExtendNext({ wind: "南", dealer: 0, honba: "keep" });
         setShowExtendConfirm(true);
       } else if (next === 0 && curWi2 >= lastWi2) {
         setGameFinished(true);
@@ -1909,7 +2025,8 @@ export default function MahjongScorer() {
       const parentScore = ns[dealerIdx];
       const isTop = ns.every((s, i) => i === dealerIdx || parentScore > s);
       if (isTop && ruleSet.orasYame !== false) {
-        if (cfg.matchType === "tonpu") setShowExtendConfirm(true);
+        // 親のテンパイやめ → 延長するなら親の連荘（本場は流局で積んだ分のまま）
+        if (cfg.matchType === "tonpu") { setExtendNext({ wind: roundWind, dealer: dealerIdx, honba: "keep" }); setShowExtendConfirm(true); }
         else setGameFinished(true);
       }
     }
@@ -1921,6 +2038,18 @@ export default function MahjongScorer() {
   }, [scores, honba, dealerIdx, roundWind, gameConfig, drawTenpai, resetDrawWiz, fixIdx, manualAdj, rounds, declaredRiichi]);
 
   const startGame = useCallback(() => {
+    // 保留中の対局は1つしか持てない。黙って上書きすると消えてしまうので、先にたずねる
+    if (suspendedGame) {
+      const sg = suspendedGame;
+      const label = `${sg.config?.date || ""} ${MATCH_LABEL_SHORT(sg.config?.matchType)}（${(sg.players || []).join("・")}）`;
+      if (!window.confirm(
+        "保留中の対局があります。\n" + label + "\n\n" +
+        "新しい対局をはじめると、保留中の対局は消えます。\n" +
+        "つづきを遊ぶときは「キャンセル」を押し、メニューの「対局のつづきを再開」から戻ってください。\n\n" +
+        "新しくはじめますか？"
+      )) return;
+      setSuspendedGame(null);
+    }
     const sp = rules.startPoints || 25000;
     // 返し点が持ち点を下回るルールは現在のUIでは作れないが、古い保存データ
     // （mj_last_rules 経由など）から紛れ込むとオカが負になる。
@@ -1959,7 +2088,7 @@ export default function MahjongScorer() {
     splashTimer.current = setTimeout(() => setStartSplash(null), 3200);
     // 対局は東1局から始まるので、開始の演出に合わせて読み上げる
     playRoundVoice("東", 0, 0);
-  }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues]);
+  }, [gameDate, matchType, players, rules, playerCount, activeLeagueId, leagues, suspendedGame]);
 
   // 局や本場が変わったら、次の局が始まる前に演出を挟む
   const prevRoundKey = React.useRef(null);
@@ -1984,7 +2113,7 @@ export default function MahjongScorer() {
   }, [roundWind, dealerIdx, honba, gameStarted, gameFinished]);
 
   // ── Theme ──
-  const t = { bg: "#0c1117", sf: "#161d27", card: "#1c2533", ac: "#5b9bff", acS: "rgba(91,155,255,0.14)", gn: "#34d872", gnS: "rgba(52,216,114,0.14)", rd: "#f26d6d", rdS: "rgba(242,109,109,0.14)", gd: "#f2c14e", gdS: "rgba(242,193,78,0.14)", tx: "#f5f8fc", dm: "#9db0c7", bd: "#35415a" };
+  const t = { bg: "#0c1117", sf: "#161d27", card: "#1c2533", ac: "#5b9bff", acB: "#2f6fd6", acS: "rgba(91,155,255,0.14)", gn: "#34d872", gnS: "rgba(52,216,114,0.14)", rd: "#f26d6d", rdS: "rgba(242,109,109,0.14)", gd: "#f2c14e", gdS: "rgba(242,193,78,0.14)", tx: "#f5f8fc", dm: "#9db0c7", bd: "#35415a" };
 
   // ── Shared Styles ──
   const card = { background: t.card, borderRadius: 14, padding: 22, marginBottom: 18, border: `1px solid ${t.bd}`, boxSizing: "border-box", maxWidth: "100%", overflow: "hidden", lineHeight: 1.7 };
@@ -1993,7 +2122,7 @@ export default function MahjongScorer() {
   // 文字を画面幅に追従させる。19pxのままだと狭い端末（280〜320px）で
   // 4列のマス目が枠や画面の外へはみ出る。365px以上では19pxのまま変わらない。
   const numBtn = (on) => ({ height: 62, padding: "0 2px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: "clamp(14px, 5.2vw, 19px)", fontWeight: 800, cursor: "pointer", textAlign: "center", transition: "all 0.1s", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", whiteSpace: "nowrap", letterSpacing: "-0.03em" });
-  const actionBtn = (v) => ({ width: "100%", padding: "15px 12px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 10, boxSizing: "border-box", lineHeight: 1.5, ...(v === "p" ? { background: t.ac, color: "#fff" } : v === "d" ? { background: t.rd, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }) });
+  const actionBtn = (v) => ({ width: "100%", padding: "15px 12px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", marginBottom: 10, boxSizing: "border-box", lineHeight: 1.5, ...(v === "p" ? { background: t.acB, color: "#fff" } : v === "d" ? { background: t.rd, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }) });
   const pSelBtn = (on) => ({ padding: "14px 8px", border: `2px solid ${on ? t.ac : t.bd}`, borderRadius: 12, background: on ? t.acS : "transparent", color: on ? t.ac : t.tx, fontSize: 14, fontWeight: 700, cursor: "pointer", textAlign: "center", flex: 1, transition: "all 0.1s" });
   // 対局ルールの説明（設定・セットアップ・リーグで共用）
   const RuleHelp = () => {
@@ -2395,7 +2524,7 @@ export default function MahjongScorer() {
   };
 
   const FuHelpModal = () => (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', overflowY: "auto" }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 200, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)', overflowY: "auto" }}>
       <div style={{ width: "100%", maxWidth: 400, paddingBottom: 40 }}>
         <div style={{ ...card, padding: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -3596,7 +3725,7 @@ export default function MahjongScorer() {
           }}>{winnerName} {tsumo ? "ツモ" : `← ${loserName}`}</div>
           {/* 実際に受け取る点数（和了点＋本場）。リーチ棒は点に混ぜず本数で添える */}
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
+            <span style={{ fontSize: 40, fontWeight: 900, color: t.ac, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
               {receive.toLocaleString()}
               <span style={{ fontSize: 16, fontWeight: 800, color: t.dm, marginLeft: 3 }}>点</span>
             </span>
@@ -5223,6 +5352,7 @@ input, select { padding: 10px 14px; }
       // 友達の行なら、個人IDとの結びつきも新しい名前に移す（自動共有が切れないように）
       const fid = fidOfName(before);
       if (fid) saveFriendLinks({ ...friendLinks, [fid]: v });
+      renameInGroups(before, v);
       setEditNameIdx(null); setEditErr("");
     };
     return (
@@ -5295,7 +5425,7 @@ input, select { padding: 10px 14px; }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input
-                    value={editNameVal}
+                    value={editNameVal} maxLength={10}
                     onChange={e => { setEditNameVal(e.target.value); if (editErr) setEditErr(""); }}
                     onKeyDown={e => { if (e.key === "Enter") commitEdit(); }}
                     autoFocus
@@ -5308,7 +5438,7 @@ input, select { padding: 10px 14px; }
                   />
                   <button onClick={commitEdit} style={{
                     padding: "8px 12px", borderRadius: 8, border: "none",
-                    background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                    background: t.acB, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
                   }}>保存</button>
                   <button onClick={() => { setEditNameIdx(null); setEditErr(""); }} style={{
                     padding: "8px 10px", borderRadius: 8, border: `1px solid ${t.bd}`,
@@ -5345,11 +5475,11 @@ input, select { padding: 10px 14px; }
                     )}
                   </span>
                   <button onClick={() => { setEditNameIdx(i); setEditNameVal(n); setEditErr(""); }} style={{
-                    padding: "7px 12px", borderRadius: 8, border: `1px solid ${t.bd}`,
+                    padding: "7px 12px", minHeight: 36, borderRadius: 8, border: `1px solid ${t.bd}`,
                     background: "transparent", color: t.dm, fontSize: 12, cursor: "pointer",
                   }}>編集</button>
                   <button onClick={() => removeName(i)} style={{
-                    padding: "7px 12px", borderRadius: 8, border: `1px solid ${t.rd}55`,
+                    padding: "7px 12px", minHeight: 36, borderRadius: 8, border: `1px solid ${t.rd}55`,
                     background: t.rdS, color: t.rd, fontSize: 12, fontWeight: 700, cursor: "pointer",
                   }}>削除</button>
                 </>
@@ -5903,7 +6033,11 @@ input, select { padding: 10px 14px; }
     const ok = location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1";
     if (!ok) return;
     let reloading = false;
-    const onChange = () => { if (!reloading) { reloading = true; location.reload(); } };
+    // はじめて入ったときも「担当が付いた」合図が来るが、そのときは読み直さない
+    // （名前を打っている途中で画面が読み直され、入力が消えてしまう）。
+    // 読み直すのは、古い版から新しい版へ切り替えたときだけ
+    const hadController = !!navigator.serviceWorker.controller;
+    const onChange = () => { if (hadController && !reloading) { reloading = true; location.reload(); } };
     navigator.serviceWorker.addEventListener("controllerchange", onChange);
     navigator.serviceWorker.register("sw.js").then((reg) => {
       const watch = (w) => {
@@ -5920,6 +6054,22 @@ input, select { padding: 10px 14px; }
     }).catch(() => {});
     return () => navigator.serviceWorker.removeEventListener("controllerchange", onChange);
   }, []);
+
+  // 端末の空きが少ないときに、ブラウザが記録を勝手に消さないよう頼んでおく
+  // （ストア版はChromeと保存場所を共有するため）。断られても動きは変わらない
+  React.useEffect(() => {
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch {}
+  }, []);
+
+  // 卓上モード中は、スマホを卓に置いたまま触っても画面が横にならないよう縦で固定する。
+  // 固定できるのはアプリとして開いているときだけ（ブラウザでは黙って何もしない）。タブレットは固定しない
+  React.useEffect(() => {
+    const so = window.screen && window.screen.orientation;
+    if (!so || !so.lock) return;
+    const small = Math.min(window.screen.width || 0, window.screen.height || 0) < 600;
+    if (gameStarted && tableMode && small) { try { so.lock("portrait").catch(() => {}); } catch {} }
+    else { try { so.unlock && so.unlock(); } catch {} }
+  }, [gameStarted, tableMode]);
 
   // ── はじめて開いたとき、名前を1つだけ聞く ──
   // 名簿（対局のメンバー）と、友達に表示される名前の両方に使う
@@ -6120,6 +6270,17 @@ input, select { padding: 10px 14px; }
   const saveGroups = (arr) => {
     setGroups(arr);
     try { localStorage.setItem("mj_groups", JSON.stringify(arr)); } catch {}
+  };
+  // 名前を変えたとき、グループの中の名前もそろえる。古い名前のままだと、そのグループで
+  // 始めたときに古い名前で登録し直され、友達への自動送信も止まってしまう
+  const renameInGroups = (before, after) => {
+    if (!before || !after || before === after) return;
+    setGroups(prev => {
+      if (!prev.some(g => (g.members || []).includes(before))) return prev;
+      const next = prev.map(g => ({ ...g, members: (g.members || []).map(m => (m === before ? after : m)) }));
+      try { localStorage.setItem("mj_groups", JSON.stringify(next)); } catch {}
+      return next;
+    });
   };
   const [groupNameInput, setGroupNameInput] = useState("");
   const [showGroupSave, setShowGroupSave] = useState(false);
@@ -6450,7 +6611,7 @@ input, select { padding: 10px 14px; }
 
             <button style={{
               width: "100%", padding: "14px", borderRadius: 12, marginBottom: 8,
-              border: "none", background: diceRolling ? "#2a5d4a" : t.ac,
+              border: "none", background: diceRolling ? "#2a5d4a" : t.acB,
               color: "#fff", fontSize: 15, fontWeight: 800, cursor: diceRolling ? "default" : "pointer",
             }} disabled={diceRolling} onClick={rollDice}>
               {diceRolling ? "🎲 …" : diceSettled ? "🎲 もう一度振る" : "🎲 サイコロを振る"}
@@ -6592,7 +6753,7 @@ input, select { padding: 10px 14px; }
             proceed();
           }} style={{
             width: "100%", padding: "14px 10px", marginBottom: 9, borderRadius: 11, cursor: "pointer",
-            border: "none", background: t.ac, color: "#fff", fontSize: 14, fontWeight: 800, lineHeight: 1.5,
+            border: "none", background: t.acB, color: "#fff", fontSize: 14, fontWeight: 800, lineHeight: 1.5,
           }}>
             ルールを「{needLabel}」に変更して続ける
             <span style={{ display: "block", fontSize: 10, fontWeight: 400, opacity: 0.85, marginTop: 3 }}>
@@ -7121,7 +7282,7 @@ input, select { padding: 10px 14px; }
   // 受け渡しの内訳（矢印の元データ）。埋め込み表示と全画面表示で共用
   const payInfo = () => {
     const payers = PC - 1;
-    const hb = honba * HU();
+    const hb = gHonba * HU();
     const pool = (riichiBets + gRiichi.filter(Boolean).length) * 1000;
     // 支払いの明細（供託は卓上からなので矢印にしない）
     const flows = [];
@@ -7130,7 +7291,7 @@ input, select { padding: 10px 14px; }
         if (i === gWinner) continue;
         let amt;
         if (isSanma || gParent) amt = gResult.each;
-        else amt = (i === dealerIdx) ? gResult.fromParent : gResult.fromChild;
+        else amt = (i === gDealer) ? gResult.fromParent : gResult.fromChild;
         flows.push({ from: i, amt: amt + Math.floor(hb / payers) });
       }
     } else if (gLoser !== null) {
@@ -7144,7 +7305,7 @@ input, select { padding: 10px 14px; }
   // ツモは人数で割って集めるため端数が出る。表示は必ずこの実額に合わせる
   const honbaGet = () => {
     const payers = PC - 1;
-    const hb = honba * HU();
+    const hb = gHonba * HU();
     return gTsumo ? Math.floor(hb / payers) * payers : (gLoser !== null ? hb : 0);
   };
   // 卓に出ているリーチ棒の本数（前局からの供託＋この局のウィザード入力ぶん）
@@ -7613,7 +7774,7 @@ input, select { padding: 10px 14px; }
     const startPt = gameConfig?.rules?.startPoints || 30000;
     const diff = scores[pi] - startPt;
     return (
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto" }}>
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto" }}>
         <div style={{ width: "100%", maxWidth: 400 }}>
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -7714,6 +7875,12 @@ input, select { padding: 10px 14px; }
     setScores(newScores);
     setRiichiBets(recalced.carry + liveCount);
     setEditingRoundIdx(null);
+    // 最後の局を消したときは、卓をその局のはじめ（場・親・本場）に戻す。
+    // 途中の局を消したときは、あとの局がそのまま続いているので動かさない
+    if (delSet.has(rounds.length - 1) && !reviewing && !gameFinished) {
+      const head = rounds[Math.min(...delSet)];
+      if (head) moveTableTo({ wind: head.wind, dealer: head.dealer, honba: head.honba || 0 });
+    }
   };
 
   // ── 結果画面からの修正モード（reviewing）の出入り ──
@@ -7790,9 +7957,9 @@ input, select { padding: 10px 14px; }
         border: `1px solid ${t.bd}`, background: t.card, color: t.tx,
         display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
       }}>
-        <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
-        <span style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
+        <span style={{ fontSize: 19, lineHeight: 1.15 }}>{icon}</span>
+        <span style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
     // 横いっぱいの一行版。3つ並びのタイルより背が低い
@@ -7803,8 +7970,8 @@ input, select { padding: 10px 14px; }
         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
       }}>
         <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
-        <span style={{ fontSize: 13, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
-        <span style={{ fontSize: 11, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
+        <span style={{ fontSize: 14, fontWeight: 800, whiteSpace: "nowrap" }}>{label}</span>
+        <span style={{ fontSize: 12, color: t.dm, whiteSpace: "nowrap" }}>{sub}</span>
       </button>
     );
     // はじめて開いたときだけ名前を聞く。すでに記録がある人には出さない
@@ -7870,7 +8037,7 @@ input, select { padding: 10px 14px; }
             color: "rgba(255,255,255,0.95)",
             textShadow: "0 0 14px rgba(234,179,8,0.4), 0 2px 10px rgba(0,0,0,0.85)",
             animation: "tapIn 0.6s 1.8s ease-out both, tapBlink 1.7s 2.6s ease-in-out infinite",
-          }}>TAP TO START</div>
+          }}>タップしてはじめる</div>
         )}
 
         {/* ロゴ（演出中は少し下・少し大きく見せて、メニューが出るときに定位置へ収める） */}
@@ -7930,7 +8097,7 @@ input, select { padding: 10px 14px; }
             animation: intro ? "bootLine 0.7s 1.15s ease-out both" : undefined,
           }} />
           <div style={{
-            fontSize: 10, color: t.dm, marginTop: 2,
+            fontSize: 14, color: "#c3d0e0", marginTop: 2,
             animation: intro ? "bootSub 0.8s 1.7s ease-out both" : undefined,
             opacity: intro ? undefined : 0.9,   // bootSub の終わりの値に合わせる
           }}>卓の真ん中に置いて使えます</div>
@@ -7941,7 +8108,7 @@ input, select { padding: 10px 14px; }
         {needOnboard ? (
           <div style={{ ...card, padding: 20, marginBottom: 0, ...reveal(1) }}>
             <div style={{ fontSize: 17, fontWeight: 900, color: t.tx, marginBottom: 7, lineHeight: 1.5 }}>はじめまして</div>
-            <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9, marginBottom: 14 }}>
+            <div style={{ fontSize: 14, color: t.dm, lineHeight: 1.9, marginBottom: 14 }}>
               {["あなたの名前を教えてください。", "対局のメンバーと、", "友達に表示される名前に使います。", "あとで変えられます。"].map((x, k) => (
                 <span key={k} style={{ display: "inline-block" }}>{x}</span>
               ))}
@@ -8004,11 +8171,11 @@ input, select { padding: 10px 14px; }
         {/* メイン */}
         <button onClick={startPlay} style={{
           width: "100%", padding: "20px 12px", borderRadius: 16, cursor: "pointer", marginBottom: 12,
-          border: "none", background: t.ac, color: "#fff",
+          border: "none", background: t.acB, color: "#fff",
           boxShadow: "0 8px 24px rgba(91,155,255,0.28)", ...reveal(1),
         }}>
           <div style={{ fontSize: 19, fontWeight: 900, letterSpacing: "0.05em" }}>対局をはじめる</div>
-          <div style={{ fontSize: 11, opacity: 0.9, marginTop: 3 }}>東風戦・半荘戦・全荘戦 / 四人・三人麻雀</div>
+          <div style={{ fontSize: 12, marginTop: 3 }}>東風戦・半荘戦・全荘戦 / 四人・三人麻雀</div>
         </button>
 
         {/* サブメニュー */}
@@ -8058,7 +8225,7 @@ input, select { padding: 10px 14px; }
               border: `1px solid ${t.ac}55`, background: t.acS, color: t.tx,
               display: "flex", alignItems: "center", gap: 8, textAlign: "left",
             }}>
-              <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>📲</span>
+              <span style={{ fontSize: 16, lineHeight: 1.15, flexShrink: 0 }}>📲</span>
               {/* 2行に分けて置く。まかせると「ア／イコン」のような切れ方をする */}
               <span style={{ flex: 1, minWidth: 0, lineHeight: 1.5 }}>
                 <span style={{ display: "block", fontSize: 12, fontWeight: 700 }}>ホーム画面に追加</span>
@@ -8287,7 +8454,7 @@ input, select { padding: 10px 14px; }
                     }}>
                     <span style={{
                       width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                      border: `2px solid ${frAuto ? t.ac : t.bd}`, background: frAuto ? t.ac : "transparent",
+                      border: `2px solid ${frAuto ? t.ac : t.bd}`, background: frAuto ? t.acB : "transparent",
                       display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1,
                     }}>{frAuto ? "✓" : ""}</span>
                     <span style={{ minWidth: 0, flex: 1 }}>
@@ -8316,7 +8483,9 @@ input, select { padding: 10px 14px; }
 
             {/* 登録の入口はここ1つ。名前だけ／QR／リンク の違いは次の画面で説明する */}
             {menuItem("➕", ["メンバー・", "友達を登録"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)),
-              Net.enabled() ? "名前だけ／QR／リンク から選べます" : "名前を登録します",
+              Net.enabled()
+                ? ["名前だけ／QR／リンク", "から選べます"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>))
+                : "名前を登録します",
               () => { setAddwhoBackTo("members"); setAddNameOpen(false); setAddedMsg(""); setNameErr(""); setView("addwho"); }, true)}
 
             {menuItem("📋", ["メンバー・", "お友達リスト"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)),
@@ -8449,7 +8618,7 @@ input, select { padding: 10px 14px; }
                         setNamesBackTo("members"); setView("names"); setNewNameInput(""); setEditNameIdx(null);
                       }} style={{
                         width: "100%", padding: "10px 8px", borderRadius: 9, cursor: "pointer",
-                        border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700,
+                        border: "none", background: t.acB, color: "#fff", fontSize: 12, fontWeight: 700,
                       }}>👤 名前の登録へ</button>
                     </div>
                   )}
@@ -8465,7 +8634,7 @@ input, select { padding: 10px 14px; }
                       }}
                       style={{
                         flex: 1, padding: "12px 8px", borderRadius: 10, border: "none", cursor: "pointer",
-                        background: t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
+                        background: t.acB, color: "#fff", fontSize: 14, fontWeight: 800,
                         opacity: (gEditName.trim() && gEditMembers.length === gEditSize) ? 1 : 0.4,
                       }}>{gEditId ? "更新する" : "保存する"}</button>
                     <button onClick={() => { setGEditOpen(false); setGEditId(null); setGEditName(""); setGEditMembers([]); }}
@@ -8487,7 +8656,7 @@ input, select { padding: 10px 14px; }
 
             {/* このアプリ自体を友達にすすめる（オンライン共有が使えなくても意味がある） */}
             <div style={{ marginTop: 12 }}>
-              {menuItem("📤", "このアプリを友達に教える", "リンクを送ります", shareApp)}
+              {menuItem("📤", ["このアプリを", "友達に教える"].map((x, k) => (<span key={k} style={{ display: "inline-block" }}>{x}</span>)), "リンクを送ります", shareApp)}
               {shareMsg && (
                 <div style={{ fontSize: 12, color: t.gn, fontWeight: 700, lineHeight: 1.8, marginTop: -4, marginBottom: 12, textWrap: "balance" }}>
                   ✓ {shareMsg}
@@ -8694,6 +8863,60 @@ input, select { padding: 10px 14px; }
 
             {secHdr("screen", "💡", "画面設定", "開いている間のスリープ防止")}
             {setOpen === "screen" && screenPanelCard()}
+
+            {/* このアプリについて（プライバシー・ライセンス・オンラインのデータの削除） */}
+            {secHdr("about", "ℹ️", "このアプリについて", "プライバシー・データの削除・ライセンス")}
+            {setOpen === "about" && (
+              <div style={{ ...card, padding: 16, marginTop: 4 }}>
+                <a href="privacy.html" target="_blank" rel="noopener" style={{
+                  display: "flex", alignItems: "center", gap: 8, minHeight: 44, padding: "10px 12px",
+                  borderRadius: 10, border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
+                  fontSize: 14, fontWeight: 700, textDecoration: "none", boxSizing: "border-box",
+                }}>
+                  <span style={{ flex: 1 }}>🔒 プライバシーポリシー</span>
+                  <span style={{ color: t.dm }}>›</span>
+                </a>
+
+                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 18, marginBottom: 6 }}>オンラインのデータ</div>
+                {Net.enabled() && (myCode || cloudBox) ? (
+                  <>
+                    <div style={{ fontSize: 13, color: t.dm, lineHeight: 1.9, marginBottom: 10, textWrap: "balance" }}>
+                      個人ID・友達のリスト・受信箱・クラウドに預けた記録を、まとめて削除できます。
+                      この端末の中の対局記録や名簿は消えません。
+                    </div>
+                    <button disabled={delBusy} onClick={deleteOnlineData} style={{
+                      width: "100%", minHeight: 44, padding: "12px 8px", borderRadius: 10, cursor: "pointer",
+                      border: `1px solid ${t.rd}`, background: "transparent", color: t.rd,
+                      fontSize: 14, fontWeight: 800, opacity: delBusy ? 0.5 : 1,
+                    }}>{delBusy ? "削除しています…" : ["オンラインのデータを", "すべて削除"].map((x, k) => (
+                      <span key={k} style={{ display: "inline-block" }}>{x}</span>
+                    ))}</button>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, color: t.dm, lineHeight: 1.9, textWrap: "balance" }}>
+                    オンラインに保存しているデータはありません（対局の記録は、この端末の中だけにあります）。
+                  </div>
+                )}
+                {delMsg && (
+                  <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.8, marginTop: 10, color: delMsg.ok ? t.gn : t.rd, textWrap: "balance" }}>
+                    {delMsg.ok ? "✓ " : ""}{delMsg.text}
+                  </div>
+                )}
+
+                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 18, marginBottom: 6 }}>使っている部品とライセンス</div>
+                <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.9 }}>
+                  React（MIT License, © Meta Platforms, Inc.）<br />
+                  Noto Sans JP（SIL Open Font License 1.1, Google Fonts）<br />
+                  Firebase JavaScript SDK（Apache License 2.0）<br />
+                  jsQR（Apache License 2.0）<br />
+                  qrcode-generator（MIT License, © Kazuhiko Arase）
+                </div>
+
+                <div style={{ fontSize: 14, fontWeight: 800, marginTop: 18, marginBottom: 6 }}>問い合わせ</div>
+                <a href="https://github.com/yamamototsu/mahjong-scorer/issues" target="_blank" rel="noopener"
+                  style={{ fontSize: 13, color: t.ac, wordBreak: "break-all" }}>github.com/yamamototsu/mahjong-scorer/issues</a>
+              </div>
+            )}
 
             {/* ルール類の保存（変更があるときだけ表示）。横並び1行の小さめボタン */}
             {(rulesDirty || rulesSaved) && (
@@ -9388,7 +9611,7 @@ input, select { padding: 10px 14px; }
             setLgMatchType("hanchan"); setView("leaguestart");
           }} style={{
             width: "100%", padding: "16px 8px", marginBottom: 16, borderRadius: 13, cursor: "pointer",
-            border: "none", background: t.ac, color: "#fff", fontWeight: 800,
+            border: "none", background: t.acB, color: "#fff", fontWeight: 800,
             // 280px幅で「対局を始/める」と折り返さないよう画面幅に追従させる
             fontSize: "clamp(13px, 4.6vw, 16px)", whiteSpace: "nowrap",
           }}>▶ このリーグで対局を始める</button>
@@ -9874,7 +10097,7 @@ input, select { padding: 10px 14px; }
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}>
             <span style={{
-              width: 24, height: 24, borderRadius: "50%", background: t.ac, color: "#fff",
+              width: 24, height: 24, borderRadius: "50%", background: t.acB, color: "#fff",
               fontSize: 13, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}>{no}</span>
             <span style={{ fontSize: 15, fontWeight: 800, color: t.tx, textWrap: "balance" }}>{title}</span>
@@ -10992,7 +11215,8 @@ input, select { padding: 10px 14px; }
               </div>
             </button>
 
-            <button style={{ ...actionBtn("p"), opacity: oyaDice?.sum > 0 ? 1 : 0.4 }}
+            <button style={oyaDice?.sum > 0 ? actionBtn("p")
+                : { ...actionBtn(), background: t.card, color: "#6b7a90", cursor: "default" }}
               disabled={!(oyaDice?.sum > 0)} onClick={applyOya}>次へ</button>
             <button style={actionBtn()} onClick={() => setSetupStep(nextStep)}>
               {/* 最終行に数文字だけ残らないよう意味の切れ目で区切る */}
@@ -11085,7 +11309,7 @@ input, select { padding: 10px 14px; }
                 <button disabled={!matchType}
                   onClick={() => { setRules({ ...base }); setSetupStep(0); }} style={{
                   width: "100%", padding: "13px 10px", borderRadius: 10, cursor: matchType ? "pointer" : "default", border: "none",
-                  background: ok ? t.gn : t.ac, color: "#fff", fontSize: 14, fontWeight: 800,
+                  background: ok ? t.gn : t.acB, color: "#fff", fontSize: 14, fontWeight: 800,
                   opacity: matchType ? 1 : 0.4,
                 }}>{/* 「メンバー決定/へ」のように語の途中で折り返さないよう、
                        意味の切れ目ごとに inline-block で区切る */
@@ -11360,7 +11584,7 @@ input, select { padding: 10px 14px; }
                   }}
                   style={{
                     padding: "0 16px", borderRadius: 9, border: "none", cursor: "pointer",
-                    background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700,
+                    background: t.acB, color: "#fff", fontSize: 13, fontWeight: 700,
                     opacity: groupNameInput.trim() ? 1 : 0.4, flexShrink: 0,
                   }}>保存</button>
                 <button onClick={() => { setShowGroupSave(false); setGroupNameInput(""); }} style={{
@@ -11736,7 +11960,7 @@ input, select { padding: 10px 14px; }
 
   // 局の修正モーダル（卓上モード・通常画面の両方から使う）
   const RoundEditModal = () => !showRoundEdit ? null : (
-          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto" }}>
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto" }}>
             {/* 上側（対面向き）のボタンから開いたときは、向かいの人が読める向きにする */}
             <div style={{ width: "100%", maxWidth: 400, transform: showRoundEdit === "flip" ? "rotate(180deg)" : "none" }}>
               <div style={card}>
@@ -11970,20 +12194,20 @@ input, select { padding: 10px 14px; }
               <div style={{ padding: "0 2px" }}>
                 {/* 名前は横幅いっぱいを使う（長い名前でも切れないように） */}
                 <div style={{
-                  fontSize: nameFont(players[i], 4), fontWeight: 700, color: t.tx,
+                  fontSize: nameFont(players[i], 4.6), fontWeight: 700, color: t.tx,
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  lineHeight: 1.2, textAlign: "center", width: "100%", flexShrink: 0,
+                  lineHeight: 1.15, textAlign: "center", width: "100%", flexShrink: 0,
                 }}>{players[i]}</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1cqmin", marginTop: "1cqmin" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.8cqmin", marginTop: "0.8cqmin" }}>
                   <span style={{
-                    fontSize: "3.9cqmin", fontWeight: 900, lineHeight: 1,
+                    fontSize: "4cqmin", fontWeight: 900, lineHeight: 1,
                     color: isDealer ? "#1a1a1a" : t.tx,
                     background: isDealer ? t.gd : t.sf,
                     border: `1px solid ${isDealer ? t.gd : t.bd}`,
                     borderRadius: "1.6cqmin", padding: "0.5cqmin 1cqmin", flexShrink: 0,
                   }}>{seatWind}</span>
                   <span style={{
-                    fontSize: "5.3cqmin", fontWeight: 900, lineHeight: 1.1, flexShrink: 0,
+                    fontSize: "6cqmin", fontWeight: 900, lineHeight: 1.15, flexShrink: 0, letterSpacing: "-0.02em",
                     color: score < 0 ? t.rd : t.tx, fontVariantNumeric: "tabular-nums",
                   }}>{score.toLocaleString()}</span>
                 </div>
@@ -12000,16 +12224,18 @@ input, select { padding: 10px 14px; }
                 // 指で押せる高さ（32px以上）と読める文字を確保する。
                 // 卓上モードは cqmin が基本だが、狭い画面では潰れて押せなくなるため
                 // 高さと文字だけ最低値を持たせている（大小関係は名前・点数より小さいまま）
-                width: "100%", padding: "2.4cqmin 1.2cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "1.4cqmin",
+                width: "100%", padding: "1.4cqmin 1cqmin", borderRadius: "2cqmin", cursor: "pointer", marginTop: "0.8cqmin",
                 // 余白を足した分だけ縦に潰されて文字が枠に貼りつかないよう、
                 // このボタンだけは縮まないようにしている
                 minHeight: "32px", flexShrink: 0, boxSizing: "border-box",
                 border: `1px solid ${isRiichi ? t.rd : t.bd}`,
                 background: isRiichi ? t.rd : "transparent",
                 color: isRiichi ? "#fff" : t.dm,
-                fontSize: "max(10px, 2.9cqmin)", fontWeight: 800, letterSpacing: "0.04em", whiteSpace: "nowrap",
+                // 「リーチ中・取消」は長いので、狭い画面でも枠に収まる大きさにする
+                fontSize: isRiichi ? "max(10.5px, 3.2cqmin)" : "max(12px, 3.4cqmin)",
+                fontWeight: 800, letterSpacing: isRiichi ? 0 : "0.04em", whiteSpace: "nowrap",
               }}>
-                {isRiichi ? "🔴 リーチ中 (取消)" : "リーチ"}
+                {isRiichi ? "リーチ中・取消" : "リーチ"}
               </button>
             </>
           )}
@@ -12048,7 +12274,7 @@ input, select { padding: 10px 14px; }
     const smallBtn = (v) => ({
       width: "100%", padding: "11px 6px", border: "none", borderRadius: 10,
       fontSize: 13, fontWeight: 700, cursor: "pointer", boxSizing: "border-box", lineHeight: 1.4,
-      ...(v === "p" ? { background: t.ac, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }),
+      ...(v === "p" ? { background: t.acB, color: "#fff" } : { background: t.sf, color: t.tx, border: `1px solid ${t.bd}` }),
     });
     // 順位ビューはボタンを押した側の席の人を基準にする（上のバーは対面向き）
     const rowSeat = (flip) => (((flip && PC === 4) ? 2 : 0) + seatRot) % PC;
@@ -12066,7 +12292,7 @@ input, select { padding: 10px 14px; }
       // smallBtn の width:100% が残っていると basis が枠いっぱいになってしまうので戻す
       ...smallBtn(v), width: "auto", flex: "1 1 auto", minWidth: 0, padding: "11px 4px",
       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-      fontSize: "clamp(11px, 3.2vw, 14px)",
+      fontSize: "clamp(12px, 3.7vw, 16px)",
     });
     const rankBtn = (flip) => (
       <button aria-label="順位と点差" style={{ ...barIcon("clamp(14px, 4.2vw, 17px)") }}
@@ -12127,7 +12353,7 @@ input, select { padding: 10px 14px; }
                   }}>{multiRonMax >= 3 ? "トリプルロン" : multiRonMax === 2 ? "ダブロン" : "頭ハネ"}</span>
                 </>
               ) : (
-                <span>{ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ or ホウジュウした人をタップ"}</span>
+                <span>{ronPick.length >= 2 ? "② ホウジュウした人をタップ" : "② ツモ、またはホウジュウした人をタップ"}</span>
               )}
             </div>
             {tmWinStep === "how" && ronPick.length >= 2 && (
@@ -12180,6 +12406,8 @@ input, select { padding: 10px 14px; }
             {/* 対局を保留はめったに押さないので、「アガリ入力」から離して外側に置く */}
             <button aria-label="対局を保留" style={barIcon()}
               onClick={() => {
+                // 1回押しただけで卓が消えると「対局が消えた」と思われるので、たずねてから保留する
+                if (!window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) return;
                 setSuspendedGame(snapshotGame());
                 setGameStarted(false); setHomeCat(null); setView("title");
               }}>⏸</button>
@@ -12273,9 +12501,9 @@ input, select { padding: 10px 14px; }
             <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             {tmDrawMode && (
               <button onClick={(e) => { e.stopPropagation(); applyDraw(); setTmDrawMode(false); }} style={{
-                padding: "12px 26px", borderRadius: 12, cursor: "pointer",
-                border: "none", background: t.ac, color: "#fff",
-                fontSize: 17, fontWeight: 900, letterSpacing: "0.05em",
+                padding: "2.6cqmin 4cqmin", minHeight: 36, borderRadius: 12, cursor: "pointer",
+                border: "none", background: t.acB, color: "#fff",
+                fontSize: "max(13px, 5.2cqmin)", fontWeight: 900, letterSpacing: "0.05em", whiteSpace: "nowrap",
               }}>確定</button>
             )}
             {tmWinStep === "winner" && (
@@ -12286,12 +12514,12 @@ input, select { padding: 10px 14px; }
                   if (ronPick.length === 1) { setGWinner(ronPick[0]); }
                   setTmWinStep("how");
                 }} style={{
-                  padding: "10px 14px", borderRadius: 12, cursor: "pointer",
-                  border: "none", background: t.ac, color: "#fff",
-                  fontSize: 14, fontWeight: 900, lineHeight: 1.4, whiteSpace: "nowrap",
+                  padding: "2.4cqmin 3cqmin", borderRadius: 12, cursor: "pointer",
+                  border: "none", background: t.acB, color: "#fff",
+                  fontSize: "max(12px, 4.4cqmin)", fontWeight: 900, lineHeight: 1.4, whiteSpace: "nowrap",
                 }}>{ronPick.length}人<br />で確定</button>
               ) : (
-                <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", lineHeight: 1.5, whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: "max(12px, 4.2cqmin)", fontWeight: 800, color: "#fff", lineHeight: 1.5, whiteSpace: "nowrap" }}>
                   あがった人<br />を<br />選択
                 </div>
               )
@@ -12341,7 +12569,7 @@ input, select { padding: 10px 14px; }
                   });
                 }} style={{
                   width: "100%", height: "100%", borderRadius: 16, cursor: "pointer",
-                  border: "none", background: t.ac, color: "#fff",
+                  border: "none", background: t.acB, color: "#fff",
                   display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "1cqmin",
                   padding: "2cqmin", boxSizing: "border-box", overflow: "hidden",
                 }}>
@@ -12437,7 +12665,7 @@ input, select { padding: 10px 14px; }
                 transform: `translate(-50%,-50%) rotate(${rot}deg) translateY(${offsetY}cqmin)`,
                 transition: "transform 0.4s cubic-bezier(.3,1.2,.4,1)",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                whiteSpace: "nowrap", lineHeight: 1,
+                whiteSpace: "nowrap", lineHeight: 1.25,
               });
               return (
                 <>
@@ -12459,11 +12687,11 @@ input, select { padding: 10px 14px; }
                   {/* サイコロの下: 本場・供託 */}
                   <div style={posBase(8.5)}>
                     <span style={{
-                      fontSize: "max(10px, 3.2cqmin)", fontWeight: 800,
-                      color: honba > 0 ? t.gd : "rgba(255,255,255,0.45)",
+                      fontSize: "max(11px, 3.6cqmin)", fontWeight: 800,
+                      color: honba > 0 ? t.gd : "rgba(255,255,255,0.8)",
                     }}>{honba}本場</span>
                     {riichiBets > 0 && (
-                      <span style={{ fontSize: "max(10px, 3.2cqmin)", fontWeight: 800, color: t.ac }}>
+                      <span style={{ fontSize: "max(11px, 3.6cqmin)", fontWeight: 800, color: t.ac }}>
                         供託{riichiBets}本
                       </span>
                     )}
@@ -12621,7 +12849,7 @@ input, select { padding: 10px 14px; }
 
       {/* ── Round Wizard Modal ── */}
       {showGW && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             {/* 確認画面の「訂正」から来たときは、どのステップからでも
                 やめて確認画面に戻れるようにする */}
@@ -12985,7 +13213,7 @@ input, select { padding: 10px 14px; }
 
       {/* ── Draw (Ryuukyoku) Wizard Modal ── */}
       {showDrawWiz && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -13097,7 +13325,7 @@ input, select { padding: 10px 14px; }
 
       {/* ── チョンボ ── */}
       {chomboStep && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 130, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 130, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -13220,7 +13448,7 @@ input, select { padding: 10px 14px; }
                     流局
                     {r.tenpai && r.tenpai.some(Boolean) && (
                       <span style={{ marginLeft: 4, color: t.gn }}>
-                        聴{r.tenpai.map((tp, i) => tp ? players[i]?.charAt(0) : null).filter(Boolean).join("")}
+                        （テンパイ: {r.tenpai.map((tp, i) => tp ? players[i] : null).filter(Boolean).join("・")}）
                       </span>
                     )}
                   </span>
@@ -13250,7 +13478,7 @@ input, select { padding: 10px 14px; }
 
       {/* ── Extend to Hanchan Confirm ── */}
       {showExtendConfirm && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             <div style={card}>
               <div style={{ textAlign: "center", marginBottom: 16 }}>
@@ -13268,12 +13496,16 @@ input, select { padding: 10px 14px; }
                 ))}
               </div>
               <button style={{ ...actionBtn("p"), marginBottom: 8 }} onClick={() => {
-                // Extend to hanchan
+                // 半荘戦に延長する。次の局と本場は、延長の確認を出したときに決めた続きにする
+                // （以前は必ず南1局0本場にしていて、流局で積んだ本場が消えていた）
+                const nx = extendNext || { wind: "南", dealer: 0, honba: "zero" };
                 setShowExtendConfirm(false);
+                setExtendNext(null);
                 setGameConfig(prev => ({ ...prev, matchType: "hanchan" }));
-                setRoundWind("南");
-                setDealerIdx(0);
-                setHonba(0);
+                setRoundWind(nx.wind);
+                setDealerIdx(nx.dealer);
+                if (nx.honba === "zero") setHonba(0);
+                else if (nx.honba === "plus1") setHonba(h => h + 1);
               }}>🔄 半荘戦に延長する</button>
               <button style={actionBtn()} onClick={() => {
                 setShowExtendConfirm(false);
@@ -13334,6 +13566,7 @@ input, select { padding: 10px 14px; }
           endedAt: Date.now(),
         };
         setGameHistory(prev => [...prev, rec]);
+        histRef.current = [...histRef.current, rec];
         // 卓にいた友達（個人ID登録済み）には、結果をそのまま送る
         frAutoSend(rec);
         // クラウド保存を使っているなら送る。先に未送信として控えるので、
@@ -13544,7 +13777,7 @@ input, select { padding: 10px 14px; }
                   流局
                   {r.tenpai && r.tenpai.some(Boolean) && (
                     <span style={{ marginLeft: 4, color: t.gn }}>
-                      聴{r.tenpai.map((tp, i) => tp ? players[i]?.charAt(0) : null).filter(Boolean).join("")}
+                      （テンパイ: {r.tenpai.map((tp, i) => tp ? players[i] : null).filter(Boolean).join("・")}）
                     </span>
                   )}
                 </span>
@@ -13614,7 +13847,7 @@ input, select { padding: 10px 14px; }
         })()}
 
         {/* 「終了」「再試合」をまず読ませ、説明はそのうしろに小さく置く */}
-        <button style={{ ...actionBtn("d"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }} onClick={() => {
+        <button style={{ ...actionBtn("p"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }} onClick={() => {
           const lgName = leagues.find(l => l.id === activeLeagueId)?.name;
           if (!window.confirm(
             lgName
@@ -13632,24 +13865,24 @@ input, select { padding: 10px 14px; }
           else setView("home");
         }}>
           <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>✓ 終了</span>
-          <span style={{ width: "100%", fontSize: "min(12px, 3.6vw)", fontWeight: 600, opacity: 0.9, marginTop: 2 }}>
+          <span style={{ width: "100%", fontSize: "max(12px, min(13px, 3.6vw))", fontWeight: 600, marginTop: 2 }}>
             {activeLeagueId ? "リーグに記録します" : "履歴に記録して対局を終わります"}
           </span>
         </button>
 
         {/* 再試合（リーグ対局はリーグ画面から次戦を始めるため通常対局のみ） */}
         {!activeLeagueId && (
-          <button style={{ ...actionBtn("p"), display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}
+          <button style={{ ...actionBtn(), border: `2px solid ${t.ac}`, background: "transparent", color: t.ac, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, flexWrap: "wrap" }}
             onClick={() => setRematchPick(true)}>
-            <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>🔁 再試合</span>
-            <span style={{ width: "100%", fontSize: "min(12px, 3.6vw)", fontWeight: 600, opacity: 0.9, marginTop: 2 }}>
+            <span style={{ width: "100%", fontSize: "min(20px, 6vw)", fontWeight: 900 }}>再試合</span>
+            <span style={{ width: "100%", fontSize: "max(12px, min(13px, 3.6vw))", fontWeight: 600, marginTop: 2, color: t.dm }}>
               履歴を残して同じメンバーでもう一度
             </span>
           </button>
         )}
 
         {rematchPick && (
-          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.88)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
             <div style={{ width: "100%", maxWidth: 400 }}>
               <div style={card}>
                 <div style={{ textAlign: "center", marginBottom: 14 }}>
@@ -13769,6 +14002,7 @@ input, select { padding: 10px 14px; }
   // 自分の名前を決め直す。名簿・友達に表示される名前・サーバの3つをそろえる
   const applyMyName = (nm) => {
     const before = myName;
+    renameInGroups(before, nm);
     setMyName(nm);
     try { localStorage.setItem("mj_my_name", nm); } catch {}
     // 名簿にも自分を置いておく（同じ名前が2つ並ばないようにする）
@@ -13834,7 +14068,11 @@ input, select { padding: 10px 14px; }
   const [frQueue, setFrQueue] = useState(() => {
     try { const v = JSON.parse(localStorage.getItem("mj_fr_queue") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
   });
-  const saveFrQueue = (arr) => {
+  // 控えの最新（送り直しの途中で増減しても、古い控えで上書きしないため）
+  const frQueueRef = React.useRef(frQueue);
+  const saveFrQueue = (next) => {
+    const arr = typeof next === "function" ? next(frQueueRef.current) : next;
+    frQueueRef.current = arr;
     setFrQueue(arr);
     try { localStorage.setItem("mj_fr_queue", JSON.stringify(arr)); } catch {}
   };
@@ -13877,8 +14115,16 @@ input, select { padding: 10px 14px; }
       const [fr, inb] = await Promise.all([Net.get("friends/" + uid), Net.get("inbox/" + uid)]);
       setFriendsMap(fr || {});
       syncFriendNames(fr || {});
-      const items = Object.entries(inb || {}).map(([k, v]) => ({ key: k, ...v }))
-        .sort((a, b) => (b.sentAt || 0) - (a.sentAt || 0));
+      const items = Object.entries(inb && typeof inb === "object" ? inb : {})
+        .filter(([, v]) => v && typeof v === "object")
+        .map(([k, v]) => ({
+          key: k,
+          from: typeof v.from === "string" ? v.from : "",
+          fromName: String(v.fromName == null ? "" : v.fromName).slice(0, 20),
+          sentAt: Number(v.sentAt) || 0,
+          game: v.game,
+        }))
+        .sort((a, b) => b.sentAt - a.sentAt);
       setInboxItems(items);
       // 友達から届いたぶんは、そのまま履歴に入れる（自動共有）。
       // 友達でない人から届いたものは、受信箱に置いたまま本人に選んでもらう
@@ -13929,7 +14175,13 @@ input, select { padding: 10px 14px; }
   const frAddFriend = async (codeArg, meName) => {
     const code = CODE_FROM(typeof codeArg === "string" ? codeArg : frAddInput);
     const me = meName || myName;
-    if (!code) { setFrError("6文字の個人IDを入れてください"); return; }
+    if (!code) {
+      const raw = String(typeof codeArg === "string" ? codeArg : frAddInput).normalize("NFKC").trim().toUpperCase();
+      setFrError(raw.length === 6
+        ? "個人IDに 0・1・2・I・L・O・Z は使いません。もう一度確かめてください"
+        : "6文字の個人IDを入れてください");
+      return;
+    }
     if (code === myCode) { setFrError("それはあなた自身の個人IDです"); return; }
     setFrBusy(true); setFrError(null);
     try {
@@ -13955,6 +14207,7 @@ input, select { padding: 10px 14px; }
     if (Object.entries(friendLinks).some(([k, v]) => k !== fid && v === nm)) { setFrError("その名前は別の友達に使っています"); return; }
     const before = friendLinks[fid];
     saveFriendLinks({ ...friendLinks, [fid]: nm });
+    renameInGroups(before, nm);
     // 名簿の名前もそろえる（メンバーに入れたときに同じ人だと分かるように）
     updatePresetNames(prev => (prev.includes(before)
       ? prev.map(x => (x === before ? nm : x)).filter((x, i, a) => a.indexOf(x) === i)
@@ -13997,6 +14250,11 @@ input, select { padding: 10px 14px; }
   // quiet=友達から自動で届いたぶん（増えたときだけ知らせる）
   const frImportInbox = async (items, quiet) => {
     const added = mergeIntoHistory(items.map(i => i.game));
+    // 端末に書けなかった（容量いっぱいなど）ときは、サーバ側に残して次の機会に回す
+    if (added > 0) {
+      try { localStorage.setItem("mj_history", JSON.stringify(histRef.current)); }
+      catch { setSaveFull(true); return; }
+    }
     try {
       const { uid } = await Net.ensureReady();
       for (const i of items) await Net.remove("inbox/" + uid + "/" + i.key);
@@ -14017,39 +14275,45 @@ input, select { padding: 10px 14px; }
   const frAutoSendTargets = (names) =>
     Array.from(new Set((names || []).map(fidOfName).filter(Boolean)));
 
+  // 1件を、まだ届いていない相手へ送る。送れた相手を控えから外していく
+  const frSendOne = async (uid, gameRec, fids) => {
+    let left = [...fids];
+    for (const fid of fids) {
+      await withTimeout(
+        Net.push("inbox/" + fid, { from: uid, fromName: myName, sentAt: Date.now(), game: gameRec }), 8000);
+      left = left.filter(x => x !== fid);
+      saveFrQueue(q => q.map(x => (x.id === gameRec.id ? { ...x, fids: left } : x)).filter(x => x.fids.length > 0));
+    }
+  };
+
   const frAutoSend = async (rec) => {
     if (!frAuto || !Net.enabled() || !myCode) return;
     const fids = frAutoSendTargets(rec.players);
     if (!fids.length) return;
+    // 先に控えに積んでから送る。圏外やアプリが閉じられても、次に開いたときに送り直せる
+    saveFrQueue(q => [...q.filter(x => x.id !== rec.id), { id: rec.id, fids }]);
     try {
-      const { uid } = await Net.ensureReady();
-      for (const fid of fids) {
-        await Net.push("inbox/" + fid, { from: uid, fromName: myName, sentAt: Date.now(), game: rec });
-      }
+      const { uid } = await withTimeout(Net.ensureReady(), 8000);
+      await frSendOne(uid, rec, fids);
       setFrNotice(fids.map(f => friendLinks[f]).join("、") + " さんに結果を送りました");
-    } catch {
-      // 圏外でも消さずに控えておき、次に友達画面や履歴を開いたときに送る
-      saveFrQueue(frQueue.some(q => q.id === rec.id) ? frQueue : [...frQueue, { id: rec.id, fids }]);
-    }
+    } catch {}   // 送れなかった分は控えに残る
   };
 
-  // 控えてあったぶんを送り直す
+  // 控えてあったぶんを送り直す（同時に2回走らせない）
+  const frFlushing = React.useRef(false);
   const frFlushQueue = async () => {
-    if (!frQueue.length || !frAuto || !Net.enabled() || !myCode) return;
+    if (frFlushing.current || !frQueueRef.current.length || !frAuto || !Net.enabled() || !myCode) return;
+    frFlushing.current = true;
     try {
-      const { uid } = await Net.ensureReady();
-      const rest = [];
-      for (const q of frQueue) {
-        const g = gameHistory.find(x => x.id === q.id);
-        if (!g) continue;                       // 消された対局は送らない
-        try {
-          for (const fid of q.fids) {
-            await Net.push("inbox/" + fid, { from: uid, fromName: myName, sentAt: Date.now(), game: g });
-          }
-        } catch { rest.push(q); }
+      const { uid } = await withTimeout(Net.ensureReady(), 8000);
+      for (const q of [...frQueueRef.current]) {
+        const g = histRef.current.find(x => String(x.id) === String(q.id));
+        // 消された対局は送らない
+        if (!g) { saveFrQueue(list => list.filter(x => x.id !== q.id)); continue; }
+        try { await frSendOne(uid, g, q.fids); } catch {}
       }
-      if (rest.length !== frQueue.length) saveFrQueue(rest);
     } catch {}
+    frFlushing.current = false;
   };
 
   // ══════════════════════════════════
@@ -14060,6 +14324,7 @@ input, select { padding: 10px 14px; }
   const LS = (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
   const [cloudKey, setCloudKey] = useState(() => LS("mj_cloud_key"));
   const [cloudBox, setCloudBox] = useState(() => LS("mj_cloud_box"));
+  cloudBoxRef.current = cloudBox;
   const [cloudQueue, setCloudQueue] = useState(() => {
     try { const v = JSON.parse(LS("mj_cloud_queue") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; }
   });
@@ -14123,27 +14388,27 @@ input, select { padding: 10px 14px; }
 
   // クラウドから、手元に無い対局だけを取ってくる
   const cloudPull = async (box, meta) => {
-    const have = new Set(gameHistory.map(g => String(g.id)));
+    const have = new Set(histRef.current.map(g => String(g.id)));
     // 目次がまだ無い箱（この仕組みより前に作ったもの）は、1回だけ丸ごと読んで目次を作る
     if (!meta || !meta.ids) {
       const games = (await Net.get(`box/${box}/games`)) || {};
       const ids = {};
       Object.keys(games).forEach(id => { ids[id] = 1; });
       if (Object.keys(ids).length > 0) { try { await Net.update(`box/${box}/meta/ids`, ids); } catch {} }
-      return mergeIntoHistory(Object.values(games));
+      return mergeIntoHistory(Object.values(games), true);
     }
     const missing = Object.keys(meta.ids).filter(id => !have.has(id));
     if (missing.length === 0) return 0;
     // たくさん足りないとき（引き継いだ直後など）は、1件ずつより丸ごとのほうが速い
     if (missing.length > 40) {
       const games = (await Net.get(`box/${box}/games`)) || {};
-      return mergeIntoHistory(Object.values(games));
+      return mergeIntoHistory(Object.values(games), true);
     }
     const got = [];
     for (const id of missing) {
       try { const g = await Net.get(`box/${box}/games/${id}`); if (g) got.push(g); } catch {}
     }
-    return mergeIntoHistory(got);
+    return mergeIntoHistory(got, true);
   };
 
   // 送る（未送信ぶん）と受け取る（ほかの端末が足したぶん）を1回で行う
@@ -14224,7 +14489,7 @@ input, select { padding: 10px 14px; }
       const { uid } = await Net.ensureReady();
       await Net.set(`box/${rec.box}/owners/${uid}`, true);
       const games = (await Net.get(`box/${rec.box}/games`)) || {};
-      const added = mergeIntoHistory(Object.values(games));
+      const added = mergeIntoHistory(Object.values(games), true);
       saveCloudId(key, rec.box);
       // 目次が無い箱なら、ここで作っておく
       const cloudIds = Object.keys(games);
@@ -14234,7 +14499,7 @@ input, select { padding: 10px 14px; }
         try { await Net.update(`box/${rec.box}/meta/ids`, ids); } catch {}
       }
       // 手元にしか無かった対局も、この箱へ入れておく
-      const mine = gameHistory.filter(g => !cloudIds.includes(String(g.id)));
+      const mine = histRef.current.filter(g => !cloudIds.includes(String(g.id)));
       const failed = await cloudPush(mine, rec.box);
       saveCloudQueue(failed);
       try { localStorage.setItem("mj_cloud_pulled", String(Date.now())); } catch {}
@@ -14245,6 +14510,68 @@ input, select { padding: 10px 14px; }
   };
 
   // 復元キーを自分あてに送って控える
+  // ── オンラインのデータをすべて削除 ──
+  // ストアの決まり（アカウントを作れるアプリは、アプリの中から消せること）に合わせる。
+  // 端末の中の記録・名簿は消さない（オンラインに置いた分だけを消す）
+  const [delBusy, setDelBusy] = useState(false);
+  const [delMsg, setDelMsg] = useState(null);            // { ok, text }
+  const deleteOnlineData = async () => {
+    if (!window.confirm(
+      "オンラインに保存している、あなたのデータをすべて削除します。\n\n" +
+      "・個人ID、表示名、友達のリスト、受信箱\n" +
+      "・クラウドに預けた対局の記録\n\n" +
+      "この端末の中の対局記録や名簿は消えません。\n" +
+      "友達の端末にすでに届いている記録は、友達の端末に残ります。\n\n" +
+      "削除してよろしいですか？"
+    )) return;
+    setDelBusy(true); setDelMsg(null);
+    let uid = null;
+    try { uid = (await withTimeout(Net.ensureReady(), 15000)).uid; }
+    catch { setDelBusy(false); setDelMsg({ ok: false, text: NET_FAIL }); return; }
+    const fails = [];
+    const step = async (label, fn) => { try { await withTimeout(fn(), 20000); } catch { fails.push(label); } };
+    await step("友達のリスト", async () => {
+      const fr = (await Net.get("friends/" + uid)) || {};
+      for (const fid of Object.keys(fr)) {
+        await Net.remove("friends/" + fid + "/" + uid);    // 相手のリストからも外れる
+        await Net.remove("friends/" + uid + "/" + fid);
+      }
+    });
+    await step("受信箱", async () => {
+      const inb = (await Net.get("inbox/" + uid)) || {};
+      for (const k of Object.keys(inb)) await Net.remove("inbox/" + uid + "/" + k);
+    });
+    if (cloudBox) {
+      await step("クラウドの記録", async () => {
+        await Net.remove(`box/${cloudBox}/games`);
+        await Net.remove(`box/${cloudBox}/meta`);
+        if (cloudKey) await Net.remove(`keys/${await sha256Hex(KEY_NORM(cloudKey))}`);
+        await Net.remove(`box/${cloudBox}/owners/${uid}`);
+      });
+    }
+    if (myCode) {
+      await step("個人ID", async () => {
+        await Net.remove("codes/" + myCode);
+        await Net.remove("users/" + uid);
+      });
+    }
+    if (fails.length) {
+      // 途中で止まったときは、手元の控えを残しておく（もう一度押せば続きから消せる）
+      setDelBusy(false);
+      setDelMsg({ ok: false, text: fails.join("・") + " を消せませんでした。電波のよいところで、もう一度お試しください。" });
+      return;
+    }
+    try { if (Net.deleteUser) await withTimeout(Net.deleteUser(), 10000); } catch {}
+    // 端末に残っている、オンライン用の控えを片づける
+    ["mj_my_code", "mj_friend_link", "mj_fr_queue", "mj_cloud_key", "mj_cloud_box", "mj_cloud_queue", "mj_cloud_pulled"]
+      .forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    setMyCode(""); setFriendsMap({}); setInboxItems(null); setMyQR(null);
+    saveFriendLinks({}); saveFrQueue([]);
+    setCloudKey(""); setCloudBox(""); saveCloudQueue([]);
+    setDelBusy(false);
+    setDelMsg({ ok: true, text: "オンラインのデータをすべて削除しました。この端末の記録はそのまま残っています。" });
+  };
+
   const shareRestoreKey = () => shareLink(
     "卓上ポンづけ｜復元キー",
     `卓上ポンづけの復元キーです。機種を変えたときにこれを入れると、対局の記録を引き継げます。人に見せないでください。\n${KEY_VIEW(cloudKey)}`,
@@ -14302,7 +14629,7 @@ input, select { padding: 10px 14px; }
         });
         const qr = window.qrcode(0, "M");
         qr.addData(FRIEND_LINK(myCode)); qr.make();
-        if (!dead) setMyQR(qr.createSvgTag({ cellSize: 3, margin: 0 }));
+        if (!dead) setMyQR(qr.createSvgTag({ cellSize: 5, margin: 0 }));
       } catch {}
     })();
     return () => { dead = true; };
@@ -14467,6 +14794,11 @@ input, select { padding: 10px 14px; }
             style={{ ...actionBtn("p"), marginBottom: 0, opacity: frBusy ? 0.5 : 1 }}>
             {frBusy ? "登録しています…" : "この名前で登録する"}
           </button>
+          {/* ここで初めて端末の外（サーバ）へ送るので、扱いを確かめられるようにする */}
+          <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
+            登録すると、表示名と個人IDがサーバ（Google Firebase）に保存されます。
+            <a href="privacy.html" target="_blank" rel="noopener" style={{ color: t.ac, display: "inline-block" }}>プライバシーポリシー</a>
+          </div>
           {pend && (
             <div style={{ fontSize: 12, color: t.ac, fontWeight: 700, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
               登録すると、そのまま個人ID「{pend}」の人と友達になります
@@ -14505,11 +14837,11 @@ input, select { padding: 10px 14px; }
             </button>
             <div style={{ fontSize: 11, color: t.dm, marginBottom: 6 }}>個人IDを入力して追加</div>
             <div style={{ display: "flex", gap: 8 }}>
-              <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.toUpperCase())} maxLength={6}
+              <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.normalize("NFKC").toUpperCase())} maxLength={6}
                 placeholder="例）ABC345" autoCapitalize="characters" autoCorrect="off"
                 style={{ ...frInput, flex: 1, minWidth: 0, letterSpacing: "0.12em", fontWeight: 700 }} />
               <button disabled={frBusy} onClick={() => frAddFriend()}
-                style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
+                style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.acB, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
             </div>
             <div style={{ fontSize: 11, color: t.dm, lineHeight: 1.8, marginTop: 10, textWrap: "balance" }}>
               友達から届いた追加リンクを開いても、この欄に入ります。
@@ -14546,7 +14878,7 @@ input, select { padding: 10px 14px; }
                             <input value={frEditInput} onChange={(e) => setFrEditInput(e.target.value)} maxLength={10}
                               style={{ ...frInput, flex: 1, minWidth: 0 }} />
                             <button onClick={() => frSetAlias(fid)}
-                              style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700 }}>保存</button>
+                              style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.acB, color: "#fff", fontSize: 13, fontWeight: 700 }}>保存</button>
                           </div>
                         </div>
                       )}
@@ -14578,7 +14910,7 @@ input, select { padding: 10px 14px; }
         }}>{label}</button>
     );
     return (
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.92)", zIndex: 160, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 160, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
         <div style={{ width: "100%", maxWidth: 400 }}>
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -14740,7 +15072,7 @@ input, select { padding: 10px 14px; }
                 style={{ ...frInput, flex: 1, minWidth: 0 }} />
               <button onClick={doAddName} disabled={!newNameInput.trim()} style={{
                 flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none",
-                background: newNameInput.trim() ? t.ac : t.bd, color: "#fff", fontSize: 13, fontWeight: 700,
+                background: newNameInput.trim() ? t.acB : t.bd, color: "#fff", fontSize: 13, fontWeight: 700,
               }}>追加</button>
             </div>
             {nameErr && (
@@ -14795,11 +15127,11 @@ input, select { padding: 10px 14px; }
                   相手の個人ID（6文字）を聞いているなら、ここに入れても追加できます。
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.toUpperCase())} maxLength={6}
+                  <input value={frAddInput} onChange={(e) => setFrAddInput(e.target.value.normalize("NFKC").toUpperCase())} maxLength={6}
                     placeholder="例）ABC345" autoCapitalize="characters" autoCorrect="off"
                     style={{ ...frInput, flex: 1, minWidth: 0, letterSpacing: "0.12em", fontWeight: 700 }} />
                   <button disabled={frBusy} onClick={() => frAddFriend()}
-                    style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
+                    style={{ flex: "0 0 64px", borderRadius: 10, cursor: "pointer", border: "none", background: t.acB, color: "#fff", fontSize: 13, fontWeight: 700, opacity: frBusy ? 0.5 : 1 }}>追加</button>
                 </div>
                 {frError && (
                   <div style={{ fontSize: 12, color: t.rd, fontWeight: 700, lineHeight: 1.8, marginTop: 8, textWrap: "balance" }}>{frError}</div>
@@ -14856,7 +15188,7 @@ input, select { padding: 10px 14px; }
     const games = gameHistory.filter(g => sendPick.ids.includes(g.id));
     const fids = Object.keys(friendsMap);
     return (
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)", overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
         <div style={{ width: "100%", maxWidth: 400 }}>
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -14874,7 +15206,7 @@ input, select { padding: 10px 14px; }
                 <button key={fid} onClick={() => setSendSel(prev => on ? prev.filter(x => x !== fid) : [...prev, fid])}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "12px 12px", marginBottom: 8, borderRadius: 10, cursor: "pointer", textAlign: "left",
                     border: on ? `2px solid ${t.ac}` : `1px solid ${t.bd}`, background: on ? t.acS : t.sf, color: t.tx, boxSizing: "border-box" }}>
-                  <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, border: `2px solid ${on ? t.ac : t.bd}`, background: on ? t.ac : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1 }}>{on ? "✓" : ""}</span>
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", flexShrink: 0, border: `2px solid ${on ? t.ac : t.bd}`, background: on ? t.acB : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1 }}>{on ? "✓" : ""}</span>
                   <span style={{ fontSize: 14, fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friendsMap[fid].name}</span>
                 </button>
               );
@@ -15038,12 +15370,12 @@ input, select { padding: 10px 14px; }
                       <span style={{ flex: 1, minWidth: 0, fontSize: 12, lineHeight: 1.6 }}>
                         <span style={{ fontWeight: 700 }}>{it.fromName}</span> さんから
                         <span style={{ display: "block", color: t.dm, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {it.game?.date} {MATCH_LABEL_SHORT(it.game?.matchType)} — {(it.game?.players || []).join("・")}
+                          {String(it.game?.date || "")} {MATCH_LABEL_SHORT(String(it.game?.matchType || ""))} — {(Array.isArray(it.game?.players) ? it.game.players : []).map(x => String(x)).join("・")}
                         </span>
                       </span>
                       <button onClick={() => frImportInbox([it])} style={{
                         flexShrink: 0, minHeight: 38, padding: "10px 12px", borderRadius: 8, cursor: "pointer",
-                        border: "none", background: t.ac, color: "#fff", fontSize: 12, fontWeight: 700,
+                        border: "none", background: t.acB, color: "#fff", fontSize: 12, fontWeight: 700,
                       }}>取り込む</button>
                     </div>
                   ))}
@@ -15125,7 +15457,7 @@ input, select { padding: 10px 14px; }
                       {histSelMode && (
                         <span style={{
                           width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                          border: `2px solid ${sel ? t.ac : t.bd}`, background: sel ? t.ac : "transparent",
+                          border: `2px solid ${sel ? t.ac : t.bd}`, background: sel ? t.acB : "transparent",
                           display: "inline-flex", alignItems: "center", justifyContent: "center",
                           color: "#fff", fontSize: 12, fontWeight: 900, lineHeight: 1,
                         }}>{sel ? "✓" : ""}</span>
@@ -15217,6 +15549,10 @@ input, select { padding: 10px 14px; }
                         border: `1px solid ${t.bd}`, background: t.sf, color: t.tx,
                         fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
                       }}>別の端末から引き継ぐ</button>
+                      <div style={{ fontSize: 12, color: t.dm, lineHeight: 1.8, textWrap: "balance" }}>
+                        はじめると、対局の記録がサーバ（Google Firebase）にも保存されます。
+                        <a href="privacy.html" target="_blank" rel="noopener" style={{ color: t.ac, display: "inline-block" }}>プライバシーポリシー</a>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -15237,7 +15573,7 @@ input, select { padding: 10px 14px; }
                       <div style={{ display: "flex", gap: 8 }}>
                         <button disabled={cloudBusy} onClick={cloudRestore} style={{
                           flex: 1, minWidth: 0, minHeight: 42, padding: "11px 6px", borderRadius: 10, cursor: "pointer",
-                          border: "none", background: t.ac, color: "#fff", fontSize: 13, fontWeight: 700,
+                          border: "none", background: t.acB, color: "#fff", fontSize: 13, fontWeight: 700,
                           opacity: cloudBusy ? 0.5 : 1, whiteSpace: "nowrap",
                         }}>{cloudBusy ? "確認中…" : "引き継ぐ"}</button>
                         <button disabled={cloudBusy} onClick={() => { setCloudRestoring(false); setCloudKeyInput(""); setCloudMsg(null); }} style={{
@@ -15349,7 +15685,7 @@ input, select { padding: 10px 14px; }
 
           {/* 集計結果 */}
           {histAgg && (
-            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.9)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(12,17,23,0.98)", zIndex: 150, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", paddingTop: 'calc(env(safe-area-inset-top, 0px) + 20px)', paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 20px)', overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
               <div style={{ width: "100%", maxWidth: 400 }}>
                 <div style={card}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -15475,7 +15811,7 @@ input, select { padding: 10px 14px; }
                     流局
                     {r.tenpai && r.tenpai.some(Boolean) && (
                       <span style={{ marginLeft: 4, color: t.gn }}>
-                        聴{r.tenpai.map((tp, i) => tp ? historyDetail.players[i]?.charAt(0) : null).filter(Boolean).join("")}
+                        （テンパイ: {r.tenpai.map((tp, i) => tp ? historyDetail.players[i] : null).filter(Boolean).join("・")}）
                       </span>
                     )}
                   </span>
@@ -15494,6 +15830,79 @@ input, select { padding: 10px 14px; }
       )}
     </div>
   );
+
+  // ══════════════════════════════════
+  // ── Android の戻るボタン ──
+  // ══════════════════════════════════
+  // ストア版（TWA）では、本体の戻るボタンが「ブラウザの戻る」になる。何もしないと
+  // どの画面でもアプリが閉じてしまうので、1つ前の画面に戻すようにする。
+  // メニュー（題字・トップ）では今までどおり閉じる。
+  const appBackRef = React.useRef(() => false);
+  appBackRef.current = () => {
+    // 開いている小さな画面を先に閉じる
+    if (qrOpen) { setQrOpen(false); return true; }
+    if (sendPick) { setSendPick(null); setSendSel([]); return true; }
+    if (showInstall) { setShowInstall(false); return true; }
+    if (rematchPick) { setRematchPick(false); return true; }
+    // 終局画面はまだ記録前。戻ると結果が宙に浮くので止めて、記録のしかたを伝える
+    if (view === "game" && gameStarted && gameFinished) {
+      window.alert("この結果はまだ記録されていません。\n画面の「✓ 終了」を押すと履歴に記録されます。");
+      return true;
+    }
+    if (view === "history" && historyDetail) { setHistoryDetail(null); return true; }
+    // 画面に「← 戻る」があれば、それを押したのと同じにする（入力の途中も1段ずつ戻れる）
+    const back = [...document.querySelectorAll("button")]
+      .find(b => b.offsetParent !== null && /^←\s*戻る/.test((b.textContent || "").trim()));
+    if (back) { back.click(); return true; }
+    // 卓上の入力（アガリ・流局など）の途中なら、その入力をやめる
+    if (view === "game" && gameStarted) {
+      const cancel = [...document.querySelectorAll("button")]
+        .find(b => b.offsetParent !== null && (b.textContent || "").trim() === "キャンセル");
+      if (cancel) { cancel.click(); return true; }
+    }
+    // 対局中に戻ると対局が消えたように見えるので、保留してメニューへ戻るかたずねる
+    if (view === "game" && gameStarted) {
+      if (window.confirm("対局を保留して、メニューに戻りますか？\n（メニューの「対局のつづきを再開」から戻れます）")) {
+        setSuspendedGame(snapshotGame());
+        setGameStarted(false);
+        setView("home");
+      }
+      return true;
+    }
+    if (view === "home") {
+      if (homeCat !== null) { setHomeCat(null); return true; }
+      return false;
+    }
+    if (view === "title") return false;
+    setView("home");
+    return true;
+  };
+  // 画面を移ったら先頭から見せる（前の画面のスクロール位置のまま開くと、見出しが見えない）。
+  // 対局の画面は卓の固定があるので触らない
+  React.useEffect(() => {
+    if (view === "game") return;
+    try { window.scrollTo(0, 0); } catch {}
+  }, [view, homeCat]);
+
+  // メニュー以外にいるあいだは、履歴を1つ積んでおく（戻るボタンをアプリで受け止めるため）
+  const needBackGuard = !(view === "title" || (view === "home" && homeCat === null))
+    || qrOpen || !!sendPick || showInstall;
+  const [backTick, setBackTick] = useState(0);
+  React.useEffect(() => {
+    if (!needBackGuard) return;
+    try {
+      if (!history.state || history.state.mj !== "guard") history.pushState({ mj: "guard" }, "");
+    } catch {}
+  }, [needBackGuard, backTick]);
+  React.useEffect(() => {
+    const onPop = () => {
+      try { appBackRef.current(); } catch {}
+      // 戻ったあとも、まだメニュー以外なら積み直す（上の見張りが動くように合図する）
+      setBackTick(n => n + 1);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   return (
     <>
@@ -15536,10 +15945,29 @@ input, select { padding: 10px 14px; }
                 cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
               }}>← 戻る</button>
           ) : <span style={{ width: 62, flexShrink: 0 }} />}
-          <h1 style={{ flex: 1, fontSize: 17, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer" }}
+          <h1 style={{ flex: 1, minWidth: 0, fontSize: "clamp(14px, 4.6vw, 17px)", fontWeight: 800, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", whiteSpace: "nowrap" }}
             onClick={() => { setHomeCat(null); setView("title"); }}>🀄 <span>卓上ポンづけ</span></h1>
           <span style={{ width: 62, flexShrink: 0 }} />
         </div>
+        )}
+        {/* 端末に記録を書けなかったときは、どの画面でも分かるように出す（対局中と題字は除く） */}
+        {saveFull && view !== "title" && view !== "game" && (
+          <div style={{
+            margin: "10px 14px 0", padding: "11px 12px", borderRadius: 10,
+            background: t.rdS, border: `1px solid ${t.rd}66`, color: t.tx, fontSize: 13, lineHeight: 1.8,
+          }}>
+            <div style={{ fontWeight: 800, color: t.rd }}>⚠ 対局の記録を保存できませんでした</div>
+            <div style={{ textWrap: "balance" }}>
+              端末の保存領域がいっぱいです。このままアプリを閉じると、最近の記録が消えることがあります。
+              「対局履歴」の下にある「データのバックアップ」から書き出して控えてください。
+            </div>
+            {view !== "history" && (
+              <button onClick={() => { setActiveLeagueId(null); setView("history"); }} style={{
+                marginTop: 8, minHeight: 40, padding: "9px 14px", borderRadius: 9, cursor: "pointer",
+                border: `1px solid ${t.rd}`, background: "transparent", color: t.rd, fontSize: 13, fontWeight: 800,
+              }}>対局履歴を開く</button>
+            )}
+          </div>
         )}
         {view === "title" && renderTitle()}
         {view === "home" && renderHome()}

@@ -47,102 +47,28 @@ const FIREBASE_CONFIG = {
 
 ## 3. セキュリティルール（ルールタブに貼るJSON）
 
-**貼り替えるときは `dev/firebase-rules.json` を丸ごとコピーするのが確実。**
-下の2つ（既存ぶん・クラウド保存ぶん）を合わせたものが、そのファイルに入っている。
+**`dev/firebase-rules.json` を丸ごとコピーして、ルールタブに貼り「公開」する。**
+（以前はここにJSONを載せていたが、二重管理でずれるのでファイル1つにまとめた）
 
-
-```json
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['name', 'code'])",
-        "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
-        "code": { ".validate": "newData.isString() && newData.val().length === 6" },
-        "createdAt": { ".validate": "newData.isNumber()" },
-        "$other": { ".validate": false }
-      }
-    },
-    "codes": {
-      "$code": {
-        ".read": "auth != null",
-        ".write": "auth != null && !data.exists() && newData.val() === auth.uid"
-      }
-    },
-    "friends": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        "$fid": {
-          ".write": "auth != null && (auth.uid === $uid || auth.uid === $fid)",
-          ".validate": "newData.hasChildren(['name', 'addedAt'])",
-          "name": { ".validate": "newData.isString() && newData.val().length <= 20" },
-          "addedAt": { ".validate": "newData.isNumber()" },
-          "$other": { ".validate": false }
-        }
-      }
-    },
-    "inbox": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        "$item": {
-          ".write": "auth != null && ((newData.exists() && newData.child('from').val() === auth.uid) || (!newData.exists() && auth.uid === $uid))",
-          ".validate": "newData.hasChildren(['from', 'fromName', 'sentAt', 'game'])"
-        }
-      }
-    }
-  }
-}
-```
-
-**クラウド保存（復元キー）を使うときは、上のJSONの `"rules"` の中に次の2つを足す。**
-足さないと、アプリが「サーバのルールが古いようです」と出して先へ進めない。
-
-```json
-"keys": {
-  "$k": {
-    ".read":  "auth != null",
-    ".write": "auth != null && !data.exists()",
-    ".validate": "newData.hasChildren(['box','createdAt'])",
-    "box":       { ".validate": "newData.isString() && newData.val().length === 24" },
-    "createdAt": { ".validate": "newData.isNumber()" },
-    "$other":    { ".validate": false }
-  }
-},
-"box": {
-  "$box": {
-    "owners": {
-      "$uid": {
-        ".read":  "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid && newData.val() === true"
-      }
-    },
-    "games": {
-      ".read":  "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()",
-      "$gid": {
-        ".write": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()"
-      }
-    },
-    "meta": {
-      ".read":  "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()",
-      ".write": "auth != null && root.child('box/'+$box+'/owners/'+auth.uid).exists()"
-    }
-  }
-}
-```
-
-クラウド保存のルールの意味:
-- `keys` は親を読めないので**一覧が取れない**。復元キーを知っている人だけが1件を引ける
-- `!data.exists()` により、**すでにあるキーの行き先は書き換えられない**
-- 箱の中身は、**持ち主として登録された端末しか読み書きできない**
-- キーそのものはサーバに置かない。置くのは SHA-256 の16進だけ
+> **2026-10-29 改訂（必ず貼り直すこと）**
+> - 「オンラインのデータをすべて削除」（設定 → このアプリについて）のため、
+>   本人が 個人ID（codes）・復元キー（keys）・箱の持ち主（owners）・箱の対局（games）を消せるようにした。
+>   貼り直すまでは、削除ボタンが「〜を消せませんでした」と出て最後まで消えない。
+> - 受信箱（inbox）は、**受け取る人の友達リストに入っている人からだけ**書き込めるようにした。
+>   あわせて、差出人の名前（20文字まで）と対局の形（名前・点数が入っている）を確かめる。
 
 ルールの意味:
 - 自分のプロフィール・友達リスト・受信箱は本人しか書けない／受信箱と友達リストは本人しか読めない
-- 友達コード（codes）は「空きコードを自分のuidで1回だけ確保」しかできない
-- 他人の受信箱には「差出人＝自分」の対局しか入れられない。削除は受け取った本人のみ
+  - 友達の追加は「片方が追加すればお互いのリストに入る」ため、相手のリストの自分の行だけは書ける
+- 個人ID（codes）は「空きコードを自分のuidで確保」と「自分のコードを消す」だけができる
+- 他人の受信箱には「差出人＝自分」かつ「相手の友達リストに自分がいる」ときだけ対局を入れられる。削除は受け取った本人のみ
 - ルート直下はすべて拒否（部屋の一覧取得のようなことはできない）
+
+クラウド保存のルールの意味:
+- `keys` は親を読めないので**一覧が取れない**。復元キーを知っている人だけが1件を引ける
+- すでにあるキーの行き先は書き換えられない。消せるのは、その箱の持ち主だけ
+- 箱の中身は、**持ち主として登録された端末しか読み書きできない**
+- キーそのものはサーバに置かない。置くのは SHA-256 の16進だけ
 
 ## 4. 動作確認（スマホ2台で）
 

@@ -6,8 +6,8 @@
 //
 // ★ このファイルは手で置いているが、下の2行は build.js が書き替える。
 //   VERSION が変わると新しい入れ物に入れ直し、古いものは捨てる。
-const VERSION = "a13da6d06585";
-const EXTRA = ["https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js","https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"];   // React など、外から読み込むもの（build.js が入れる）
+const VERSION = "2fcd41798b12";
+const EXTRA = [];   // React など、外から読み込むもの（build.js が入れる）
 
 const CACHE = "ponzuke-" + VERSION;
 
@@ -21,6 +21,8 @@ const SHELL = [
   "./apple-touch-icon.png",
   "./assets/table.jpg",
   "./assets/intro.jpg",
+  "./vendor/react.production.min.js",
+  "./vendor/react-dom.production.min.js",
 ];
 
 // あとから取っておく先（フォント・音声）。本体とは別の入れ物にして、
@@ -81,18 +83,29 @@ self.addEventListener("fetch", (e) => {
 
   // アプリを開くとき。?fr=… が付いていても同じ本体を返す
   if (req.mode === "navigate") {
+    // アプリ本体（入口の / と index.html）だけを本体として扱う。
+    // プライバシーポリシーなど別のページを本体として取っておくと、圏外で開いたときに
+    // アプリの代わりにそのページが出てしまう
+    const scopePath = new URL(self.registration.scope).pathname;
+    const isApp = url.pathname === scopePath || url.pathname === scopePath + "index.html";
+    if (!isApp) {
+      e.respondWith(fetch(req).catch(async () => (await caches.match(req)) || Response.error()));
+      return;
+    }
     e.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        if (fresh && fresh.ok) {
-          const cache = await caches.open(CACHE);
-          try { await cache.put("./index.html", fresh.clone()); } catch {}
-          return fresh;
-        }
-      } catch {}
-      // 圏外・サーバが落ちているとき
       const cache = await caches.open(CACHE);
-      return (await cache.match("./index.html")) || (await cache.match("./")) || Response.error();
+      // 新しい版を取りに行きつつ、電波が弱くて3秒待っても来なければ取っておいた本体で開く
+      const net = fetch(req).then(async (res) => {
+        if (res && res.ok) { try { await cache.put("./index.html", res.clone()); } catch {} }
+        return res;
+      });
+      try {
+        const fresh = await Promise.race([net, new Promise((_, ng) => setTimeout(() => ng(new Error("slow")), 3000))]);
+        if (fresh && fresh.ok) return fresh;
+      } catch {}
+      const hit = (await cache.match("./index.html")) || (await cache.match("./"));
+      if (hit) return hit;
+      try { return await net; } catch { return Response.error(); }
     })());
     return;
   }

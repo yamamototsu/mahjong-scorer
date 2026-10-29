@@ -44,7 +44,7 @@ const html = `<!DOCTYPE html>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="preload" as="image" href="assets/intro.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 html,body{margin:0;padding:0;background:#0c1117;-webkit-tap-highlight-color:transparent;overscroll-behavior-y:contain}
 *,*::before,*::after{box-sizing:border-box}
@@ -54,14 +54,55 @@ input,select{font-family:inherit}
 </head>
 <body>
 <div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script>
+// 部品が読めなかったとき（通信が切れた初回など）は、真っ黒のままにせず一言出す
+if (!window.React || !window.ReactDOM) {
+  document.getElementById("root").innerHTML =
+    '<div style="color:#e6edf6;padding:48px 24px;font:16px/1.9 sans-serif;text-align:center">' +
+    'アプリを読み込めませんでした。<br>電波のよいところで、もう一度開いてください。</div>';
+}
+</script>
 <script>
 const { useState, useCallback, useMemo } = React;
 
 ${out.code}
 
-ReactDOM.render(React.createElement(MahjongScorer), document.getElementById("root"));
+// 画面のどこかで思わぬエラーが起きても、真っ白にせず立て直せるようにする
+class AppGuard extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err) { try { console.error(err); } catch (e) {} }
+  render() {
+    if (!this.state.err) return this.props.children;
+    const h = React.createElement;
+    // 記録は端末に残っているので、念のため書き出せるようにしておく（バックアップと同じ形）
+    const save = () => {
+      try {
+        const data = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(),
+          history: JSON.parse(localStorage.getItem("mj_history") || "[]") }, null, 2);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([data], { type: "application/json" }));
+        a.download = "ponzuke-backup.json";
+        document.body.appendChild(a); a.click(); a.remove();
+      } catch (e) {}
+    };
+    const btn = (label, onClick, main) => h("button", { onClick, style: {
+      display: "block", width: "100%", margin: "12px 0 0", padding: "15px 12px", borderRadius: 12,
+      border: main ? "none" : "1px solid #2a3442", background: main ? "#2f6fd6" : "transparent",
+      color: main ? "#fff" : "#e6edf6", fontSize: 16, fontWeight: 700 } }, label);
+    return h("div", { style: { maxWidth: 420, margin: "0 auto", padding: "56px 24px", color: "#e6edf6",
+        fontFamily: "sans-serif", lineHeight: 1.9 } },
+      h("div", { style: { fontSize: 20, fontWeight: 800, marginBottom: 8 } }, "うまく表示できませんでした"),
+      h("div", { style: { fontSize: 15, color: "#9fb0c6" } },
+        "対局の記録は端末に残っています。もう一度開いてみてください。直らないときは、記録を書き出して控えておけます。"),
+      btn("もう一度開く", () => location.reload(), true),
+      btn("記録を書き出す", save, false));
+  }
+}
+
+ReactDOM.render(React.createElement(AppGuard, null, React.createElement(MahjongScorer)), document.getElementById("root"));
 </script>
 </body>
 </html>`;
@@ -84,13 +125,18 @@ if (fs.existsSync(swPath)) {
   fs.writeFileSync(swPath, sw);
 }
 
-// ローカル検証用（CDN・Google Fontsに繋がない）
+// React はリポジトリの vendor/ に同梱する（初回に圏外・CDNが落ちていても開けるように）。
+// 無ければこの開発環境の node_modules から入れる
+const vendorDir = path.join(repo, 'vendor');
+if (!fs.existsSync(vendorDir)) fs.mkdirSync(vendorDir);
+for (const [pkg, file] of [['react', 'react.production.min.js'], ['react-dom', 'react-dom.production.min.js']]) {
+  const dst = path.join(vendorDir, file);
+  if (!fs.existsSync(dst)) fs.copyFileSync(path.join(__dirname, 'node_modules', pkg, 'umd', file), dst);
+}
+
+// ローカル検証用（Google Fontsに繋がない）。React は同じ vendor/ を使う
 const local = html
-  .replace('https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js',
-           'file://' + path.join(__dirname, 'node_modules/react/umd/react.production.min.js'))
-  .replace('https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js',
-           'file://' + path.join(__dirname, 'node_modules/react-dom/umd/react-dom.production.min.js'))
-  .replace('<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet">', '');
+  .replace(`<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">`, '');
 fs.writeFileSync(path.join(repo, 'local.html'), local);
 
 console.log('build OK:', Math.round(out.code.length / 1024) + 'KB JS →', path.join(repo, 'index.html'), '/ local.html');
